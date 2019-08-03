@@ -323,6 +323,7 @@
     </ClInclude>
     <ClInclude Include="vid_uwp.h" />
     <ClInclude Include="sys_uwp.h" />
+    <ClInclude Include="virtualkeymap.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\LockScreenLogo.scale-200.png" />

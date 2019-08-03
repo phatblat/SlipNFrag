@@ -4,6 +4,7 @@
 #include <Windows.UI.Xaml.Media.DXInterop.h>
 #include "vid_uwp.h"
 #include "sys_uwp.h"
+#include "virtualkeymap.h"
 
 using namespace winrt;
 using namespace DirectX;
@@ -23,6 +24,7 @@ using namespace Windows::UI::Popups;
 using namespace Windows::UI::ViewManagement;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
+using namespace Windows::UI::Xaml::Input;
 using namespace Windows::UI::Xaml::Media;
 using namespace Windows::UI::Xaml::Media::Imaging;
 
@@ -301,6 +303,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 					return;
 				}
 				Window::Current().CoreWindow().PointerCursor(nullptr);
+				Window::Current().CoreWindow().KeyDown([](IInspectable const&, KeyEventArgs const& e)
+					{
+						auto mapped = virtualkeymap[(int)e.VirtualKey()];
+						Key_Event(mapped, true);
+					});
+				Window::Current().CoreWindow().KeyUp([](IInspectable const&, KeyEventArgs const& e)
+					{
+						auto mapped = virtualkeymap[(int)e.VirtualKey()];
+						Key_Event(mapped, false);
+					});
 				ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
 				renderLoopWorker = ThreadPool::RunAsync([=](IAsyncAction const& action)
 					{
@@ -1172,7 +1184,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		screenUpload->SetName(L"screenUpload");
 		screenUploadLocation.pResource = screenUpload.get();
 		d3dDevice->GetCopyableFootprints(&screenTextureDesc, 0, 1, 0, &screenLocation.PlacedFootprint, nullptr, nullptr, nullptr);
-		newRowbytes = screenLocation.PlacedFootprint.Footprint.RowPitch;
+		newRowbytes = (float)screenLocation.PlacedFootprint.Footprint.RowPitch;
 	}
 
 	void MainPage::UpdateModelViewProjectionMatrix(XMFLOAT4X4 const& orientationTransform3D)
