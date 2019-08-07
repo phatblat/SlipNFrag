@@ -146,7 +146,7 @@ void entity_t::Clear()
 	update_type = 0;
 	memset(&baseline, 0, sizeof(baseline));
 	msgtime = 0;
-	memset(&msg_origins, 0, sizeof(msg_origins));
+	memset(msg_origins, 0, sizeof(msg_origins));
 	memset(origin, 0, sizeof(origin));
 	memset(msg_angles, 0, sizeof(msg_angles));
 	memset(angles, 0, sizeof(angles));

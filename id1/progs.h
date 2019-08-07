@@ -62,7 +62,6 @@ extern	float			*pr_globals;			// same as pr_global_struct
 extern	int				pr_edict_size;	// in bytes
 
 extern int pr_string_pool_index;
-extern int pr_string_pool_used;
 
 //============================================================================
 

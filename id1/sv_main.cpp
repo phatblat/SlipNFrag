@@ -46,7 +46,7 @@ void server_t::Clear()
     sound_precache.clear();
     num_edicts = 0;
     memset(edicts.data(), 0, edicts.size());
-    memset(&state, 0, sizeof(state));
+	state = ss_loading;
     datagram.Clear();
     reliable_datagram.Clear();
     signon.Clear();
