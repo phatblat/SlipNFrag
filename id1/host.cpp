@@ -201,7 +201,10 @@ void	Host_FindMaxClients (void)
 	if (limit < 4)
 		limit = 4;
 	svs.clients.resize(limit);
-    memset(svs.clients.data(), 0, limit * sizeof(struct client_s));
+	for (auto& client : svs.clients)
+	{
+		client.Clear();
+	}
 	if (svs.maxclients > 1)
 		Cvar_SetValue ("deathmatch", 1.0);
 	else
@@ -489,7 +492,10 @@ void Host_ShutdownServer(qboolean crash)
 // clear structures
 //
     sv.Clear();
-	memset (svs.clients.data(), 0, svs.clients.size()*sizeof(client_t));
+	for (auto& client : svs.clients)
+	{
+		client.Clear();
+	}
 }
 
 

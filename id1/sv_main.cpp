@@ -52,6 +52,27 @@ void server_t::Clear()
     signon.Clear();
 }
 
+void client_t::Clear()
+{
+	active = false;
+	spawned = false;
+	dropasap = false;
+	privileged = false;
+	sendsignon = false;
+	last_message = 0;
+	netconnection = nullptr;
+	memset(&cmd, 0, sizeof(cmd));
+	memset(wishdir, 0, sizeof(wishdir));
+	message.Clear();
+	edict = nullptr;
+	memset(name, 0, sizeof(name));
+	colors = 0;
+	memset(ping_times, 0, sizeof(ping_times));
+	num_pings = 0;
+	memset(spawn_parms, 0, sizeof(spawn_parms));
+	old_frags = 0;
+}
+
 //============================================================================
 
 /*
@@ -283,7 +304,7 @@ void SV_ConnectClient (int clientnum)
 	
 	if (sv.loadgame)
 		memcpy (spawn_parms, client->spawn_parms, sizeof(spawn_parms));
-	memset (client, 0, sizeof(*client));
+	client->Clear();
 	client->netconnection = netconnection;
 
 	strcpy (client->name, "unconnected");

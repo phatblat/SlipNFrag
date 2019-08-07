@@ -275,7 +275,7 @@ entity_t *CL_NewTempEntity (void)
 		return NULL;
     }
 	ent = &cl_temp_entities[num_temp_entities];
-	memset (ent, 0, sizeof(*ent));
+	ent->Clear();
 	num_temp_entities++;
     cl_visedicts.push_back(ent);
 

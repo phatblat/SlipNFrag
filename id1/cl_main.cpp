@@ -123,7 +123,10 @@ void CL_ClearState (void)
     cl_dlights.clear();
     cl_dlight_index.clear();
 	memset (cl_lightstyle, 0, sizeof(cl_lightstyle));
-	memset (cl_temp_entities.data(), 0, cl_temp_entities.size() * sizeof(entity_t));
+	for (auto& entity : cl_temp_entities)
+	{
+		entity.Clear();
+	}
 	memset (cl_beams.data(), 0, cl_beams.size() * sizeof(beam_t));
 
 //
