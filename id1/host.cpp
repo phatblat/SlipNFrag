@@ -771,6 +771,7 @@ void _Host_Frame (float time)
 		basespan_stack_index = -1;
 		increase_basespan = 0;
 		pr_string_pool_index = -1;
+		pr_string_pool_used = 0;
 		warp_stack_index = -1;
 	}
 }

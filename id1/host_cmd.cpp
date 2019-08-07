@@ -741,6 +741,7 @@ Host_Name_f
 void Host_Name_f (void)
 {
 	char	*newName;
+    char finalName[16];
 
 	if (Cmd_Argc () == 1)
 	{
@@ -751,21 +752,24 @@ void Host_Name_f (void)
 		newName = Cmd_Argv(1);	
 	else
 		newName = Cmd_Args();
+    auto length = Q_strlen(newName);
+    memcpy(finalName, newName, std::min(length, 15));
+	finalName[15] = 0;
 
 	if (cmd_source == src_command)
 	{
-		if (Q_strcmp(cl_name.string.c_str(), newName) == 0)
+		if (Q_strcmp(cl_name.string.c_str(), finalName) == 0)
 			return;
-		Cvar_Set ("_cl_name", newName);
+		Cvar_Set ("_cl_name", finalName);
 		if (cls.state == ca_connected)
 			Cmd_ForwardToServer ();
 		return;
 	}
 
 	if (host_client->name[0] && strcmp(host_client->name, "unconnected") )
-		if (Q_strcmp(host_client->name, newName) != 0)
-			Con_Printf ("%s renamed to %s\n", host_client->name, newName);
-	Q_strncpy (host_client->name, newName, 15);
+		if (Q_strcmp(host_client->name, finalName) != 0)
+			Con_Printf ("%s renamed to %s\n", host_client->name, finalName);
+	Q_strcpy (host_client->name, finalName);
 	host_client->edict->v.netname = host_client->name - pr_strings;
 	
 // send notification to all clients
