@@ -95,6 +95,7 @@ Mod_Init
 */
 void Mod_Init (void)
 {
+    pr_strings = pr_string_block.data();
 }
 
 /*
@@ -232,7 +233,7 @@ model_t *Mod_FindName (const char *name)
     for (auto& entry : mod_known)
     {
         mod = &entry;
-		if (!strcmp (mod->name, name) )
+		if (!strcmp (pr_strings + mod->name, name) )
 			break;
 		if (mod->needload == NL_UNREFERENCED)
 			if (!avail || mod->type != mod_alias)
@@ -256,7 +257,9 @@ model_t *Mod_FindName (const char *name)
                 mod_known.emplace_back();
                 mod = &mod_known.back();
             }
-        strcpy (mod->name, name);
+        auto name_len = (int)strlen(name);
+        mod->name = ED_NewString(name_len + 1);
+        Q_strncpy(pr_strings + mod->name, name, name_len);
 		mod->needload = NL_NEEDS_LOADED;
 	}
 
@@ -306,7 +309,7 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
     unsigned *buf = nullptr;
     std::vector<byte> contents;
     int handle = -1;
-    auto length = COM_OpenFile(mod->name, &handle);
+    auto length = COM_OpenFile(pr_strings + mod->name, &handle);
     if (handle >= 0 && length > 0)
     {
         contents.resize(length + 1);
@@ -320,14 +323,14 @@ model_t *Mod_LoadModel (model_t *mod, qboolean crash)
 	if (!buf)
 	{
 		if (crash)
-			Sys_Error ("Mod_NumForName: %s not found", mod->name);
+			Sys_Error ("Mod_NumForName: %s not found", pr_strings + mod->name);
 		return NULL;
 	}
 	
 //
 // allocate a new model
 //
-	COM_FileBase (mod->name, loadname);
+	COM_FileBase (pr_strings + mod->name, loadname);
 	
 	loadmodel = mod;
 
@@ -602,7 +605,7 @@ void Mod_LoadVertexes (lump_t *l)
 
 	in = (dvertex_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.vertexes.emplace_back(count);
     out = mod_pool.vertexes.back().data();
@@ -631,7 +634,7 @@ void Mod_LoadSubmodels (lump_t *l)
 
 	in = (dmodel_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.submodels.emplace_back(count);
 	out = mod_pool.submodels.back().data();
@@ -668,7 +671,7 @@ void Mod_LoadEdges (lump_t *l)
 
 	in = (dedge_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.edges.emplace_back(count + 1);
 	out = mod_pool.edges.back().data();
@@ -698,7 +701,7 @@ void Mod_LoadTexinfo (lump_t *l)
 
 	in = (texinfo_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.texinfo.emplace_back(count);
 	out = mod_pool.texinfo.back().data();
@@ -818,7 +821,7 @@ void Mod_LoadFaces (lump_t *l)
 
 	in = (dface_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.surfaces.emplace_back(count);
     out = mod_pool.surfaces.back().data();
@@ -902,7 +905,7 @@ void Mod_LoadNodes (lump_t *l)
 
 	in = (dnode_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.nodes.emplace_back(count);
 	out = mod_pool.nodes.back().data();
@@ -950,7 +953,7 @@ void Mod_LoadLeafs (lump_t *l)
 
 	in = (dleaf_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.leafs.emplace_back(count);
 	out = mod_pool.leafs.back().data();
@@ -998,7 +1001,7 @@ void Mod_LoadClipnodes (lump_t *l)
 
 	in = (dclipnode_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.clipnodes.emplace_back(count);
 	out = mod_pool.clipnodes.back().data();
@@ -1091,7 +1094,7 @@ void Mod_LoadMarksurfaces (lump_t *l)
 	
 	in = (short*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.marksurfaces.emplace_back(count);
 	out = mod_pool.marksurfaces.back().data();
@@ -1120,7 +1123,7 @@ void Mod_LoadSurfedges (lump_t *l)
 	
 	in = (int*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.surfedges.emplace_back(count);
 	out = mod_pool.surfedges.back().data();
@@ -1147,7 +1150,7 @@ void Mod_LoadPlanes (lump_t *l)
 	
 	in = (dplane_t*)(void *)(mod_base + l->fileofs);
 	if (l->filelen % sizeof(*in))
-		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",loadmodel->name);
+		Sys_Error ("MOD_LoadBmodel: funny lump size in %s",pr_strings + loadmodel->name);
 	count = l->filelen / sizeof(*in);
     mod_pool.planes.emplace_back(count * 2);
 	out = mod_pool.planes.back().data();
@@ -1206,7 +1209,7 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 
 	i = LittleLong (header->version);
 	if (i != BSPVERSION)
-		Sys_Error ("Mod_LoadBrushModel: %s has wrong version number (%i should be %i)", mod->name, i, BSPVERSION);
+		Sys_Error ("Mod_LoadBrushModel: %s has wrong version number (%i should be %i)", pr_strings + mod->name, i, BSPVERSION);
 
 // swap all the lumps
 	mod_base = (byte *)header;
@@ -1267,7 +1270,9 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer)
 			sprintf (name, "*%i", i+1);
 			loadmodel = Mod_FindName (name);
 			*loadmodel = *mod;
-			strcpy (loadmodel->name, name);
+            auto name_len = (int)strlen(name);
+            loadmodel->name = ED_NewString(name_len + 1);
+            Q_strncpy(pr_strings + loadmodel->name, name, name_len);
 			mod = loadmodel;
 		}
 	}
@@ -1536,7 +1541,7 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 	version = LittleLong (pinmodel->version);
 	if (version != ALIAS_VERSION)
 		Sys_Error ("%s has wrong version number (%i should be %i)",
-				 mod->name, version, ALIAS_VERSION);
+				 pr_strings + mod->name, version, ALIAS_VERSION);
 
 //
 // allocate space for a working header, plus all the data except the frames,
@@ -1569,12 +1574,12 @@ void Mod_LoadAliasModel (model_t *mod, void *buffer)
 	pmodel->numverts = LittleLong (pinmodel->numverts);
 
 	if (pmodel->numverts <= 0)
-		Sys_Error ("model %s has no vertices", mod->name);
+		Sys_Error ("model %s has no vertices", pr_strings + mod->name);
 
 	pmodel->numtris = LittleLong (pinmodel->numtris);
 
 	if (pmodel->numtris <= 0)
-		Sys_Error ("model %s has no triangles", mod->name);
+		Sys_Error ("model %s has no triangles", pr_strings + mod->name);
 
 	pmodel->numframes = LittleLong (pinmodel->numframes);
 	pmodel->size = LittleFloat (pinmodel->size) * ALIAS_BASE_SIZE_RATIO;
@@ -1870,7 +1875,7 @@ void Mod_LoadSpriteModel (model_t *mod, void *buffer)
 	version = LittleLong (pin->version);
 	if (version != SPRITE_VERSION)
 		Sys_Error ("%s has wrong version number "
-				 "(%i should be %i)", mod->name, version, SPRITE_VERSION);
+				 "(%i should be %i)", pr_strings + mod->name, version, SPRITE_VERSION);
 
 	numframes = LittleLong (pin->numframes);
 
@@ -1947,7 +1952,7 @@ void Mod_Print (void)
 	Con_Printf ("Cached models:\n");
     for (auto& mod : mod_known)
 	{
-		Con_Printf ("%8p : %s",mod.extradata, mod.name);
+		Con_Printf ("%8p : %s",mod.extradata, pr_strings + mod.name);
 		if (mod.needload & NL_UNREFERENCED)
 			Con_Printf (" (!R)");
 		if (mod.needload & NL_NEEDS_LOADED)

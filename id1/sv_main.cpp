@@ -37,7 +37,7 @@ void server_t::Clear()
     time = 0;
     lastcheck = 0;
     lastchecktime = 0;
-    memset(name, 0, sizeof(name));
+    name = 0;
     memset(modelname, 0, sizeof(modelname));
     worldmodel = nullptr;
     model_precache.clear();
@@ -65,7 +65,7 @@ void client_t::Clear()
 	memset(wishdir, 0, sizeof(wishdir));
 	message.Clear();
 	edict = nullptr;
-	memset(name, 0, sizeof(name));
+	name = 0;
 	colors = 0;
 	memset(ping_times, 0, sizeof(ping_times));
 	num_pings = 0;
@@ -307,7 +307,8 @@ void SV_ConnectClient (int clientnum)
 	client->Clear();
 	client->netconnection = netconnection;
 
-	strcpy (client->name, "unconnected");
+    client->name = ED_NewString(12);
+	strcpy (pr_strings + client->name, "unconnected");
 	client->active = true;
 	client->spawned = false;
 	client->edict = ent;
@@ -1222,7 +1223,9 @@ void SV_SpawnServer (char *server)
 
 	sv.Clear();
 
-	strcpy (sv.name, server);
+    auto name_len = (int)strlen(server);
+    sv.name = ED_NewString(name_len + 1);
+    Q_strncpy(pr_strings + sv.name, server, name_len);
 
 // load progs to get entity field count
 	PR_LoadProgs ();
@@ -1245,6 +1248,8 @@ void SV_SpawnServer (char *server)
 	sv.signon.maxsize = 0;
 	sv.signon.data.clear();
 	
+    pr_string_temp = ED_NewString(128);
+    
 // leave slots at start for clients only
 	sv.num_edicts = svs.maxclients+1;
 	for (i=0 ; i<svs.maxclients ; i++)
@@ -1258,7 +1263,9 @@ void SV_SpawnServer (char *server)
 
 	sv.time = 1.0;
 	
-	strcpy (sv.name, server);
+    name_len = (int)strlen(server);
+    sv.name = ED_NewString(name_len + 1);
+    Q_strncpy(pr_strings + sv.name, server, name_len);
 	sprintf (sv.modelname,"maps/%s.bsp", server);
 	sv.worldmodel = Mod_ForName (sv.modelname, false);
 	if (!sv.worldmodel)
@@ -1299,7 +1306,7 @@ void SV_SpawnServer (char *server)
 	ent = EDICT_NUM(0);
 	memset (&ent->v, 0, progs->entityfields * 4);
 	ent->free = false;
-	ent->v.model = sv.worldmodel->name - pr_strings;
+	ent->v.model = sv.worldmodel->name;
 	ent->v.modelindex = 1;		// world model
 	ent->v.solid = SOLID_BSP;
 	ent->v.movetype = MOVETYPE_PUSH;
@@ -1309,7 +1316,7 @@ void SV_SpawnServer (char *server)
 	else
 		pr_global_struct->deathmatch = deathmatch.value;
 
-	pr_global_struct->mapname = sv.name - pr_strings;
+	pr_global_struct->mapname = sv.name;
 
 // serverflags are for cross level information (sigils)
 	pr_global_struct->serverflags = svs.serverflags;

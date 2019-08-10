@@ -701,9 +701,8 @@ void ED_ParseGlobals (char *data)
 
 //============================================================================
 
-std::vector<std::vector<byte>> pr_string_pool;
-int pr_string_pool_index = -1;
-int pr_string_pool_used = 0;
+std::vector<char> pr_string_block;
+int pr_string_block_used;
 
 /*
 =============
@@ -715,27 +714,9 @@ char *ED_NewString (const char *string)
 	char	*new_string, *new_p;
 	int		i,l;
 	
-	l = strlen(string) + 1;
-    if (pr_string_pool_index < 0 || pr_string_pool_used + l > pr_string_pool[pr_string_pool_index].size())
-    {
-        pr_string_pool_index++;
-        int size = std::max(progs->numstrings, l);
-        if (pr_string_pool_index >= pr_string_pool.size())
-        {
-            pr_string_pool.emplace_back(size);
-        }
-        else
-        {
-            pr_string_pool[pr_string_pool_index].resize(size);
-        }
-        new_string = (char*)pr_string_pool[pr_string_pool_index].data();
-        pr_string_pool_used = l;
-    }
-    else
-    {
-        new_string = (char*)pr_string_pool[pr_string_pool_index].data() + pr_string_pool_used;
-        pr_string_pool_used += l;
-    }
+	l = (int)strlen(string) + 1;
+    i = ED_NewString(l);
+    new_string = pr_string_block.data() + i;
 	new_p = new_string;
 
 	for (i=0 ; i< l ; i++)
@@ -755,6 +736,36 @@ char *ED_NewString (const char *string)
 	return new_string;
 }
 
+int ED_NewString(int size)
+{
+    size = (size + 15) & ~15;
+    if (pr_string_block_used + size > pr_string_block.size())
+    {
+        int additional = size;
+        if (progs != nullptr && progs->numstrings > size)
+        {
+            additional = (progs->numstrings + 15) & ~15;
+        }
+        pr_string_block.resize(pr_string_block.size() + additional);
+        pr_strings = pr_string_block.data();
+    }
+    auto offset = pr_string_block_used;
+    pr_string_block_used += size;
+    return offset;
+}
+
+void PR_LoadStrings(char* source, int size)
+{
+    auto to_use = (size + 15) & ~15;
+    auto to_allocate = to_use;
+    if (pr_string_block_used + to_allocate > pr_string_block.size())
+    {
+        pr_string_block.resize(pr_string_block.size() + to_allocate);
+        pr_strings = pr_string_block.data();
+    }
+    pr_string_block_used += to_use;
+    Q_memcpy(pr_strings, source, size);
+}
 
 /*
 =============
@@ -1027,8 +1038,6 @@ void PR_LoadProgs (void)
 
 	CRC_Init (&pr_crc);
 
-    pr_string_pool_index = -1;
-    pr_string_pool_used = 0;
     progs = nullptr;
     int handle = -1;
     auto length = COM_OpenFile("progs.dat", &handle);
@@ -1059,7 +1068,7 @@ void PR_LoadProgs (void)
 		Sys_Error ("progs.dat system vars have been modified, progdefs.h is out of date");
 
 	pr_functions = (dfunction_t *)((byte *)progs + progs->ofs_functions);
-	pr_strings = (char *)progs + progs->ofs_strings;
+    PR_LoadStrings((char*)progs + progs->ofs_strings, progs->numstrings);
 	pr_globaldefs = (ddef_t *)((byte *)progs + progs->ofs_globaldefs);
 	pr_fielddefs = (ddef_t *)((byte *)progs + progs->ofs_fielddefs);
 	pr_statements = (dstatement_t *)((byte *)progs + progs->ofs_statements);

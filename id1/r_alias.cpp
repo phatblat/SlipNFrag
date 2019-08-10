@@ -113,7 +113,7 @@ qboolean R_AliasCheckBBox (void)
 	if ((frame >= pmdl->numframes) || (frame < 0))
 	{
 		Con_DPrintf ("No such frame %d %s\n", frame,
-				pmodel->name);
+				pr_strings + pmodel->name);
 		frame = 0;
 	}
 

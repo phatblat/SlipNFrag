@@ -211,7 +211,7 @@ void R_ReadPointFile_f (void)
 	particle_t	*p;
     std::string name;
 	
-    name = std::string("maps/") + sv.name + ".pts";
+    name = std::string("maps/") + (pr_strings + sv.name) + ".pts";
 
     COM_FOpenFile (name.c_str(), &f);
 	if (f < 0)

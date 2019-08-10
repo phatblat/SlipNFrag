@@ -80,7 +80,7 @@ void Host_Status_f (void)
 		print ("tcp/ip:  %s\n", my_tcpip_address);
 	if (ipxAvailable)
 		print ("ipx:     %s\n", my_ipx_address);
-	print ("map:     %s\n", sv.name);
+	print ("map:     %s\n", pr_strings + sv.name);
 	print ("players: %i active (%i max)\n\n", net_activeconnections, svs.maxclients);
 	for (j=0, client = svs.clients.data() ; j<svs.maxclients ; j++, client++)
 	{
@@ -97,7 +97,7 @@ void Host_Status_f (void)
 		}
 		else
 			hours = 0;
-		print ("#%-2u %-16.16s  %3i  %2i:%02i:%02i\n", j+1, client->name, (int)client->edict->v.frags, hours, minutes, seconds);
+		print ("#%-2u %-16.16s  %3i  %2i:%02i:%02i\n", j+1, pr_strings + client->name, (int)client->edict->v.frags, hours, minutes, seconds);
 		print ("   %s\n", client->netconnection->address.c_str());
 	}
 }
@@ -231,7 +231,7 @@ void Host_Ping_f (void)
 		for (j=0 ; j<NUM_PING_TIMES ; j++)
 			total+=client->ping_times[j];
 		total /= NUM_PING_TIMES;
-		SV_ClientPrintf ("%4i %s\n", (int)(total*1000), client->name);
+		SV_ClientPrintf ("%4i %s\n", (int)(total*1000), pr_strings + client->name);
 	}
 }
 
@@ -339,7 +339,7 @@ void Host_Restart_f (void)
 
 	if (cmd_source != src_command)
 		return;
-	strcpy (mapname, sv.name);	// must copy out, because it gets cleared
+	strcpy (mapname, pr_strings + sv.name);	// must copy out, because it gets cleared
 								// in sv_spawnserver
 	SV_SpawnServer (mapname);
 }
@@ -487,7 +487,7 @@ void Host_Savegame_f (void)
 	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
         to_write += std::to_string(svs.clients.data()->spawn_parms[i]) + "\n";
     to_write += std::to_string(current_skill) + "\n";
-    to_write += std::string(sv.name) + "\n";
+    to_write += std::string(pr_strings + sv.name) + "\n";
     to_write += std::to_string(sv.time) + "\n";
 
 // write the light styles
@@ -762,17 +762,18 @@ void Host_Name_f (void)
 		return;
 	}
 
-	if (host_client->name[0] && strcmp(host_client->name, "unconnected") )
-		if (Q_strcmp(host_client->name, newName) != 0)
-			Con_Printf ("%s renamed to %s\n", host_client->name, newName);
-	Q_strncpy (host_client->name, newName, 15);
-	host_client->edict->v.netname = host_client->name - pr_strings;
+	if (strcmp(pr_strings + host_client->name, "unconnected") )
+		if (Q_strcmp(pr_strings + host_client->name, newName) != 0)
+			Con_Printf ("%s renamed to %s\n", pr_strings + host_client->name, newName);
+    host_client->name = ED_NewString(16);
+	Q_strncpy (pr_strings + host_client->name, newName, 15);
+	host_client->edict->v.netname = host_client->name;
 	
 // send notification to all clients
 	
 	MSG_WriteByte (&sv.reliable_datagram, svc_updatename);
 	MSG_WriteByte (&sv.reliable_datagram, host_client - svs.clients.data());
-	MSG_WriteString (&sv.reliable_datagram, host_client->name);
+	MSG_WriteString (&sv.reliable_datagram, pr_strings + host_client->name);
 }
 
 	
@@ -873,7 +874,7 @@ void Host_Say(qboolean teamonly)
 
 // turn on color set 1
 	if (!fromServer)
-		sprintf (text, "%c%s: ", 1, save->name);
+		sprintf (text, "%c%s: ", 1, pr_strings + save->name);
 	else
 		sprintf (text, "%c<%s> ", 1, hostname.string.c_str());
 
@@ -928,7 +929,7 @@ void Host_Tell_f(void)
 	if (Cmd_Argc () < 3)
 		return;
 
-	Q_strcpy(text, host_client->name);
+	Q_strcpy(text, pr_strings + host_client->name);
 	Q_strcat(text, ": ");
 
 	p = Cmd_Args();
@@ -953,7 +954,7 @@ void Host_Tell_f(void)
 	{
 		if (!client->active || !client->spawned)
 			continue;
-		if (Q_strcasecmp(client->name, Cmd_Argv(1)))
+		if (Q_strcasecmp(pr_strings + client->name, Cmd_Argv(1)))
 			continue;
 		host_client = client;
 		SV_ClientPrintf("%s", text);
@@ -1138,7 +1139,7 @@ void Host_Spawn_f (void)
 		memset (&ent->v, 0, progs->entityfields * 4);
 		ent->v.colormap = NUM_FOR_EDICT(ent);
 		ent->v.team = (host_client->colors & 15) + 1;
-		ent->v.netname = host_client->name - pr_strings;
+		ent->v.netname = host_client->name;
 
 		// copy spawn parms out of the client_t
 
@@ -1152,7 +1153,7 @@ void Host_Spawn_f (void)
 		PR_ExecuteProgram (pr_global_struct->ClientConnect);
 
 		if ((Sys_FloatTime() - host_client->netconnection->connecttime) <= sv.time)
-			Sys_Printf ("%s entered the game\n", host_client->name);
+			Sys_Printf ("%s entered the game\n", pr_strings + host_client->name);
 
 		PR_ExecuteProgram (pr_global_struct->PutClientInServer);	
 	}
@@ -1169,7 +1170,7 @@ void Host_Spawn_f (void)
 	{
 		MSG_WriteByte (&host_client->message, svc_updatename);
 		MSG_WriteByte (&host_client->message, i);
-		MSG_WriteString (&host_client->message, client->name);
+		MSG_WriteString (&host_client->message, pr_strings + client->name);
 		MSG_WriteByte (&host_client->message, svc_updatefrags);
 		MSG_WriteByte (&host_client->message, i);
 		MSG_WriteShort (&host_client->message, client->old_frags);
@@ -1288,7 +1289,7 @@ void Host_Kick_f (void)
 		{
 			if (!host_client->active)
 				continue;
-			if (Q_strcasecmp(host_client->name, Cmd_Argv(1)) == 0)
+			if (Q_strcasecmp(pr_strings + host_client->name, Cmd_Argv(1)) == 0)
 				break;
 		}
 	}
@@ -1301,7 +1302,7 @@ void Host_Kick_f (void)
 			else
 				who = cl_name.string.c_str();
 		else
-			who = save->name;
+			who = pr_strings + save->name;
 
 		// can't kick yourself!
 		if (host_client == save)

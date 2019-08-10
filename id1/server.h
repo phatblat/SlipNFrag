@@ -43,7 +43,7 @@ struct server_t
 	int			lastcheck;			// used by PF_checkclient
 	double		lastchecktime;
 	
-	char		name[64];			// map name
+	string_t		name;			// map name
 	char		modelname[64];		// maps/<name>.bsp, for model_precache[0]
 	struct model_s 	*worldmodel;
     std::vector<std::string> model_precache;
@@ -91,7 +91,7 @@ struct client_t
 										// copied and clear once per frame
 
     edict_t			*edict;				// EDICT_NUM(clientnum+1)
-	char			name[32];			// for printing to other people
+	string_t			name;			// for printing to other people
 	int				colors;
 		
 	float			ping_times[NUM_PING_TIMES];

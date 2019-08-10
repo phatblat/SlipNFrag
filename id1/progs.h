@@ -61,8 +61,10 @@ extern	float			*pr_globals;			// same as pr_global_struct
 
 extern	int				pr_edict_size;	// in bytes
 
-extern int pr_string_pool_index;
-extern int pr_string_pool_used;
+extern std::vector<char> pr_string_block;
+extern int pr_string_block_used;
+
+extern string_t pr_string_temp;
 
 //============================================================================
 
@@ -78,6 +80,9 @@ void ED_Free (edict_t *ed);
 
 char	*ED_NewString (const char *string);
 // returns a copy of the string allocated from the server's string heap
+
+int ED_NewString(int size);
+void ED_LoadStrings(char* source, int size);
 
 void ED_Print (edict_t *ed);
 void ED_Write (int f, edict_t *ed);

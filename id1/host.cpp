@@ -398,7 +398,7 @@ void SV_DropClient (qboolean crash)
 			pr_global_struct->self = saveSelf;
 		}
 
-		Sys_Printf ("Client %s removed\n",host_client->name);
+		Sys_Printf ("Client %s removed\n",pr_strings + host_client->name);
 	}
 
 // break the net connection
@@ -407,7 +407,6 @@ void SV_DropClient (qboolean crash)
 
 // free the client (the body stays around)
 	host_client->active = false;
-	host_client->name[0] = 0;
 	host_client->old_frags = -999999;
 	net_activeconnections--;
 
@@ -770,8 +769,6 @@ void _Host_Frame (float time)
 		increasebedges = false;
 		basespan_stack_index = -1;
 		increase_basespan = 0;
-		pr_string_pool_index = -1;
-		pr_string_pool_used = 0;
 		warp_stack_index = -1;
 	}
 }
