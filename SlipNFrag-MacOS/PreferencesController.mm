@@ -28,17 +28,22 @@
 -(void)viewDidLoad
 {
     [super viewDidLoad];
-    self.basedir_text.delegate = self;
     self.game_text.delegate = self;
     self.command_line_text.delegate = self;
-    [self loadStringUserDefault:@"basedir_text" intoTextField:self.basedir_text];
+    
+    NSData* bookmark = [NSUserDefaults.standardUserDefaults objectForKey:@"basedir_bookmark"];
+    if (bookmark != nil)
+    {
+        NSURL* url = [NSURL URLByResolvingBookmarkData:bookmark options:NSURLBookmarkResolutionWithSecurityScope relativeToURL:nil bookmarkDataIsStale:nil error:nil];
+        self.basedir_text.stringValue = url.path;
+    }
+
     [self loadBooleanUserDefault:@"standard_quake_radio" intoButton:self.standard_quake_radio];
     [self loadBooleanUserDefault:@"hipnotic_radio" intoButton:self.hipnotic_radio];
     [self loadBooleanUserDefault:@"rogue_radio" intoButton:self.rogue_radio];
     [self loadBooleanUserDefault:@"game_radio" intoButton:self.game_radio];
     [self loadStringUserDefault:@"game_text" intoTextField:self.game_text];
     [self loadStringUserDefault:@"command_line_text" intoTextField:self.command_line_text];
-    [self checkCommandLine];
     if (self.standard_quake_radio.state == NSControlStateValueOff && self.hipnotic_radio.state == NSControlStateValueOff && self.rogue_radio.state == NSControlStateValueOff && self.game_radio.state == NSControlStateValueOff)
     {
         self.standard_quake_radio.state = NSControlStateValueOn;
@@ -55,11 +60,7 @@
 -(void)controlTextDidChange:(NSNotification *)notification
 {
     NSTextField* textField = notification.object;
-    if (textField == self.basedir_text)
-    {
-        [self storeStringUserDefault:@"basedir_text" fromTextField:self.basedir_text];
-    }
-    else if (textField == self.game_text)
+    if (textField == self.game_text)
     {
         [self storeStringUserDefault:@"game_text" fromTextField:self.game_text];
     }
@@ -67,7 +68,6 @@
     {
         [self storeStringUserDefault:@"command_line_text" fromTextField:self.command_line_text];
     }
-    [self checkCommandLine];
 }
 
 -(IBAction)chooseMissionPack:(NSButton *)sender
@@ -85,63 +85,21 @@
     openPanel.canChooseDirectories = YES;
     if ([openPanel runModal] == NSModalResponseOK)
     {
-        self.basedir_text.stringValue = openPanel.directoryURL.path;
-        [self storeStringUserDefault:@"basedir_text" fromTextField:self.basedir_text];
-    }
-}
-
-- (IBAction)resetAllSettings:(NSButton *)sender
-{
-    NSAlert* alert = [NSAlert new];
-    [alert setMessageText:@"Reset All Preferences"];
-    [alert setInformativeText:@"Are you sure you want to reset all preferences? This will delete all your configuration for Slip & Frag from your system."];
-    [alert addButtonWithTitle:@"Yes"];
-    [alert addButtonWithTitle:@"No"];
-    [alert setAlertStyle:NSAlertStyleWarning];
-    [alert beginSheetModalForWindow:self.view.window completionHandler:^(NSModalResponse returnCode)
-    {
-        if (returnCode == NSAlertSecondButtonReturn)
+        NSURL* url = openPanel.URL;
+        self.basedir_text.stringValue = url.path;
+        NSData* bookmark = [url bookmarkDataWithOptions:NSURLBookmarkCreationWithSecurityScope includingResourceValuesForKeys:nil relativeToURL:nil error:nil];
+        [NSUserDefaults.standardUserDefaults setObject:bookmark forKey:@"basedir_bookmark"];
+        [url startAccessingSecurityScopedResource];
+        BOOL found = [NSFileManager.defaultManager fileExistsAtPath:[url.path stringByAppendingPathComponent:@"ID1/PAK0.PAK"]];
+        [url stopAccessingSecurityScopedResource];
+        if (!found)
         {
-            return;
+            NSAlert* alert = [NSAlert new];
+            [alert setMessageText:@"Core game data not found"];
+            [alert setInformativeText:[NSString stringWithFormat:@"The folder %@ does not contain a folder ID1 with a file PAK0.PAK - the game might not start.\n\nEnsure that all required files are present before starting the game.", url.path]];
+            [alert setAlertStyle:NSAlertStyleCritical];
+            [alert beginSheetModalForWindow:self.view.window completionHandler:nil];
         }
-        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"basedir_text"];
-        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"standard_quake_radio"];
-        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"hipnotic_radio"];
-        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"rogue_radio"];
-        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"game_radio"];
-        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"game_text"];
-        [NSUserDefaults.standardUserDefaults removeObjectForKey:@"command_line_text"];
-        [self.view.window close];
-    }];
-}
-
--(void)checkCommandLine
-{
-    NSString* command_line = self.command_line_text.stringValue;
-    if (command_line == nil || [command_line isEqualToString:@""])
-    {
-        if (!self.basedir_text.isEnabled)
-        {
-            self.basedir_label.textColor = NSColor.textColor;
-            self.basedir_text.enabled = YES;
-            self.basedir_choose.enabled = YES;
-            self.standard_quake_radio.enabled = YES;
-            self.hipnotic_radio.enabled = YES;
-            self.rogue_radio.enabled = YES;
-            self.game_radio.enabled = YES;
-            self.game_text.enabled = YES;
-        }
-    }
-    else if (self.basedir_text.isEnabled)
-    {
-        self.basedir_label.textColor = NSColor.disabledControlTextColor;
-        self.basedir_text.enabled = NO;
-        self.basedir_choose.enabled = NO;
-        self.standard_quake_radio.enabled = NO;
-        self.hipnotic_radio.enabled = NO;
-        self.rogue_radio.enabled = NO;
-        self.game_radio.enabled = NO;
-        self.game_text.enabled = NO;
     }
 }
 

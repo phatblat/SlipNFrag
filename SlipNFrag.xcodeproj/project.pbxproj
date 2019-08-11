@@ -174,7 +174,6 @@
 		2822EE5B229ED2BA00B5332D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		2822EE5D229ED2BA00B5332D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2822EE5E229ED2BA00B5332D /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
-		2822EE60229ED2BA00B5332D /* SlipNFrag_MacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SlipNFrag_MacOS.entitlements; sourceTree = "<group>"; };
 		283D4B79229DCFD100D68A47 /* console.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = console.cpp; sourceTree = "<group>"; };
 		283D4B7B229DD10F00D68A47 /* host.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = host.cpp; sourceTree = "<group>"; };
 		283D4B7D229DD13200D68A47 /* r_local.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = r_local.h; sourceTree = "<group>"; };
@@ -238,6 +237,7 @@
 		283D4BED229E146600D68A47 /* pr_cmds.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = pr_cmds.cpp; sourceTree = "<group>"; };
 		283D4BEF229E168300D68A47 /* sv_move.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = sv_move.cpp; sourceTree = "<group>"; };
 		283D4BF1229E16D400D68A47 /* r_vars.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = r_vars.cpp; sourceTree = "<group>"; };
+		2848A7F122FF991E00735495 /* Slip & Frag.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Slip & Frag.entitlements"; sourceTree = "<group>"; };
 		284E087C22C568B3001DF320 /* in_macos.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = in_macos.cpp; sourceTree = "<group>"; };
 		284E087D22C568B3001DF320 /* in_macos.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = in_macos.h; sourceTree = "<group>"; };
 		285D5B0A229F9F9900B6ED09 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
@@ -332,6 +332,7 @@
 		2822EE51229ED2B900B5332D /* SlipNFrag-MacOS */ = {
 			isa = PBXGroup;
 			children = (
+				2848A7F122FF991E00735495 /* Slip & Frag.entitlements */,
 				2822EE52229ED2B900B5332D /* AppDelegate.h */,
 				2822EE53229ED2B900B5332D /* AppDelegate.m */,
 				2822EE55229ED2B900B5332D /* ViewController.h */,
@@ -342,7 +343,6 @@
 				2822EE5A229ED2BA00B5332D /* Main.storyboard */,
 				2822EE5D229ED2BA00B5332D /* Info.plist */,
 				2822EE5E229ED2BA00B5332D /* main.mm */,
-				2822EE60229ED2BA00B5332D /* SlipNFrag_MacOS.entitlements */,
 				28BA2A72229F3271001830E9 /* Shaders.metal */,
 				284E087C22C568B3001DF320 /* in_macos.cpp */,
 				284E087D22C568B3001DF320 /* in_macos.h */,
@@ -566,6 +566,11 @@
 				TargetAttributes = {
 					2822EE4F229ED2B900B5332D = {
 						CreatedOnToolsVersion = 10.2.1;
+						SystemCapabilities = {
+							com.apple.Sandbox = {
+								enabled = 1;
+							};
+						};
 					};
 					287A320C229DBAA100AE6BFA = {
 						CreatedOnToolsVersion = 10.2.1;
@@ -774,7 +779,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "SlipNFrag-MacOS/SlipNFrag_MacOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "SlipNFrag-MacOS/Slip & Frag.entitlements";
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -795,7 +800,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "SlipNFrag-MacOS/SlipNFrag_MacOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "SlipNFrag-MacOS/Slip & Frag.entitlements";
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;

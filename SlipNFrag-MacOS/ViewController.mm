@@ -234,58 +234,49 @@
     screenPlane = [device newBufferWithBytes:screenPlaneVertices length:sizeof(screenPlaneVertices) options:0];
     vid_width = (int)self.view.frame.size.width;
     vid_height = (int)self.view.frame.size.height;
+    std::vector<std::string> arguments;
+    arguments.emplace_back(sys_argv[0]);
+    NSData* basedir = [NSUserDefaults.standardUserDefaults objectForKey:@"basedir_bookmark"];
+    if (basedir != nil)
+    {
+        NSURL* url = [NSURL URLByResolvingBookmarkData:basedir options:NSURLBookmarkResolutionWithSecurityScope relativeToURL:nil bookmarkDataIsStale:nil error:nil];
+        [url startAccessingSecurityScopedResource];
+        arguments.emplace_back("-basedir");
+        arguments.emplace_back([url.path cStringUsingEncoding:NSString.defaultCStringEncoding]);
+    }
+    if ([NSUserDefaults.standardUserDefaults boolForKey:@"hipnotic_radio"])
+    {
+        arguments.emplace_back("-hipnotic");
+    }
+    else if ([NSUserDefaults.standardUserDefaults boolForKey:@"rogue_radio"])
+    {
+        arguments.emplace_back("-rogue");
+    }
+    else if ([NSUserDefaults.standardUserDefaults boolForKey:@"game_radio"])
+    {
+        auto game = [NSUserDefaults.standardUserDefaults stringForKey:@"game_text"];
+        if (game != nil && ![game isEqualToString:@""])
+        {
+            arguments.emplace_back("-game");
+            arguments.emplace_back([game cStringUsingEncoding:NSString.defaultCStringEncoding]);
+        }
+    }
     auto commandLine = [NSUserDefaults.standardUserDefaults stringForKey:@"command_line_text"];
     if (commandLine != nil && ![commandLine isEqualToString:@""])
     {
-        std::string firstArgument = sys_argv[0];
-        NSArray<NSString*>* arguments = [commandLine componentsSeparatedByString:@" "];
-        sys_argc = (int)arguments.count + 1;
-        sys_argv = new char*[sys_argc];
-        auto i = 0;
-        sys_argv[i] = new char[firstArgument.length() + 1];
-        strcpy(sys_argv[i], firstArgument.c_str());
-        for (NSString* argument : arguments)
+        NSArray<NSString*>* components = [commandLine componentsSeparatedByString:@" "];
+        for (NSString* component : components)
         {
-            i++;
-            auto argumentAsString = [argument cStringUsingEncoding:NSString.defaultCStringEncoding];
-            sys_argv[i] = new char[strlen(argumentAsString) + 1];
-            strcpy(sys_argv[i], argumentAsString);
+            auto componentAsString = [component cStringUsingEncoding:NSString.defaultCStringEncoding];
+            arguments.emplace_back(componentAsString);
         }
     }
-    else
+    sys_argc = (int)arguments.size();
+    sys_argv = new char*[sys_argc];
+    for (auto i = 0; i < arguments.size(); i++)
     {
-        auto basedir = [NSUserDefaults.standardUserDefaults stringForKey:@"basedir_text"];
-        if (basedir != nil && ![basedir isEqualToString:@""])
-        {
-            std::vector<std::string> arguments;
-            arguments.emplace_back(sys_argv[0]);
-            arguments.emplace_back("-basedir");
-            arguments.emplace_back([basedir cStringUsingEncoding:NSString.defaultCStringEncoding]);
-            if ([NSUserDefaults.standardUserDefaults boolForKey:@"hipnotic_radio"])
-            {
-                arguments.emplace_back("-hipnotic");
-            }
-            else if ([NSUserDefaults.standardUserDefaults boolForKey:@"rogue_radio"])
-            {
-                arguments.emplace_back("-rogue");
-            }
-            else if ([NSUserDefaults.standardUserDefaults boolForKey:@"game_radio"])
-            {
-                arguments.emplace_back("-game");
-                auto game = [NSUserDefaults.standardUserDefaults stringForKey:@"game_text"];
-                if (game != nil && ![game isEqualToString:@""])
-                {
-                    arguments.emplace_back([game cStringUsingEncoding:NSString.defaultCStringEncoding]);
-                }
-            }
-            sys_argc = (int)arguments.size();
-            sys_argv = new char*[sys_argc];
-            for (auto i = 0; i < arguments.size(); i++)
-            {
-                sys_argv[i] = new char[arguments[i].length() + 1];
-                strcpy(sys_argv[i], arguments[i].c_str());
-            }
-        }
+        sys_argv[i] = new char[arguments[i].length() + 1];
+        strcpy(sys_argv[i], arguments[i].c_str());
     }
     Sys_Init(sys_argc, sys_argv);
     if ([self displaySysErrorIfNeeded])
@@ -394,7 +385,7 @@
         {
             NSAlert* alert = [NSAlert new];
             [alert setMessageText:@"Game data not found"];
-            [alert setInformativeText:@"Go to Preferences and set Game directory (-basedir) to your copy of the game files, or add it to the Command line."];
+            [alert setInformativeText:@"Go to Preferences and set Game directory (-basedir) to your copy of the game files."];
             [alert addButtonWithTitle:@"Go to Preferences"];
             [alert addButtonWithTitle:@"Where to buy the game"];
             [alert addButtonWithTitle:@"Where to get shareware episode"];
