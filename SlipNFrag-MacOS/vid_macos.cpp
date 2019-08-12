@@ -14,6 +14,9 @@ extern viddef_t vid;
 std::vector<unsigned char> vid_buffer;
 int vid_width;
 int vid_height;
+std::vector<unsigned char> con_buffer;
+int con_width;
+int con_height;
 std::vector<short> zbuffer;
 std::vector<byte> surfcache;
 
@@ -54,16 +57,21 @@ void VID_ShiftPalette(unsigned char *palette)
 void VID_Init(unsigned char *palette)
 {
     vid_buffer.resize(vid_width * vid_height);
+    con_buffer.resize(con_width * con_height);
     vid.maxwarpwidth = WARP_WIDTH;
-    vid.width = vid.conwidth = vid_width;
+    vid.width = vid_width;
+    vid.conwidth = con_width;
     vid.maxwarpheight = WARP_HEIGHT;
-    vid.height = vid.conheight = vid_height;
+    vid.height = vid_height;
+    vid.conheight = con_height;
     vid.aspect = ((float)vid.height / (float)vid.width) * (320.0 / 240.0);
     vid.numpages = 1;
     vid.colormap = host_colormap;
     vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
-    vid.buffer = vid.conbuffer = vid_buffer.data();
-    vid.rowbytes = vid.conrowbytes = vid_width;
+    vid.buffer = vid_buffer.data();
+    vid.conbuffer = con_buffer.data();
+    vid.rowbytes = vid_width;
+    vid.conrowbytes = con_width;
     zbuffer.resize(vid_width * vid.height);
     d_pzbuffer = zbuffer.data();
     int surfcachesize = D_SurfaceCacheForRes(vid_width, vid_height);
@@ -75,11 +83,16 @@ void VID_Resize()
 {
     D_FlushCaches();
     vid_buffer.resize(vid_width * vid_height);
-    vid.width = vid.conwidth = vid_width;
-    vid.height = vid.conheight = vid_height;
+    con_buffer.resize(con_width * con_height);
+    vid.width = vid_width;
+    vid.conwidth = con_width;
+    vid.height = vid_height;
+    vid.conheight = con_height;
     vid.aspect = ((float)vid.height / (float)vid.width) * (320.0 / 240.0);
-    vid.buffer = vid.conbuffer = vid_buffer.data();
-    vid.rowbytes = vid.conrowbytes = vid_width;
+    vid.buffer = vid_buffer.data();
+    vid.conbuffer = con_buffer.data();
+    vid.rowbytes = vid_width;
+    vid.conrowbytes = con_width;
     zbuffer.resize(vid_width * vid_height);
     d_pzbuffer = zbuffer.data();
     int surfcachesize = D_SurfaceCacheForRes(vid_width, vid_height);
@@ -88,7 +101,6 @@ void VID_Resize()
     D_InitCaches (surfcache.data(), (int)surfcache.size());
     R_ResizeTurb();
     R_ResizeEdges();
-    Cvar_SetValue("scr_conspeed", vid_height * 300.0 / 240.0);
     vid.recalc_refdef = 1;
 }
 

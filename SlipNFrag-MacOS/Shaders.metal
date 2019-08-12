@@ -30,7 +30,8 @@ vertex VertexOut vertexMain(VertexIn inVertex [[stage_in]], constant float4x4* m
     return outVertex;
 }
 
-fragment half4 fragmentMain(VertexOut input [[stage_in]], texture2d<half> diffuseTexture [[texture(0)]], texture1d<float> colorTableTexture [[texture(1)]], sampler diffuseSampler [[sampler(0)]], sampler colorTableSampler [[sampler(1)]])
+fragment half4 fragmentMain(VertexOut input [[stage_in]], texture2d<half> screenTexture [[texture(0)]], texture2d<half> consoleTexture [[texture(1)]], texture1d<float> paletteTexture [[texture(2)]], sampler screenSampler [[sampler(0)]], sampler consoleSampler [[sampler(1)]], sampler paletteSampler [[sampler(2)]])
 {
-    return half4(colorTableTexture.sample(colorTableSampler, diffuseTexture.sample(diffuseSampler, input.texCoords)[0]));
+    half entry = consoleTexture.sample(consoleSampler, input.texCoords)[0];
+    return half4(paletteTexture.sample(paletteSampler, (entry < 1 ? entry : screenTexture.sample(screenSampler, input.texCoords)[0])));
 }

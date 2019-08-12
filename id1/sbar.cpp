@@ -288,9 +288,9 @@ Draws one solid graphics character
 void Sbar_DrawCharacter (int x, int y, int num)
 {
 	if (cl.gametype == GAME_DEATHMATCH)
-		Draw_Character ( x /*+ ((vid.width - 320)>>1) */ + 4 , y + vid.height-SBAR_HEIGHT, num);
+		Draw_CharacterOnScreen ( x /*+ ((vid.width - 320)>>1) */ + 4 , y + vid.height-SBAR_HEIGHT, num);
 	else
-		Draw_Character ( x + ((vid.width - 320)>>1) + 4 , y + vid.height-SBAR_HEIGHT, num);
+		Draw_CharacterOnScreen ( x + ((vid.width - 320)>>1) + 4 , y + vid.height-SBAR_HEIGHT, num);
 }
 
 /*
@@ -301,9 +301,9 @@ Sbar_DrawString
 void Sbar_DrawString (int x, int y, char *str)
 {
 	if (cl.gametype == GAME_DEATHMATCH)
-		Draw_String (x /*+ ((vid.width - 320)>>1)*/, y+ vid.height-SBAR_HEIGHT, str);
+		Draw_StringOnScreen (x /*+ ((vid.width - 320)>>1)*/, y+ vid.height-SBAR_HEIGHT, str);
 	else
-		Draw_String (x + ((vid.width - 320)>>1), y+ vid.height-SBAR_HEIGHT, str);
+		Draw_StringOnScreen (x + ((vid.width - 320)>>1), y+ vid.height-SBAR_HEIGHT, str);
 }
 
 /*
@@ -1071,7 +1071,7 @@ void Sbar_IntermissionNumber (int x, int y, int num, int digits, int color)
 		else
 			frame = *ptr -'0';
 
-		Draw_TransPic (x,y,sb_nums[color][frame]);
+		Draw_TransPicOnConsole (x,y,sb_nums[color][frame]);
 		x += 24;
 		ptr++;
 	}
@@ -1160,7 +1160,7 @@ void Sbar_DeathmatchOverlay (void)
 
 /*
 ==================
-Sbar_DeathmatchOverlay
+Sbar_MiniDeathmatchOverlay
 
 ==================
 */
@@ -1224,13 +1224,13 @@ void Sbar_MiniDeathmatchOverlay (void)
 		f = s->frags;
 		sprintf (num, "%3i",f);
 
-		Draw_Character ( x+8 , y, num[0]);
-		Draw_Character ( x+16 , y, num[1]);
-		Draw_Character ( x+24 , y, num[2]);
+		Draw_CharacterOnScreen ( x+8 , y, num[0]);
+		Draw_CharacterOnScreen ( x+16 , y, num[1]);
+		Draw_CharacterOnScreen ( x+24 , y, num[2]);
 
 		if (k == cl.viewentity - 1) {
-			Draw_Character ( x, y, 16);
-			Draw_Character ( x + 32, y, 17);
+			Draw_CharacterOnScreen ( x, y, 16);
+			Draw_CharacterOnScreen ( x + 32, y, 17);
 		}
 
 #if 0
@@ -1247,12 +1247,12 @@ void Sbar_MiniDeathmatchOverlay (void)
 
 		sprintf (num, "%3i:%i%i", minutes, tens, units);
 
-		Draw_String ( x+48 , y, num);
+		Draw_StringOnScreen ( x+48 , y, num);
 }
 #endif
 
 	// draw name
-		Draw_String (x+48, y, s->name);
+		Draw_StringOnScreen (x+48, y, s->name);
 
 		y += 8;
 	}
@@ -1280,25 +1280,25 @@ void Sbar_IntermissionOverlay (void)
 	}
 
 	pic = Draw_CachePic ("gfx/complete.lmp");
-	Draw_Pic (64, 24, pic);
+	Draw_PicOnConsole (64, 24, pic);
 
 	pic = Draw_CachePic ("gfx/inter.lmp");
-	Draw_TransPic (0, 56, pic);
+	Draw_TransPicOnConsole (0, 56, pic);
 
 // time
 	dig = cl.completed_time/60;
 	Sbar_IntermissionNumber (160, 64, dig, 3, 0);
 	num = cl.completed_time - dig*60;
-	Draw_TransPic (234,64,sb_colon);
-	Draw_TransPic (246,64,sb_nums[0][num/10]);
-	Draw_TransPic (266,64,sb_nums[0][num%10]);
+	Draw_TransPicOnConsole (234,64,sb_colon);
+	Draw_TransPicOnConsole (246,64,sb_nums[0][num/10]);
+	Draw_TransPicOnConsole (266,64,sb_nums[0][num%10]);
 
 	Sbar_IntermissionNumber (160, 104, cl.stats[STAT_SECRETS], 3, 0);
-	Draw_TransPic (232,104,sb_slash);
+	Draw_TransPicOnConsole (232,104,sb_slash);
 	Sbar_IntermissionNumber (240, 104, cl.stats[STAT_TOTALSECRETS], 3, 0);
 
 	Sbar_IntermissionNumber (160, 144, cl.stats[STAT_MONSTERS], 3, 0);
-	Draw_TransPic (232,144,sb_slash);
+	Draw_TransPicOnConsole (232,144,sb_slash);
 	Sbar_IntermissionNumber (240, 144, cl.stats[STAT_TOTALMONSTERS], 3, 0);
 
 }
@@ -1317,5 +1317,5 @@ void Sbar_FinaleOverlay (void)
 	scr_copyeverything = 1;
 
 	pic = Draw_CachePic ("gfx/finale.lmp");
-	Draw_TransPic ( (vid.width-pic->width)/2, 16, pic);
+	Draw_TransPicOnConsole ( (vid.conwidth-pic->width)/2, 16, pic);
 }

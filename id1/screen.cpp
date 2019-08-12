@@ -29,6 +29,9 @@ int			scr_copyeverything;
 float		scr_con_current;
 float		scr_conlines;		// lines of console to display
 
+float       con_con_current;
+float       con_conlines;
+
 float		oldscreensize, oldfov;
 cvar_t		scr_viewsize = {"viewsize","100", true};
 cvar_t		scr_fov = {"fov","90"};	// 10 - 170
@@ -140,7 +143,7 @@ void SCR_DrawCenterString (void)
 	start = scr_centerstring.c_str();
 
 	if (scr_center_lines <= 4)
-		y = vid.height*0.35;
+		y = vid.conheight*0.35;
 	else
 		y = 48;
 
@@ -150,7 +153,7 @@ void SCR_DrawCenterString (void)
 		for (l=0 ; l<40 ; l++)
 			if (start[l] == '\n' || !start[l])
 				break;
-		x = (vid.width - l*8)/2;
+		x = (vid.conwidth - l*8)/2;
 		for (j=0 ; j<l ; j++, x+=8)
 		{
 			Draw_Character (x, y, start[j]);	
@@ -271,6 +274,8 @@ static void SCR_CalcRefdef (void)
 // vertical resolution
 	if (scr_con_current > vid.height)
 		scr_con_current = vid.height;
+    if (con_con_current > vid.conheight)
+        con_con_current = vid.conheight;
 
 // notify the refresh of the change
 	R_ViewChanged (&vrect, sb_lines, vid.aspect);
@@ -457,15 +462,23 @@ void SCR_SetUpToDrawConsole (void)
 	{
 		scr_conlines = vid.height;		// full screen
 		scr_con_current = scr_conlines;
+        con_conlines = vid.conheight;
+        con_con_current = con_conlines;
 	}
 	else if (key_dest == key_console)
+    {
 		scr_conlines = vid.height/2;	// half screen
+        con_conlines = vid.conheight/2;
+    }
 	else
+    {
 		scr_conlines = 0;				// none visible
-	
+        con_conlines = 0;
+    }
+    
 	if (scr_conlines < scr_con_current)
 	{
-		scr_con_current -= scr_conspeed.value*host_frametime;
+		scr_con_current -= scr_conspeed.value*(320.0/240.0)*host_frametime;
 		if (scr_conlines > scr_con_current)
 			scr_con_current = scr_conlines;
 
@@ -477,6 +490,20 @@ void SCR_SetUpToDrawConsole (void)
 			scr_con_current = scr_conlines;
 	}
 
+    if (con_conlines < con_con_current)
+    {
+        con_con_current -= scr_conspeed.value*host_frametime;
+        if (con_conlines > con_con_current)
+            con_con_current = con_conlines;
+        
+    }
+    else if (con_conlines > con_con_current)
+    {
+        con_con_current += scr_conspeed.value*host_frametime;
+        if (con_conlines < con_con_current)
+            con_con_current = con_conlines;
+    }
+    
 	if (clearconsole++ < vid.numpages)
 	{
 		scr_copytop = 1;
@@ -499,10 +526,10 @@ SCR_DrawConsole
 */
 void SCR_DrawConsole (void)
 {
-	if (scr_con_current)
+	if (con_con_current)
 	{
 		scr_copyeverything = 1;
-		Con_DrawConsole (scr_con_current, true);
+		Con_DrawConsole (con_con_current, true);
 		clearconsole = 0;
 	}
 	else

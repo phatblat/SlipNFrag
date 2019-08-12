@@ -27,8 +27,10 @@
     id<MTLRenderPipelineState> pipelineState;
     id<MTLBuffer> modelViewProjectionMatrixBuffer;
     id<MTLTexture> screen;
+    id<MTLTexture> console;
     id<MTLTexture> palette;
     id<MTLSamplerState> screenSamplerState;
+    id<MTLSamplerState> consoleSamplerState;
     id<MTLSamplerState> paletteSamplerState;
     id<MTLBuffer> screenPlane;
     NSTimeInterval previousTime;
@@ -124,6 +126,7 @@
     {
         vid_width = (int)width;
         vid_height = (int)height;
+        [self calculateConsoleDimensions];
         VID_Resize();
         float matrix[16];
         bzero(matrix, sizeof(matrix));
@@ -133,20 +136,28 @@
         matrix[15] = 1;
         float* matrixData = (float*)modelViewProjectionMatrixBuffer.contents;
         memcpy(matrixData, matrix, sizeof(matrix));
-        MTLTextureDescriptor* textureDescriptor = [MTLTextureDescriptor new];
-        textureDescriptor.pixelFormat = MTLPixelFormatR8Unorm;
-        textureDescriptor.width = width;
-        textureDescriptor.height = height;
-        screen = [mtkView.device newTextureWithDescriptor:textureDescriptor];
+        MTLTextureDescriptor* screenDescriptor = [MTLTextureDescriptor new];
+        screenDescriptor.pixelFormat = MTLPixelFormatR8Unorm;
+        screenDescriptor.width = vid_width;
+        screenDescriptor.height = vid_height;
+        screen = [mtkView.device newTextureWithDescriptor:screenDescriptor];
+        MTLTextureDescriptor* consoleDescriptor = [MTLTextureDescriptor new];
+        consoleDescriptor.pixelFormat = MTLPixelFormatR8Unorm;
+        consoleDescriptor.width = con_width;
+        consoleDescriptor.height = con_height;
+        console = [mtkView.device newTextureWithDescriptor:consoleDescriptor];
         firstFrame = NO;
     }
+    memset(con_buffer.data(), 255, con_buffer.size());
     Sys_Frame(frame_lapse);
     if ([self displaySysErrorIfNeeded])
     {
         return;
     }
-    MTLRegion screenRegion = MTLRegionMake2D(0, 0, width, height);
-    [screen replaceRegion:screenRegion mipmapLevel:0 withBytes:vid_buffer.data() bytesPerRow:width];
+    MTLRegion screenRegion = MTLRegionMake2D(0, 0, vid_width, vid_height);
+    [screen replaceRegion:screenRegion mipmapLevel:0 withBytes:vid_buffer.data() bytesPerRow:vid_width];
+    MTLRegion consoleRegion = MTLRegionMake2D(0, 0, con_width, con_height);
+    [console replaceRegion:consoleRegion mipmapLevel:0 withBytes:con_buffer.data() bytesPerRow:con_width];
     MTLRegion paletteRegion = MTLRegionMake1D(0, 256);
     [palette replaceRegion:paletteRegion mipmapLevel:0 withBytes:d_8to24table bytesPerRow:0];
     id<MTLCommandBuffer> commandBuffer = [commandQueue commandBuffer];
@@ -161,9 +172,11 @@
         [commandEncoder setVertexBuffer:screenPlane offset:0 atIndex:0];
         [commandEncoder setVertexBuffer:modelViewProjectionMatrixBuffer offset:0 atIndex:1];
         [commandEncoder setFragmentTexture:screen atIndex:0];
-        [commandEncoder setFragmentTexture:palette atIndex:1];
+        [commandEncoder setFragmentTexture:console atIndex:1];
+        [commandEncoder setFragmentTexture:palette atIndex:2];
         [commandEncoder setFragmentSamplerState:screenSamplerState atIndex:0];
-        [commandEncoder setFragmentSamplerState:paletteSamplerState atIndex:1];
+        [commandEncoder setFragmentSamplerState:consoleSamplerState atIndex:1];
+        [commandEncoder setFragmentSamplerState:paletteSamplerState atIndex:2];
         [commandEncoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
         [commandEncoder endEncoding];
         [commandBuffer presentDrawable:currentDrawable];
@@ -220,6 +233,8 @@
     palette = [device newTextureWithDescriptor:paletteDescriptor];
     MTLSamplerDescriptor* screenSamplerDescriptor = [MTLSamplerDescriptor new];
     screenSamplerState = [device newSamplerStateWithDescriptor:screenSamplerDescriptor];
+    MTLSamplerDescriptor* consoleSamplerDescriptor = [MTLSamplerDescriptor new];
+    consoleSamplerState = [device newSamplerStateWithDescriptor:consoleSamplerDescriptor];
     MTLSamplerDescriptor* paletteSamplerDescriptor = [MTLSamplerDescriptor new];
     paletteSamplerState = [device newSamplerStateWithDescriptor:paletteSamplerDescriptor];
     float screenPlaneVertices[] = {
@@ -234,6 +249,7 @@
     screenPlane = [device newBufferWithBytes:screenPlaneVertices length:sizeof(screenPlaneVertices) options:0];
     vid_width = (int)self.view.frame.size.width;
     vid_height = (int)self.view.frame.size.height;
+    [self calculateConsoleDimensions];
     std::vector<std::string> arguments;
     arguments.emplace_back(sys_argv[0]);
     NSData* basedir = [NSUserDefaults.standardUserDefaults objectForKey:@"basedir_bookmark"];
@@ -375,6 +391,21 @@
 {
     AppDelegate* appDelegate = NSApplication.sharedApplication.delegate;
     [appDelegate preferences:nil];
+}
+
+-(void)calculateConsoleDimensions
+{
+    auto factor = (double)vid_width / 320;
+    double new_conwidth = 320;
+    auto new_conheight = (double)vid_height / factor;
+    if (new_conheight < 200)
+    {
+        factor = (double)vid_height / 200;
+        new_conheight = 200;
+        new_conwidth = (double)vid_width / factor;
+    }
+    con_width = (int)new_conwidth;
+    con_height = (int)new_conheight;
 }
 
 -(BOOL)displaySysErrorIfNeeded

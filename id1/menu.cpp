@@ -109,7 +109,7 @@ Draws one solid graphics character
 */
 void M_DrawCharacter (int cx, int line, int num)
 {
-	Draw_Character ( cx + ((vid.width - 320)>>1), line, num);
+	Draw_Character ( cx + ((vid.conwidth - 320)>>1), line, num);
 }
 
 void M_Print (int cx, int cy, const char *str)
@@ -134,12 +134,12 @@ void M_PrintWhite (int cx, int cy, const char *str)
 
 void M_DrawTransPic (int x, int y, qpic_t *pic)
 {
-	Draw_TransPic (x + ((vid.width - 320)>>1), y, pic);
+	Draw_TransPicOnConsole (x + ((vid.conwidth - 320)>>1), y, pic);
 }
 
 void M_DrawPic (int x, int y, qpic_t *pic)
 {
-	Draw_Pic (x + ((vid.width - 320)>>1), y, pic);
+	Draw_PicOnConsole (x + ((vid.conwidth - 320)>>1), y, pic);
 }
 
 byte identityTable[256];
@@ -172,7 +172,7 @@ void M_BuildTranslationTable(int top, int bottom)
 
 void M_DrawTransPicTranslate (int x, int y, qpic_t *pic)
 {
-	Draw_TransPicTranslate (x + ((vid.width - 320)>>1), y, pic, translationTable);
+	Draw_TransPicTranslateOnConsole (x + ((vid.width - 320)>>1), y, pic, translationTable);
 }
 
 
@@ -3008,9 +3008,9 @@ void M_Draw (void)
 	{
 		scr_copyeverything = 1;
 
-		if (scr_con_current)
+		if (con_con_current)
 		{
-			Draw_ConsoleBackground (vid.height);
+			Draw_ConsoleBackground (vid.conheight);
 			VID_UnlockBuffer ();
 			S_ExtraUpdate ();
 			VID_LockBuffer ();
