@@ -1,0 +1,31 @@
+﻿<ContentDialog
+    x:Class="SlipNFrag_Windows.SettingsContentDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SlipNFrag_Windows"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Settings"
+    PrimaryButtonText="Close">
+    <StackPanel Orientation="Vertical">
+        <TextBlock>Game directory (-basedir):</TextBlock>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="basedir_text" IsReadOnly="True" />
+            <Button Grid.Column="1" x:Name="basedir_choose" Click="Basedir_choose_Click">...</Button>
+        </Grid>
+        <TextBlock />
+        <RadioButton x:Name="standard_quake_radio" Checked="Standard_quake_radio_Checked" IsChecked="False">Core game</RadioButton>
+        <RadioButton x:Name="hipnotic_radio" Checked="Hipnotic_radio_Checked" IsChecked="False">Mission Pack 1 (-hipnotic)</RadioButton>
+        <RadioButton x:Name="rogue_radio" Checked="Rogue_radio_Checked" IsChecked="False">Mission Pack 2 (-rogue)</RadioButton>
+        <RadioButton x:Name="game_radio" Checked="Game_radio_Checked" IsChecked="False">Other (-game):</RadioButton>
+        <TextBox x:Name="game_text" TextChanged="Game_text_TextChanged" />
+        <TextBlock />
+        <TextBlock>Additional command-line arguments:</TextBlock>
+        <TextBox x:Name="command_line_text" AcceptsReturn="True" TextWrapping="Wrap" TextChanged="Command_line_text_TextChanged" />
+    </StackPanel>
+</ContentDialog>

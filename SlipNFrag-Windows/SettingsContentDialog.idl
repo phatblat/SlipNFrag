@@ -1,0 +1,8 @@
+namespace SlipNFrag_Windows
+{
+    [default_interface]
+    runtimeclass SettingsContentDialog : Windows.UI.Xaml.Controls.ContentDialog
+    {
+		SettingsContentDialog();
+    }
+}

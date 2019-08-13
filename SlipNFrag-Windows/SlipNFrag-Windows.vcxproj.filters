@@ -198,6 +198,8 @@
     </ClCompile>
     <ClCompile Include="vid_uwp.cpp" />
     <ClCompile Include="sys_uwp.cpp" />
+    <ClCompile Include="App.cpp" />
+    <ClCompile Include="MainPage.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -324,6 +326,8 @@
     <ClInclude Include="vid_uwp.h" />
     <ClInclude Include="sys_uwp.h" />
     <ClInclude Include="virtualkeymap.h" />
+    <ClInclude Include="App.h" />
+    <ClInclude Include="MainPage.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\LockScreenLogo.scale-200.png" />
@@ -352,5 +356,9 @@
     <Filter Include="SlipNFrag">
       <UniqueIdentifier>{71c413a4-4264-491f-adc2-789070f1c79c}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Midl Include="App.idl" />
+    <Midl Include="MainPage.idl" />
   </ItemGroup>
 </Project>

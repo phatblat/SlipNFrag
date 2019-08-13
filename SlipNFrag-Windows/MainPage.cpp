@@ -14,7 +14,6 @@ using namespace Windows::Graphics::Display;
 using namespace Windows::Storage;
 using namespace Windows::Storage::AccessCache;
 using namespace Windows::Storage::FileProperties;
-using namespace Windows::Storage::Pickers;
 using namespace Windows::Storage::Streams;
 using namespace Windows::System;
 using namespace Windows::System::Threading;
@@ -168,18 +167,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 			});
 		settingsButton.Click([this, playButton, settingsButton](IInspectable const&, RoutedEventArgs const&)
 			{
-				FolderPicker picker;
-				picker.SuggestedStartLocation(Windows::Storage::Pickers::PickerLocationId::ComputerFolder);
-				picker.FileTypeFilter().Append(L"*");
-				auto task = picker.PickSingleFolderAsync();
-				task.Completed([](IAsyncOperation<StorageFolder> const& operation, AsyncStatus const) 
-					{
-						auto folder = operation.GetResults();
-						if (folder != nullptr)
-						{
-							StorageApplicationPermissions::FutureAccessList().AddOrReplace(L"basedir_text", folder);
-						}
-					});
+				SettingsContentDialog settings;
+				settings.ShowAsync(ContentDialogPlacement::InPlace);
 			});
 	}
 
@@ -229,95 +218,97 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void MainPage::Start()
 	{
-		swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [=]()
+		auto task = StorageApplicationPermissions::FutureAccessList().GetFolderAsync(L"basedir_text");
+		task.Completed([this](IAsyncOperation<StorageFolder> const& operation, AsyncStatus const status)
 			{
-				newWidth = (float)swapChainPanel().ActualWidth();
-				newHeight = (float)swapChainPanel().ActualHeight();
-				CreateDevice();
-				std::thread filesThread([this]() 
-					{
-						ProcessFiles();
-					});
-				filesThread.detach();
-				vid_width = (int)newWidth;
-				vid_height = (int)newHeight;
-				/*auto commandLine = [NSUserDefaults.standardUserDefaults stringForKey : @"command_line_text"];
-				if (commandLine != nil && ![commandLine isEqualToString : @""])
+				std::string basedir_text;
+				if (status == AsyncStatus::Completed)
 				{
-					std::string firstArgument = sys_argv[0];
-					NSArray<NSString*>* arguments = [commandLine componentsSeparatedByString : @" "];
-						sys_argc = (int)arguments.count + 1;
-					sys_argv = new char* [sys_argc];
-					auto i = 0;
-					sys_argv[i] = new char[firstArgument.length() + 1];
-					strcpy(sys_argv[i], firstArgument.c_str());
-					for (NSString* argument : arguments)
+					auto folder = operation.GetResults();
+					auto path = folder.Path();
+					for (auto c : path)
 					{
-						i++;
-						auto argumentAsString = [argument cStringUsingEncoding : NSString.defaultCStringEncoding];
-						sys_argv[i] = new char[strlen(argumentAsString) + 1];
-						strcpy(sys_argv[i], argumentAsString);
+						basedir_text.push_back((char)c);
 					}
 				}
-				else
-				{*/
-					auto basedir = "D:\\Shared\\test_maps\\quake";//[NSUserDefaults.standardUserDefaults stringForKey : @"basedir_text"];
-					/*if (basedir != nil && ![basedir isEqualToString : @""])
-					{*/
-						std::vector<std::string> arguments;
-						arguments.emplace_back("SlipNFrag.exe");//sys_argv[0]);
-						arguments.emplace_back("-basedir");
-						arguments.emplace_back(basedir);
-						/*if ([NSUserDefaults.standardUserDefaults boolForKey : @"hipnotic_radio"])
-						{
-							arguments.emplace_back("-hipnotic");
-						}
-						else if ([NSUserDefaults.standardUserDefaults boolForKey : @"rogue_radio"])
-						{
-							arguments.emplace_back("-rogue");
-						}
-						else if ([NSUserDefaults.standardUserDefaults boolForKey : @"game_radio"])
-						{
-							arguments.emplace_back("-game");
-							auto game = [NSUserDefaults.standardUserDefaults stringForKey : @"game_text"];
-							if (game != nil && ![game isEqualToString : @""])
-							{
-								arguments.emplace_back([game cStringUsingEncoding : NSString.defaultCStringEncoding]);
-							}
-						}*/
-						sys_argc = (int)arguments.size();
-						sys_argv = new char* [sys_argc];
-						for (auto i = 0; i < arguments.size(); i++)
-						{
-							sys_argv[i] = new char[arguments[i].length() + 1];
-							strcpy(sys_argv[i], arguments[i].c_str());
-						}
-					//}
-				//}
-				byte* data = nullptr;
-				check_hresult(screenUpload->Map(0, nullptr, reinterpret_cast<void**>(&data)));
-				VID_Map(data);
-				Sys_Init(sys_argc, sys_argv);
-				if (DisplaySysErrorIfNeeded())
+				std::vector<std::string> arguments;
+				arguments.emplace_back("SlipNFrag.exe");
+				if (basedir_text.length() > 0)
 				{
-					return;
+					arguments.emplace_back("-basedir");
+					arguments.push_back(basedir_text);
 				}
-				Window::Current().CoreWindow().PointerCursor(nullptr);
-				Window::Current().CoreWindow().KeyDown([](IInspectable const&, KeyEventArgs const& e)
+				/*if ([NSUserDefaults.standardUserDefaults boolForKey : @"hipnotic_radio"])
+				{
+					arguments.emplace_back("-hipnotic");
+				}
+				else if ([NSUserDefaults.standardUserDefaults boolForKey : @"rogue_radio"])
+				{
+					arguments.emplace_back("-rogue");
+				}
+				else if ([NSUserDefaults.standardUserDefaults boolForKey : @"game_radio"])
+				{
+					auto game = [NSUserDefaults.standardUserDefaults stringForKey : @"game_text"];
+					if (game != nil && ![game isEqualToString : @""])
 					{
-						auto mapped = virtualkeymap[(int)e.VirtualKey()];
-						Key_Event(mapped, true);
+						arguments.emplace_back("-game");
+						arguments.emplace_back([game cStringUsingEncoding : NSString.defaultCStringEncoding]);
+					}
+				}
+				auto commandLine = [NSUserDefaults.standardUserDefaults stringForKey : @"command_line_text"];
+				if (commandLine != nil && ![commandLine isEqualToString : @""])
+				{
+					NSArray<NSString*>* components = [commandLine componentsSeparatedByString : @" "];
+						for (NSString* component : components)
+						{
+							auto componentAsString = [component cStringUsingEncoding : NSString.defaultCStringEncoding];
+							arguments.emplace_back(componentAsString);
+						}
+				}*/
+				sys_argc = (int)arguments.size();
+				sys_argv = new char* [sys_argc];
+				for (auto i = 0; i < arguments.size(); i++)
+				{
+					sys_argv[i] = new char[arguments[i].length() + 1];
+					strcpy(sys_argv[i], arguments[i].c_str());
+				}
+				swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [=]()
+					{
+						newWidth = (float)swapChainPanel().ActualWidth();
+						newHeight = (float)swapChainPanel().ActualHeight();
+						CreateDevice();
+						std::thread filesThread([this]()
+							{
+								ProcessFiles();
+							});
+						filesThread.detach();
+						vid_width = (int)newWidth;
+						vid_height = (int)newHeight;
+						byte* data = nullptr;
+						check_hresult(screenUpload->Map(0, nullptr, reinterpret_cast<void**>(&data)));
+						VID_Map(data);
+						Sys_Init(sys_argc, sys_argv);
+						if (DisplaySysErrorIfNeeded())
+						{
+							return;
+						}
+						Window::Current().CoreWindow().PointerCursor(nullptr);
+						Window::Current().CoreWindow().KeyDown([](IInspectable const&, KeyEventArgs const& e)
+							{
+								auto mapped = virtualkeymap[(int)e.VirtualKey()];
+								Key_Event(mapped, true);
+							});
+						Window::Current().CoreWindow().KeyUp([](IInspectable const&, KeyEventArgs const& e)
+							{
+								auto mapped = virtualkeymap[(int)e.VirtualKey()];
+								Key_Event(mapped, false);
+							});
+						ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
+						renderLoopWorker = ThreadPool::RunAsync([=](IAsyncAction const& action)
+							{
+								RenderLoop(action);
+							}, WorkItemPriority::High, WorkItemOptions::TimeSliced);
 					});
-				Window::Current().CoreWindow().KeyUp([](IInspectable const&, KeyEventArgs const& e)
-					{
-						auto mapped = virtualkeymap[(int)e.VirtualKey()];
-						Key_Event(mapped, false);
-					});
-				ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
-				renderLoopWorker = ThreadPool::RunAsync([=](IAsyncAction const& action)
-					{
-						RenderLoop(action);
-					}, WorkItemPriority::High, WorkItemOptions::TimeSliced);
 			});
 	}
 

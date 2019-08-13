@@ -172,6 +172,9 @@
     <ClInclude Include="MainPage.h">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="SettingsContentDialog.h">
+      <DependentUpon>SettingsContentDialog.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="sys_uwp.h" />
     <ClInclude Include="vid_uwp.h" />
     <ClInclude Include="virtualkeymap.h" />
@@ -181,6 +184,9 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Page Include="MainPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="SettingsContentDialog.xaml">
       <SubType>Designer</SubType>
     </Page>
   </ItemGroup>
@@ -706,6 +712,9 @@
     <ClCompile Include="MainPage.cpp">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </ClCompile>
+    <ClCompile Include="SettingsContentDialog.cpp">
+      <DependentUpon>SettingsContentDialog.xaml</DependentUpon>
+    </ClCompile>
     <ClCompile Include="$(GeneratedFilesDir)module.g.cpp" />
     <ClCompile Include="sys_uwp.cpp" />
     <ClCompile Include="vid_uwp.cpp">
@@ -723,6 +732,9 @@
     </Midl>
     <Midl Include="MainPage.idl">
       <DependentUpon>MainPage.xaml</DependentUpon>
+    </Midl>
+    <Midl Include="SettingsContentDialog.idl">
+      <DependentUpon>SettingsContentDialog.xaml</DependentUpon>
     </Midl>
   </ItemGroup>
   <ItemGroup>
