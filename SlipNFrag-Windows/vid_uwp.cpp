@@ -52,7 +52,7 @@ void VID_Init(unsigned char* palette)
 	vid.maxwarpheight = WARP_HEIGHT;
 	vid.height = vid.conheight = vid_height;
 	vid.aspect = ((float)vid.height / (float)vid.width) * (320.0 / 240.0);
-	vid.numpages = 1;
+	vid.numpages = 3;
 	vid.colormap = host_colormap;
 	vid.fullbright = 256 - LittleLong(*((int*)vid.colormap + 2048));
 	vid.rowbytes = vid.conrowbytes = vid_rowbytes;

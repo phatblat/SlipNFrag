@@ -59,6 +59,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 			game_radio().IsChecked(unbox_value<bool>(value));
 			oneIsChecked = oneIsChecked || unbox_value<bool>(value);
 		}
+		if (values.HasKey(L"game_text"))
+		{
+			auto value = values.Lookup(L"game_text");
+			game_text().Text(unbox_value<hstring>(value));
+		}
+		if (values.HasKey(L"command_line_text"))
+		{
+			auto value = values.Lookup(L"command_line_text");
+			command_line_text().Text(unbox_value<hstring>(value));
+		}
 		if (!oneIsChecked)
 		{
 			standard_quake_radio().IsChecked(true);
@@ -101,14 +111,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 		SaveRadioButtons();
 	}
 
-	void SettingsContentDialog::Game_text_TextChanged(IInspectable const& sender, TextChangedEventArgs const& e)
+	void SettingsContentDialog::Game_text_TextChanged(IInspectable const&, TextChangedEventArgs const&)
 	{
-
+		auto values = ApplicationData::Current().LocalSettings().Values();
+		values.Insert(L"game_text", box_value(game_text().Text()));
 	}
 
-	void SettingsContentDialog::Command_line_text_TextChanged(IInspectable const& sender, TextChangedEventArgs const& e)
+	void SettingsContentDialog::Command_line_text_TextChanged(IInspectable const&, TextChangedEventArgs const&)
 	{
-
+		auto values = ApplicationData::Current().LocalSettings().Values();
+		values.Insert(L"command_line_text", box_value(command_line_text().Text()));
 	}
 
 	void SettingsContentDialog::SaveRadioButtons()

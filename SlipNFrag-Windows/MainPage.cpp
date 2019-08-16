@@ -238,33 +238,67 @@ namespace winrt::SlipNFrag_Windows::implementation
 					arguments.emplace_back("-basedir");
 					arguments.push_back(basedir_text);
 				}
-				/*if ([NSUserDefaults.standardUserDefaults boolForKey : @"hipnotic_radio"])
+				auto values = ApplicationData::Current().LocalSettings().Values();
+				if (values.HasKey(L"hipnotic_radio"))
 				{
-					arguments.emplace_back("-hipnotic");
-				}
-				else if ([NSUserDefaults.standardUserDefaults boolForKey : @"rogue_radio"])
-				{
-					arguments.emplace_back("-rogue");
-				}
-				else if ([NSUserDefaults.standardUserDefaults boolForKey : @"game_radio"])
-				{
-					auto game = [NSUserDefaults.standardUserDefaults stringForKey : @"game_text"];
-					if (game != nil && ![game isEqualToString : @""])
+					auto value = values.Lookup(L"hipnotic_radio");
+					if (unbox_value<bool>(value))
 					{
-						arguments.emplace_back("-game");
-						arguments.emplace_back([game cStringUsingEncoding : NSString.defaultCStringEncoding]);
+						arguments.emplace_back("-hipnotic");
 					}
 				}
-				auto commandLine = [NSUserDefaults.standardUserDefaults stringForKey : @"command_line_text"];
-				if (commandLine != nil && ![commandLine isEqualToString : @""])
+				else if (values.HasKey(L"rogue_radio"))
 				{
-					NSArray<NSString*>* components = [commandLine componentsSeparatedByString : @" "];
-						for (NSString* component : components)
+					auto value = values.Lookup(L"rogue_radio");
+					if (unbox_value<bool>(value))
+					{
+						arguments.emplace_back("-rogue");
+					}
+				}
+				else if (values.HasKey(L"game_radio"))
+				{
+					if (values.HasKey(L"game_text"))
+					{
+						auto value = values.Lookup(L"game_radio");
+						if (unbox_value<bool>(value))
 						{
-							auto componentAsString = [component cStringUsingEncoding : NSString.defaultCStringEncoding];
-							arguments.emplace_back(componentAsString);
+							value = values.Lookup(L"game_text");
+							auto value_as_string = unbox_value<hstring>(value);
+							std::string game_text;
+							for (auto c : value_as_string)
+							{
+								game_text.push_back((char)c);
+							}
+							arguments.emplace_back("-game");
+							arguments.push_back(game_text);
 						}
-				}*/
+					}
+				}
+				if (values.HasKey(L"command_line_text"))
+				{
+					auto value = values.Lookup(L"command_line_text");
+					auto value_as_string = unbox_value<hstring>(value);
+					std::string one_command;
+					for (auto c : value_as_string)
+					{
+						if (c == ' ')
+						{
+							if (one_command.length() > 0)
+							{
+								arguments.push_back(one_command);
+								one_command.clear();
+							}
+						}
+						else
+						{
+							one_command.push_back((char)c);
+						}
+					}
+					if (one_command.length() > 0)
+					{
+						arguments.push_back(one_command);
+					}
+				}
 				sys_argc = (int)arguments.size();
 				sys_argv = new char* [sys_argc];
 				for (auto i = 0; i < arguments.size(); i++)
@@ -374,11 +408,11 @@ namespace winrt::SlipNFrag_Windows::implementation
 		DXGI_SWAP_CHAIN_DESC1 swapChainDesc { };
 		swapChainDesc.Width = lround(renderTargetSize.Width);
 		swapChainDesc.Height = lround(renderTargetSize.Height);
-		swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		swapChainDesc.SampleDesc.Count = 1;
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapChainDesc.BufferCount = frameCount;
-		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
 		swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
 		com_ptr<IDXGISwapChain1> newSwapChain;
 		check_hresult(dxgiFactory->CreateSwapChainForComposition(commandQueue.get(), &swapChainDesc, nullptr, newSwapChain.put()));
