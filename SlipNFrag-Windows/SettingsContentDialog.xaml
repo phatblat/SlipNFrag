@@ -25,6 +25,9 @@
         <RadioButton x:Name="game_radio" Checked="Game_radio_Checked" IsChecked="False">Other (-game):</RadioButton>
         <TextBox x:Name="game_text" TextChanged="Game_text_TextChanged" />
         <TextBlock />
+        <CheckBox x:Name="fullscreen_check">Start in full screen mode</CheckBox>
+        <CheckBox x:Name="fullscreen_if_maximized_check">Change to full screen mode when maximizing</CheckBox>
+        <TextBlock />
         <TextBlock>Additional command-line arguments:</TextBlock>
         <TextBox x:Name="command_line_text" AcceptsReturn="True" TextWrapping="Wrap" TextChanged="Command_line_text_TextChanged" />
     </StackPanel>

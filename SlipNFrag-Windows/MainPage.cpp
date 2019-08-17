@@ -303,6 +303,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 								auto mapped = virtualkeymap[(int)e.VirtualKey()];
 								Key_Event(mapped, false);
 							});
+						ApplicationView::GetForCurrentView().SetPreferredMinSize(Size(320, 200));
 						ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
 						renderLoopWorker = ThreadPool::RunAsync([=](IAsyncAction const& action)
 							{

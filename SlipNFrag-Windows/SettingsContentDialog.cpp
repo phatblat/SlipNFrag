@@ -63,6 +63,24 @@ namespace winrt::SlipNFrag_Windows::implementation
 		{
 			standard_quake_radio().IsChecked(true);
 		}
+		if (values.HasKey(L"fullscreen_check"))
+		{
+			auto value = values.Lookup(L"fullscreen_check");
+			fullscreen_check().IsChecked(unbox_value<bool>(value));
+		}
+		else
+		{
+			game_radio().IsChecked(true);
+		}
+		if (values.HasKey(L"fullscreen_if_maximized_check"))
+		{
+			auto value = values.Lookup(L"fullscreen_if_maximized_check");
+			fullscreen_if_maximized_check().IsChecked(unbox_value<bool>(value));
+		}
+		else
+		{
+			fullscreen_if_maximized_check().IsChecked(true);
+		}
 	}
 
 	void SettingsContentDialog::Basedir_choose_Click(IInspectable const&, RoutedEventArgs const&)
