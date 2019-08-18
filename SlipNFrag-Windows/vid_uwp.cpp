@@ -3,6 +3,7 @@
 
 extern viddef_t vid;
 
+std::vector<unsigned char> vid_buffer;
 int vid_width;
 int vid_height;
 int vid_rowbytes;
@@ -47,6 +48,7 @@ void VID_ShiftPalette(unsigned char* palette)
 
 void VID_Init(unsigned char* palette)
 {
+	vid_buffer.resize(vid_rowbytes * vid_height);
 	vid.maxwarpwidth = WARP_WIDTH;
 	vid.width = vid.conwidth = vid_width;
 	vid.maxwarpheight = WARP_HEIGHT;
@@ -55,6 +57,7 @@ void VID_Init(unsigned char* palette)
 	vid.numpages = 1;
 	vid.colormap = host_colormap;
 	vid.fullbright = 256 - LittleLong(*((int*)vid.colormap + 2048));
+	vid.buffer = vid.conbuffer = vid_buffer.data();
 	vid.rowbytes = vid.conrowbytes = vid_rowbytes;
 	zbuffer.resize(vid_width * vid_height);
 	d_pzbuffer = zbuffer.data();
@@ -66,9 +69,11 @@ void VID_Init(unsigned char* palette)
 void VID_Resize()
 {
 	D_FlushCaches();
+	vid_buffer.resize(vid_rowbytes * vid_height);
 	vid.width = vid.conwidth = vid_width;
 	vid.height = vid.conheight = vid_height;
 	vid.aspect = ((float)vid.height / (float)vid.width) * (320.0 / 240.0);
+	vid.buffer = vid.conbuffer = vid_buffer.data();
 	vid.rowbytes = vid.conrowbytes = vid_rowbytes;
 	zbuffer.resize(vid_width * vid_height);
 	d_pzbuffer = zbuffer.data();

@@ -19,7 +19,7 @@
             </Grid.ColumnDefinitions>
             <TextBlock Text="Slip &amp; Frag" Grid.Column="1" Style="{StaticResource CaptionTextBlockStyle}" Margin="12,8,0,0"/>
         </Grid>
-        <Button x:Name="fullscreenButton" HorizontalAlignment="Right" Grid.Row="0" Background="Transparent" Click="FullscreenButton_Click">
+        <Button x:Name="fullscreenButton" HorizontalAlignment="Right" Grid.Row="0" Background="Transparent" IsTabStop="False" Click="FullscreenButton_Click">
             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE1D9;" FontSize="13" />
         </Button>
         <SwapChainPanel x:Name="swapChainPanel" Grid.Row="1" SizeChanged="swapChainPanel_SizeChanged" CompositionScaleChanged="swapChainPanel_CompositionScaleChanged" />

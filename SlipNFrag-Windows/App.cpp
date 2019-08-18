@@ -48,7 +48,7 @@ void App::OnLaunched(LaunchActivatedEventArgs const& e)
             }
             Window::Current().Content(rootFrame);
             Window::Current().Activate();
-			ApplicationView::GetForCurrentView().SetPreferredMinSize(Size(320, 200));
+			ApplicationView::GetForCurrentView().SetPreferredMinSize(Size(320, 244));
         }
     }
     else

@@ -2,6 +2,7 @@
 
 #include "quakedef.h"
 
+extern std::vector<unsigned char> vid_buffer;
 extern int vid_width;
 extern int vid_height;
 extern int vid_rowbytes;

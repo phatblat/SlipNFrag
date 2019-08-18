@@ -350,9 +350,6 @@ namespace winrt::SlipNFrag_Windows::implementation
 						filesThread.detach();
 						vid_width = (int)newWidth;
 						vid_height = (int)newHeight;
-						byte* data = nullptr;
-						check_hresult(screenUpload->Map(0, nullptr, reinterpret_cast<void**>(&data)));
-						VID_Map(data);
 						Sys_Init(sys_argc, sys_argv);
 						if (DisplaySysErrorIfNeeded())
 						{
@@ -362,12 +359,26 @@ namespace winrt::SlipNFrag_Windows::implementation
 						Window::Current().CoreWindow().KeyDown([](IInspectable const&, KeyEventArgs const& e)
 							{
 								auto mapped = virtualkeymap[(int)e.VirtualKey()];
-								Key_Event(mapped, true);
+								try
+								{
+									Key_Event(mapped, true);
+								}
+								catch (...)
+								{
+									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
+								}
 							});
 						Window::Current().CoreWindow().KeyUp([](IInspectable const&, KeyEventArgs const& e)
 							{
 								auto mapped = virtualkeymap[(int)e.VirtualKey()];
-								Key_Event(mapped, false);
+								try
+								{
+									Key_Event(mapped, false);
+								}
+								catch (...)
+								{
+									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
+								}
 							});
 						auto fullscreen_check = true;
 						if (values.HasKey(L"fullscreen_check"))
@@ -449,7 +460,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		DXGI_SWAP_CHAIN_DESC1 swapChainDesc { };
 		swapChainDesc.Width = lround(renderTargetSize.Width);
 		swapChainDesc.Height = lround(renderTargetSize.Height);
-		swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		swapChainDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
 		swapChainDesc.SampleDesc.Count = 1;
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapChainDesc.BufferCount = frameCount;
@@ -897,7 +908,6 @@ namespace winrt::SlipNFrag_Windows::implementation
 		if (deviceRemoved)
 		{
 			constantBuffer->Unmap(0, nullptr);
-			screenUpload->Unmap(0, nullptr);
 			screen = nullptr;
 			palette = nullptr;
 			depthStencil = nullptr;
@@ -922,6 +932,11 @@ namespace winrt::SlipNFrag_Windows::implementation
 				Render();
 				PIXEndEvent(commandQueue.get());
 			}
+		}
+		if (sys_quitcalled)
+		{
+			Application::Current().Exit();
+			return;
 		}
 		renderLoopWorker = ThreadPool::RunAsync([=](IAsyncAction const& action)
 			{
@@ -952,14 +967,18 @@ namespace winrt::SlipNFrag_Windows::implementation
 			vid_width = (int)newWidth;
 			vid_height = (int)newHeight;
 			vid_rowbytes = (int)newRowbytes;
-			screenUpload->Unmap(0, nullptr);
 			VID_Resize();
-			byte* data = nullptr;
-			check_hresult(screenUpload->Map(0, nullptr, reinterpret_cast<void**>(&data)));
-			VID_Map(data);
 			firstResize = false;
 		}
 		Sys_Frame(elapsed);
+		if (DisplaySysErrorIfNeeded() || sys_quitcalled)
+		{
+			return false;
+		}
+		byte* data = nullptr;
+		check_hresult(screenUpload->Map(0, nullptr, reinterpret_cast<void**>(&data)));
+		memcpy(data, vid_buffer.data(), vid_buffer.size());
+		screenUpload->Unmap(0, nullptr);
 		previousTime = time;
 		return true;
 	}
@@ -1289,11 +1308,13 @@ namespace winrt::SlipNFrag_Windows::implementation
 		{
 			if (sys_nogamedata)
 			{
-				MessageDialog msg(L"Go to Preferences and set Game directory(-basedir) to your copy of the game files, or add it to the Command line.", L"Game data not found");
+				MessageDialog msg(L"Go to Preferences and set Game directory (-basedir) to your copy of the game files.", L"Game data not found");
 				Windows::UI::Popups::UICommand goToPreferences(L"Go to Preferences", [this](IUICommand const &) {
-					//AppDelegate* appDelegate = NSApplication.sharedApplication.delegate;
-					//[appDelegate preferences : nil] ;
-					Application::Current().Exit();
+					SettingsContentDialog settings;
+					auto task = settings.ShowAsync(ContentDialogPlacement::InPlace);
+					task.Completed([](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const) {
+						Application::Current().Exit();
+						});
 					});
 				Windows::UI::Popups::UICommand buyGame(L"Where to buy the game", [this](IUICommand const&) {
 					Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=buy+quake+1+game"));
@@ -1317,8 +1338,6 @@ namespace winrt::SlipNFrag_Windows::implementation
 				}
 				MessageDialog msg(toDisplay, L"Sys_Error");
 				Windows::UI::Popups::UICommand okButton(L"Ok", [this](IUICommand const&) {
-					//AppDelegate* appDelegate = NSApplication.sharedApplication.delegate;
-					//[appDelegate preferences : nil] ;
 					Application::Current().Exit();
 					});
 				msg.Commands().Append(okButton);

@@ -8,6 +8,7 @@ using namespace Windows::Storage;
 using namespace Windows::Storage::AccessCache;
 using namespace Windows::Storage::Pickers;
 using namespace Windows::UI::Core;
+using namespace Windows::UI::Popups;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
 
@@ -102,6 +103,18 @@ namespace winrt::SlipNFrag_Windows::implementation
 					basedir_text().Dispatcher().RunAsync(CoreDispatcherPriority::Normal, [=]()
 						{
 							basedir_text().Text(path);
+						});
+					auto task = folder.GetFileAsync(L"ID1\\PAK0.PAK");
+					task.Completed([=](IAsyncOperation<StorageFile> const& operation, AsyncStatus const& status)
+						{
+							if (status == AsyncStatus::Error)
+							{
+								basedir_text().Dispatcher().RunAsync(CoreDispatcherPriority::Normal, [=]()
+									{
+										MessageDialog msg(L"The folder " + path + L" does not contain a folder ID1 with a file PAK0.PAK - the game might not start.\n\nEnsure that all required files are present before starting the game.", L"Core game data not found");
+										msg.ShowAsync();
+									});
+							}
 						});
 				}
 			});

@@ -13,6 +13,7 @@ char** sys_argv;
 float frame_lapse = 1.0f / 60;
 qboolean isDedicated;
 std::string sys_errormessage;
+qboolean sys_quitcalled;
 int sys_nogamedata;
 std::vector<file_t> sys_files;
 fileoperation_t sys_fileoperation;
@@ -223,7 +224,9 @@ void Sys_Printf(const char* fmt, ...)
 
 void Sys_Quit()
 {
-	exit(0);
+	Host_Shutdown();
+	sys_quitcalled = true;
+	throw std::runtime_error("Sys_Quit called.");
 }
 
 double Sys_FloatTime()
