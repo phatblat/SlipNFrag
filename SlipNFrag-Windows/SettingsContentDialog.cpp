@@ -16,6 +16,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 	SettingsContentDialog::SettingsContentDialog()
 	{
 		InitializeComponent();
+		is_loading = true;
 		if (StorageApplicationPermissions::FutureAccessList().ContainsItem(L"basedir_text"))
 		{
 			auto task = StorageApplicationPermissions::FutureAccessList().GetFolderAsync(L"basedir_text");
@@ -80,17 +81,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		}
 		else
 		{
-			game_radio().IsChecked(true);
+			fullscreen_check().IsChecked(true);
 		}
-		if (values.HasKey(L"fullscreen_if_maximized_check"))
-		{
-			auto value = values.Lookup(L"fullscreen_if_maximized_check");
-			fullscreen_if_maximized_check().IsChecked(unbox_value<bool>(value));
-		}
-		else
-		{
-			fullscreen_if_maximized_check().IsChecked(true);
-		}
+		is_loading = false;
 	}
 
 	void SettingsContentDialog::Basedir_choose_Click(IInspectable const&, RoutedEventArgs const&)
@@ -99,12 +92,17 @@ namespace winrt::SlipNFrag_Windows::implementation
 		picker.SuggestedStartLocation(Windows::Storage::Pickers::PickerLocationId::ComputerFolder);
 		picker.FileTypeFilter().Append(L"*");
 		auto task = picker.PickSingleFolderAsync();
-		task.Completed([](IAsyncOperation<StorageFolder> const& operation, AsyncStatus const)
+		task.Completed([=](IAsyncOperation<StorageFolder> const& operation, AsyncStatus const)
 			{
 				auto folder = operation.GetResults();
 				if (folder != nullptr)
 				{
 					StorageApplicationPermissions::FutureAccessList().AddOrReplace(L"basedir_text", folder);
+					auto path = folder.Path();
+					basedir_text().Dispatcher().RunAsync(CoreDispatcherPriority::Normal, [=]()
+						{
+							basedir_text().Text(path);
+						});
 				}
 			});
 	}
@@ -131,22 +129,54 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void SettingsContentDialog::Game_text_TextChanged(IInspectable const&, TextChangedEventArgs const&)
 	{
+		if (is_loading)
+		{
+			return;
+		}
 		auto values = ApplicationData::Current().LocalSettings().Values();
 		values.Insert(L"game_text", box_value(game_text().Text()));
 	}
 
 	void SettingsContentDialog::Command_line_text_TextChanged(IInspectable const&, TextChangedEventArgs const&)
 	{
+		if (is_loading)
+		{
+			return;
+		}
 		auto values = ApplicationData::Current().LocalSettings().Values();
 		values.Insert(L"command_line_text", box_value(command_line_text().Text()));
 	}
 
 	void SettingsContentDialog::SaveRadioButtons()
 	{
+		if (is_loading)
+		{
+			return;
+		}
 		auto values = ApplicationData::Current().LocalSettings().Values();
 		values.Insert(L"standard_quake_radio", standard_quake_radio().IsChecked());
 		values.Insert(L"hipnotic_radio", hipnotic_radio().IsChecked());
 		values.Insert(L"rogue_radio", rogue_radio().IsChecked());
 		values.Insert(L"game_radio", game_radio().IsChecked());
+	}
+
+	void SettingsContentDialog::Fullscreen_check_Checked(IInspectable const&, RoutedEventArgs const&)
+	{
+		SaveFullScreen();
+	}
+
+	void SettingsContentDialog::Fullscreen_check_Unchecked(IInspectable const&, RoutedEventArgs const&)
+	{
+		SaveFullScreen();
+	}
+
+	void SettingsContentDialog::SaveFullScreen()
+	{
+		if (is_loading)
+		{
+			return;
+		}
+		auto values = ApplicationData::Current().LocalSettings().Values();
+		values.Insert(L"fullscreen_check", fullscreen_check().IsChecked());
 	}
 }

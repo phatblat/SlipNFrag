@@ -65,6 +65,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		D3D12_TEXTURE_COPY_LOCATION paletteUploadLocation;
 
 		MainPage();
+		void UpdateTitleBarLayout(Windows::ApplicationModel::Core::CoreApplicationViewTitleBar const& titleBar);
 		void OpenVertexShaderFile(Windows::Storage::StorageFolder const& folder);
 		void ReadVertexShaderFile(Windows::Storage::StorageFile const& file, Windows::Storage::StorageFolder const& folder);
 		void OpenPixelShaderFile(Windows::Storage::StorageFolder const& folder);
@@ -100,6 +101,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void ReadFile();
 		void WriteToFile();
 		void GetFileTime();
+		void FullscreenButton_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 	};
 }
 

@@ -9,6 +9,7 @@
 using namespace winrt;
 using namespace DirectX;
 using namespace Windows::ApplicationModel;
+using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
 using namespace Windows::Storage;
@@ -108,6 +109,27 @@ namespace winrt::SlipNFrag_Windows::implementation
 		screenUploadLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 		paletteLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 		paletteUploadLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		auto titleBar = CoreApplication::GetCurrentView().TitleBar();
+		titleBar.ExtendViewIntoTitleBar(true);
+		UpdateTitleBarLayout(titleBar);
+		Window::Current().SetTitleBar(appTitleBar());
+		titleBar.LayoutMetricsChanged([this, titleBar](CoreApplicationViewTitleBar const&, IInspectable const&)
+			{
+				UpdateTitleBarLayout(titleBar);
+			});
+		titleBar.IsVisibleChanged([this, titleBar](CoreApplicationViewTitleBar const&, IInspectable const&)
+			{
+				if (titleBar.IsVisible())
+				{
+					appTitleBar().Visibility(Visibility::Visible);
+					fullscreenButton().Visibility(Visibility::Visible);
+				}
+				else
+				{
+					appTitleBar().Visibility(Visibility::Collapsed);
+					fullscreenButton().Visibility(Visibility::Collapsed);
+				}
+			});
 		Uri playBitmapImageUri(L"ms-appx:///Assets/play.png");
 		BitmapImage playBitmapImage(playBitmapImageUri);
 		Image playImage;
@@ -170,6 +192,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 				SettingsContentDialog settings;
 				settings.ShowAsync(ContentDialogPlacement::InPlace);
 			});
+	}
+
+	void MainPage::UpdateTitleBarLayout(CoreApplicationViewTitleBar const& titleBar)
+	{
+		auto leftInset = titleBar.SystemOverlayLeftInset();
+		auto rightInset = titleBar.SystemOverlayRightInset();
+		appTitleBarLeftPaddingColumn().Width(GridLengthHelper::FromPixels(leftInset));
+		appTitleBarRightPaddingColumn().Width(GridLengthHelper::FromPixels(rightInset));
+		fullscreenButton().Margin(ThicknessHelper::FromLengths(0, 0, rightInset, 0));
+		appTitleBar().Height(titleBar.Height());
 	}
 
 	void MainPage::OpenVertexShaderFile(StorageFolder const& folder)
@@ -337,8 +369,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 								auto mapped = virtualkeymap[(int)e.VirtualKey()];
 								Key_Event(mapped, false);
 							});
-						ApplicationView::GetForCurrentView().SetPreferredMinSize(Size(320, 200));
-						ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
+						auto fullscreen_check = true;
+						if (values.HasKey(L"fullscreen_check"))
+						{
+							auto value = values.Lookup(L"fullscreen_check");
+							fullscreen_check = unbox_value<bool>(value);
+						}
+						if (fullscreen_check)
+						{
+							ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
+						}
 						renderLoopWorker = ThreadPool::RunAsync([=](IAsyncAction const& action)
 							{
 								RenderLoop(action);
@@ -413,7 +453,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		swapChainDesc.SampleDesc.Count = 1;
 		swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 		swapChainDesc.BufferCount = frameCount;
-		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+		swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
 		com_ptr<IDXGISwapChain1> newSwapChain;
 		check_hresult(dxgiFactory->CreateSwapChainForComposition(commandQueue.get(), &swapChainDesc, nullptr, newSwapChain.put()));
@@ -620,6 +660,22 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void MainPage::swapChainPanel_SizeChanged(IInspectable const&, SizeChangedEventArgs const& e)
 	{
+		if (ApplicationView::GetForCurrentView().IsFullScreenMode())
+		{
+			fullscreenButton().Visibility(Visibility::Collapsed);
+		}
+		else
+		{
+			auto titleBar = CoreApplication::GetCurrentView().TitleBar();
+			if (titleBar.IsVisible())
+			{
+				fullscreenButton().Visibility(Visibility::Visible);
+			}
+			else
+			{
+				fullscreenButton().Visibility(Visibility::Collapsed);
+			}
+		}
 		if (deviceRemoved)
 		{
 			return;
@@ -1706,5 +1762,10 @@ namespace winrt::SlipNFrag_Windows::implementation
 							});
 					});
 			});
+	}
+
+	void MainPage::FullscreenButton_Click(IInspectable const&, RoutedEventArgs const&)
+	{
+		ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
 	}
 }

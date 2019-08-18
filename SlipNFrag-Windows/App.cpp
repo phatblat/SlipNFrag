@@ -5,6 +5,8 @@
 using namespace winrt;
 using namespace SlipNFrag_Windows::implementation;
 using namespace Windows::ApplicationModel::Activation;
+using namespace Windows::Foundation;
+using namespace Windows::UI::ViewManagement;
 using namespace Windows::UI::Xaml;
 using namespace Windows::UI::Xaml::Controls;
 using namespace Windows::UI::Xaml::Navigation;
@@ -46,6 +48,7 @@ void App::OnLaunched(LaunchActivatedEventArgs const& e)
             }
             Window::Current().Content(rootFrame);
             Window::Current().Activate();
+			ApplicationView::GetForCurrentView().SetPreferredMinSize(Size(320, 200));
         }
     }
     else
@@ -63,5 +66,5 @@ void App::OnLaunched(LaunchActivatedEventArgs const& e)
 
 void App::OnNavigationFailed(IInspectable const&, NavigationFailedEventArgs const& e)
 {
-    throw hresult_error(E_FAIL, hstring(L"Failed to load Page ") + e.SourcePageType().Name);
+    throw hresult_error(E_FAIL, hstring(L"Slip & Frag was unable to navigate to the page ") + e.SourcePageType().Name);
 }
