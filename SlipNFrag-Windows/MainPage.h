@@ -63,6 +63,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		D3D12_TEXTURE_COPY_LOCATION screenUploadLocation;
 		D3D12_TEXTURE_COPY_LOCATION paletteLocation;
 		D3D12_TEXTURE_COPY_LOCATION paletteUploadLocation;
+		bool key_dest_was_game;
+		event_token mouseMovedToken;
 
 		MainPage();
 		void UpdateTitleBarLayout(Windows::ApplicationModel::Core::CoreApplicationViewTitleBar const& titleBar);
@@ -102,6 +104,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void WriteToFile();
 		void GetFileTime();
 		void FullscreenButton_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
+		void RegisterMouseMoved();
+		void UnregisterMouseMoved();
 	};
 }
 

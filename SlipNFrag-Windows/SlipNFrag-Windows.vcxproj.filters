@@ -187,9 +187,6 @@
     <ClCompile Include="..\SlipNFrag\cd_null.cpp">
       <Filter>SlipNFrag</Filter>
     </ClCompile>
-    <ClCompile Include="..\SlipNFrag\in_null.cpp">
-      <Filter>SlipNFrag</Filter>
-    </ClCompile>
     <ClCompile Include="..\SlipNFrag\net_none.cpp">
       <Filter>SlipNFrag</Filter>
     </ClCompile>
@@ -200,6 +197,7 @@
     <ClCompile Include="sys_uwp.cpp" />
     <ClCompile Include="App.cpp" />
     <ClCompile Include="MainPage.cpp" />
+    <ClCompile Include="in_uwp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -328,6 +326,7 @@
     <ClInclude Include="virtualkeymap.h" />
     <ClInclude Include="App.h" />
     <ClInclude Include="MainPage.h" />
+    <ClInclude Include="in_uwp.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\LockScreenLogo.scale-200.png" />
@@ -348,6 +347,7 @@
   </ItemGroup>
   <ItemGroup>
     <Page Include="MainPage.xaml" />
+    <Page Include="SettingsContentDialog.xaml" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="id1">

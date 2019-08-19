@@ -5,11 +5,13 @@
 #include "vid_uwp.h"
 #include "sys_uwp.h"
 #include "virtualkeymap.h"
+#include "in_uwp.h"
 
 using namespace winrt;
 using namespace DirectX;
 using namespace Windows::ApplicationModel;
 using namespace Windows::ApplicationModel::Core;
+using namespace Windows::Devices::Input;
 using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
 using namespace Windows::Storage;
@@ -19,6 +21,7 @@ using namespace Windows::Storage::Streams;
 using namespace Windows::System;
 using namespace Windows::System::Threading;
 using namespace Windows::UI;
+using namespace Windows::UI::Input;
 using namespace Windows::UI::Core;
 using namespace Windows::UI::Popups;
 using namespace Windows::UI::ViewManagement;
@@ -355,10 +358,19 @@ namespace winrt::SlipNFrag_Windows::implementation
 						{
 							return;
 						}
-						Window::Current().CoreWindow().PointerCursor(nullptr);
+						if (key_dest == key_game)
+						{
+							RegisterMouseMoved();
+						}
+						key_dest_was_game = (key_dest == key_game);
 						Window::Current().CoreWindow().KeyDown([](IInspectable const&, KeyEventArgs const& e)
 							{
-								auto mapped = virtualkeymap[(int)e.VirtualKey()];
+								auto virtualKey = (int)e.VirtualKey();
+								auto mapped = 0;
+								if (virtualKey >= 0 && virtualKey < sizeof(virtualkeymap) / sizeof(int))
+								{
+									mapped = virtualkeymap[virtualKey];
+								}
 								try
 								{
 									Key_Event(mapped, true);
@@ -370,10 +382,61 @@ namespace winrt::SlipNFrag_Windows::implementation
 							});
 						Window::Current().CoreWindow().KeyUp([](IInspectable const&, KeyEventArgs const& e)
 							{
-								auto mapped = virtualkeymap[(int)e.VirtualKey()];
+								auto virtualKey = (int)e.VirtualKey();
+								auto mapped = 0;
+								if (virtualKey >= 0 && virtualKey < sizeof(virtualkeymap) / sizeof(int))
+								{
+									mapped = virtualkeymap[virtualKey];
+								}
 								try
 								{
 									Key_Event(mapped, false);
+								}
+								catch (...)
+								{
+									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
+								}
+							});
+						Window::Current().CoreWindow().PointerPressed([](IInspectable const&, PointerEventArgs const& e)
+							{
+								auto properties = e.CurrentPoint().Properties();
+								try
+								{
+									if (properties.IsLeftButtonPressed())
+									{
+										Key_Event(K_MOUSE1, true);
+									}
+									if (properties.IsMiddleButtonPressed())
+									{
+										Key_Event(K_MOUSE3, true);
+									}
+									if (properties.IsRightButtonPressed())
+									{
+										Key_Event(K_MOUSE2, true);
+									}
+								}
+								catch (...)
+								{
+									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
+								}
+							});
+						Window::Current().CoreWindow().PointerReleased([](IInspectable const&, PointerEventArgs const& e)
+							{
+								auto properties = e.CurrentPoint().Properties();
+								try
+								{
+									if (!properties.IsLeftButtonPressed())
+									{
+										Key_Event(K_MOUSE1, false);
+									}
+									if (!properties.IsMiddleButtonPressed())
+									{
+										Key_Event(K_MOUSE3, false);
+									}
+									if (!properties.IsRightButtonPressed())
+									{
+										Key_Event(K_MOUSE2, false);
+									}
 								}
 								catch (...)
 								{
@@ -970,6 +1033,21 @@ namespace winrt::SlipNFrag_Windows::implementation
 			VID_Resize();
 			firstResize = false;
 		}
+		if (key_dest_was_game && key_dest != key_game)
+		{
+			swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
+				{
+					UnregisterMouseMoved();
+				});
+		}
+		else if (!key_dest_was_game && key_dest == key_game)
+		{
+			swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
+				{
+					RegisterMouseMoved();
+				});
+		}
+		key_dest_was_game = (key_dest == key_game);
 		Sys_Frame(elapsed);
 		if (DisplaySysErrorIfNeeded() || sys_quitcalled)
 		{
@@ -1786,5 +1864,21 @@ namespace winrt::SlipNFrag_Windows::implementation
 	void MainPage::FullscreenButton_Click(IInspectable const&, RoutedEventArgs const&)
 	{
 		ApplicationView::GetForCurrentView().TryEnterFullScreenMode();
+	}
+
+	void MainPage::RegisterMouseMoved()
+	{
+		mouseMovedToken = MouseDevice::GetForCurrentView().MouseMoved([](IInspectable const&, MouseEventArgs const& e)
+			{
+				mx += e.MouseDelta().X;
+				my += e.MouseDelta().Y;
+			});
+		Window::Current().CoreWindow().PointerCursor(nullptr);
+	}
+
+	void MainPage::UnregisterMouseMoved()
+	{
+		Window::Current().CoreWindow().PointerCursor(CoreCursor(CoreCursorType::Arrow, 0));
+		MouseDevice::GetForCurrentView().MouseMoved(mouseMovedToken);
 	}
 }
