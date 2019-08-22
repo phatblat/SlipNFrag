@@ -65,6 +65,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		D3D12_TEXTURE_COPY_LOCATION paletteUploadLocation;
 		bool key_dest_was_game;
 		event_token mouseMovedToken;
+		Windows::Media::Audio::AudioGraph audioGraph = nullptr;
+		Windows::Media::Audio::AudioDeviceOutputNode outputNode = nullptr;
 
 		MainPage();
 		void UpdateTitleBarLayout(Windows::ApplicationModel::Core::CoreApplicationViewTitleBar const& titleBar);

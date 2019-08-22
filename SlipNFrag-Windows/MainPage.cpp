@@ -14,6 +14,8 @@ using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Devices::Input;
 using namespace Windows::Foundation;
 using namespace Windows::Graphics::Display;
+using namespace Windows::Media::Audio;
+using namespace Windows::Media::Render;
 using namespace Windows::Storage;
 using namespace Windows::Storage::AccessCache;
 using namespace Windows::Storage::FileProperties;
@@ -357,6 +359,27 @@ namespace winrt::SlipNFrag_Windows::implementation
 						if (DisplaySysErrorIfNeeded())
 						{
 							return;
+						}
+						if (snd_initialized)
+						{
+							AudioGraphSettings settings(AudioRenderCategory::Media);
+							auto task = AudioGraph::CreateAsync(settings);
+							task.Completed([=](IAsyncOperation<CreateAudioGraphResult> const& operation, AsyncStatus const status) 
+								{
+									if (status != AsyncStatus::Completed || operation.GetResults().Status() != AudioGraphCreationStatus::Success)
+									{
+										return;
+									}
+									audioGraph = operation.GetResults().Graph();
+									auto task = audioGraph.CreateDeviceOutputNodeAsync();
+									task.Completed([=](IAsyncOperation<CreateAudioDeviceOutputNodeResult> const& operation, AsyncStatus const status)
+										{
+											if (status != AsyncStatus::Completed || operation.GetResults().Status() != AudioDeviceNodeCreationStatus::Success)
+											{
+												return;
+											}
+										});
+								});
 						}
 						if (key_dest == key_game)
 						{
