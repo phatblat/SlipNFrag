@@ -190,14 +190,21 @@
     <ClCompile Include="..\SlipNFrag\net_none.cpp">
       <Filter>SlipNFrag</Filter>
     </ClCompile>
-    <ClCompile Include="..\SlipNFrag\snd_null.cpp">
-      <Filter>SlipNFrag</Filter>
-    </ClCompile>
     <ClCompile Include="vid_uwp.cpp" />
     <ClCompile Include="sys_uwp.cpp" />
     <ClCompile Include="App.cpp" />
     <ClCompile Include="MainPage.cpp" />
     <ClCompile Include="in_uwp.cpp" />
+    <ClCompile Include="..\id1\snd_dma.cpp">
+      <Filter>id1</Filter>
+    </ClCompile>
+    <ClCompile Include="..\id1\snd_mem.cpp">
+      <Filter>id1</Filter>
+    </ClCompile>
+    <ClCompile Include="..\id1\snd_mix.cpp">
+      <Filter>id1</Filter>
+    </ClCompile>
+    <ClCompile Include="snd_uwp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
