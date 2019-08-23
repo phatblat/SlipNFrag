@@ -1731,7 +1731,10 @@ void COM_InitFilesystem (void)
         while (search != nullptr)
         {
             auto nextsearch = search->next;
-            delete[] search->pack->files;
+			if (search->pack != nullptr)
+			{
+				delete[] search->pack->files;
+			}
             delete search;
             search = nextsearch;
         }
