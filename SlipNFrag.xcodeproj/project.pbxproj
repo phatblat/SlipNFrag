@@ -82,6 +82,7 @@
 		2880A4C722C5757F00AF513D /* net_macos.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2880A4C522C5757F00AF513D /* net_macos.cpp */; };
 		2880A4CA22C576E000AF513D /* net_dgrm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2880A4C822C576E000AF513D /* net_dgrm.cpp */; };
 		2880A4CD22C5774300AF513D /* net_udp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2880A4CC22C5774300AF513D /* net_udp.cpp */; };
+		28A5375F23106A85005007EE /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28A5375E23106A85005007EE /* GameController.framework */; };
 		28AA1D9722C07E2D00264AD0 /* snd_macos.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28AA1D9522C07E2D00264AD0 /* snd_macos.cpp */; };
 		28AA1D9B22C0803E00264AD0 /* snd_mix.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28AA1D9822C0803E00264AD0 /* snd_mix.cpp */; };
 		28AA1D9C22C0803E00264AD0 /* snd_dma.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28AA1D9922C0803E00264AD0 /* snd_dma.cpp */; };
@@ -293,6 +294,7 @@
 		2880A4C922C576E000AF513D /* net_dgrm.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = net_dgrm.h; sourceTree = "<group>"; };
 		2880A4CB22C5774300AF513D /* net_udp.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = net_udp.h; sourceTree = "<group>"; };
 		2880A4CC22C5774300AF513D /* net_udp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = net_udp.cpp; sourceTree = "<group>"; };
+		28A5375E23106A85005007EE /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
 		28AA1D9522C07E2D00264AD0 /* snd_macos.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = snd_macos.cpp; sourceTree = "<group>"; };
 		28AA1D9822C0803E00264AD0 /* snd_mix.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = snd_mix.cpp; sourceTree = "<group>"; };
 		28AA1D9922C0803E00264AD0 /* snd_dma.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = snd_dma.cpp; sourceTree = "<group>"; };
@@ -314,6 +316,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				28A5375F23106A85005007EE /* GameController.framework in Frameworks */,
 				28AA1DA122C089E600264AD0 /* AudioToolbox.framework in Frameworks */,
 				285D5B09229F9EE400B6ED09 /* MetalKit.framework in Frameworks */,
 			);
@@ -506,6 +509,7 @@
 		28BA2A6D229F31C1001830E9 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				28A5375E23106A85005007EE /* GameController.framework */,
 				28EDD8EE22C5D0D300BA8D90 /* libnetwork.tbd */,
 				28AA1DA022C089E600264AD0 /* AudioToolbox.framework */,
 				28AA1D9E22C0881200264AD0 /* AudioUnit.framework */,

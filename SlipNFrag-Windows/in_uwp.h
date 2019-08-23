@@ -24,4 +24,3 @@ extern qboolean mouseinitialized;
 extern qboolean joy_initialized, joy_avail;
 
 void Joy_AdvancedUpdate_f(void);
-

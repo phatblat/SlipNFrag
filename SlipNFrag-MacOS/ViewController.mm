@@ -8,10 +8,11 @@
 
 #import "ViewController.h"
 #import <MetalKit/MetalKit.h>
-#include "in_macos.h"
+#import <GameController/GameController.h>
 #include "scantokey.h"
 #include "sys_macos.h"
 #include "vid_macos.h"
+#include "in_macos.h"
 #include "AppDelegate.h"
 
 @interface ViewController () <MTKViewDelegate>
@@ -39,6 +40,7 @@
     NSEventModifierFlags previousModifierFlags;
     NSTrackingArea* trackingArea;
     NSCursor* blankCursor;
+    GCController* joystick;
 }
 
 - (void)viewDidLoad
@@ -359,32 +361,60 @@
          self->previousModifierFlags = event.modifierFlags;
          return nil;
      }];
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskMouseMoved handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-     {
-         mx += event.deltaX;
-         my += event.deltaY;
-         return event;
-     }];
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-     {
-         Key_Event(200, YES);
-         return event;
-     }];
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-     {
-         Key_Event(200, NO);
-         return event;
-     }];
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskRightMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-     {
-         Key_Event(201, YES);
-         return event;
-     }];
-    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskRightMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-     {
-         Key_Event(201, NO);
-         return event;
-     }];
+    if (mouseinitialized)
+    {
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskMouseMoved handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
+         {
+             mx += event.deltaX;
+             my += event.deltaY;
+             return event;
+         }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
+         {
+             Key_Event(200, YES);
+             return event;
+         }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
+         {
+             Key_Event(200, NO);
+             return event;
+         }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskRightMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
+         {
+             Key_Event(201, YES);
+             return event;
+         }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskRightMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
+         {
+             Key_Event(201, NO);
+             return event;
+         }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskOtherMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
+         {
+             Key_Event(202, YES);
+             return event;
+         }];
+        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskOtherMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
+         {
+             Key_Event(202, NO);
+             return event;
+         }];
+    }
+    if (joy_initialized)
+    {
+        for (GCController* controller in [GCController controllers])
+        {
+            if (controller.extendedGamepad != nil)
+            {
+                joystick = controller;
+                joy_avail = YES;
+                [self enableJoystick];
+                break;
+            }
+        }
+        [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(controllerDidConnect:) name:GCControllerDidConnectNotification object:nil];
+        [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(controllerDidDisconnect:) name:GCControllerDidDisconnectNotification object:nil];
+    }
 }
 
 -(void)preferences:(NSButton*)sender
@@ -454,6 +484,121 @@
         return YES;
     }
     return NO;
+}
+
+-(void)controllerDidConnect:(GCController*)controller
+{
+    if (joystick != nullptr && controller.extendedGamepad != nil)
+    {
+        joystick = controller;
+        joy_avail = YES;
+        [self enableJoystick];
+    }
+}
+
+-(void)controllerDidDisconnect:(GCController*)controller
+{
+    if (joystick != nullptr && controller == joystick)
+    {
+        [self enableJoystick];
+        joy_avail = NO;
+        joystick = nil;
+    }
+}
+
+-(void)enableJoystick
+{
+    joystick.playerIndex = GCControllerPlayerIndex1;
+    joystick.controllerPausedHandler = ^(GCController * _Nonnull controller)
+    {
+        Key_Event(27, YES);
+        Key_Event(27, NO);
+    };
+    [joystick.extendedGamepad.buttonA setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(203, pressed);
+     }];
+    [joystick.extendedGamepad.buttonB setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(204, pressed);
+     }];
+    [joystick.extendedGamepad.buttonX setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(205, pressed);
+     }];
+    [joystick.extendedGamepad.buttonY setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(206, pressed);
+     }];
+    [joystick.extendedGamepad.leftTrigger setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(207, pressed);
+     }];
+    [joystick.extendedGamepad.leftShoulder setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(208, pressed);
+     }];
+    [joystick.extendedGamepad.rightTrigger setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(209, pressed);
+     }];
+    [joystick.extendedGamepad.rightShoulder setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(210, pressed);
+     }];
+    [joystick.extendedGamepad.dpad.up setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(211, pressed);
+     }];
+    [joystick.extendedGamepad.dpad.left setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(212, pressed);
+     }];
+    [joystick.extendedGamepad.dpad.right setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(213, pressed);
+     }];
+    [joystick.extendedGamepad.dpad.down setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         Key_Event(214, pressed);
+     }];
+    if (@available(macOS 10.14.1, *))
+    {
+        [joystick.extendedGamepad.leftThumbstickButton setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+         {
+             Key_Event(215, pressed);
+         }];
+        [joystick.extendedGamepad.rightThumbstickButton setPressedChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+         {
+             Key_Event(216, pressed);
+         }];
+    }
+    [joystick.extendedGamepad.leftThumbstick setValueChangedHandler:^(GCControllerDirectionPad * _Nonnull dpad, float xValue, float yValue)
+     {
+         pdwRawValue[JOY_AXIS_X] = xValue;
+         pdwRawValue[JOY_AXIS_Y] = -yValue;
+     }];
+    [joystick.extendedGamepad.rightThumbstick setValueChangedHandler:^(GCControllerDirectionPad * _Nonnull dpad, float xValue, float yValue)
+     {
+         pdwRawValue[JOY_AXIS_Z] = xValue;
+         pdwRawValue[JOY_AXIS_R] = -yValue;
+     }];
+    [joystick.extendedGamepad.leftTrigger setValueChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         pdwRawValue[JOY_AXIS_U] = value;
+     }];
+    [joystick.extendedGamepad.rightTrigger setValueChangedHandler:^(GCControllerButtonInput * _Nonnull button, float value, BOOL pressed)
+     {
+         pdwRawValue[JOY_AXIS_V] = value;
+     }];
+}
+
+-(void)disableJoystick
+{
+    in_forwardmove = 0.0;
+    in_sidestepmove = 0.0;
+    in_rollangle = 0.0;
+    in_pitchangle = 0.0;
 }
 
 @end
