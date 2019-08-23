@@ -176,6 +176,7 @@
     <ClInclude Include="SettingsContentDialog.h">
       <DependentUpon>SettingsContentDialog.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="snd_uwp.h" />
     <ClInclude Include="sys_uwp.h" />
     <ClInclude Include="vid_uwp.h" />
     <ClInclude Include="virtualkeymap.h" />

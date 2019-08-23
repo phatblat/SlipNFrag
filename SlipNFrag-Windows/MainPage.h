@@ -65,8 +65,12 @@ namespace winrt::SlipNFrag_Windows::implementation
 		D3D12_TEXTURE_COPY_LOCATION paletteUploadLocation;
 		bool key_dest_was_game;
 		event_token mouseMovedToken;
+		Windows::Gaming::Input::RawGameController joystick = nullptr;
+		bool* previousJoystickButtons = nullptr;
+		int previousJoystickButtonsLength = 0;
 		Windows::Media::Audio::AudioGraph audioGraph = nullptr;
-		Windows::Media::Audio::AudioDeviceOutputNode outputNode = nullptr;
+		Windows::Media::Audio::AudioDeviceOutputNode audioOutput = nullptr;
+		Windows::Media::Audio::AudioFrameInputNode audioInput = nullptr;
 
 		MainPage();
 		void UpdateTitleBarLayout(Windows::ApplicationModel::Core::CoreApplicationViewTitleBar const& titleBar);
@@ -108,6 +112,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void FullscreenButton_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void RegisterMouseMoved();
 		void UnregisterMouseMoved();
+		void CreateAudioGraph();
+		void CreateAudioOutput();
+		void CreateAudioInput();
 	};
 }
 

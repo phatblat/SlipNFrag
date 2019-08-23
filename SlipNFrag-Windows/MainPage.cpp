@@ -6,6 +6,12 @@
 #include "sys_uwp.h"
 #include "virtualkeymap.h"
 #include "in_uwp.h"
+#include "snd_uwp.h"
+
+struct __declspec(uuid("5b0d3235-4dba-4d44-865e-8f1d0e4fd04d")) __declspec(novtable) IMemoryBufferByteAccess : ::IUnknown
+{
+	virtual HRESULT __stdcall GetBuffer(uint8_t** value, uint32_t* capacity) = 0;
+};
 
 using namespace winrt;
 using namespace DirectX;
@@ -13,8 +19,11 @@ using namespace Windows::ApplicationModel;
 using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Devices::Input;
 using namespace Windows::Foundation;
+using namespace Windows::Gaming::Input;
 using namespace Windows::Graphics::Display;
+using namespace Windows::Media;
 using namespace Windows::Media::Audio;
+using namespace Windows::Media::MediaProperties;
 using namespace Windows::Media::Render;
 using namespace Windows::Storage;
 using namespace Windows::Storage::AccessCache;
@@ -362,30 +371,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 						if (snd_initialized)
 						{
-							AudioGraphSettings settings(AudioRenderCategory::Media);
-							auto task = AudioGraph::CreateAsync(settings);
-							task.Completed([=](IAsyncOperation<CreateAudioGraphResult> const& operation, AsyncStatus const status) 
-								{
-									if (status != AsyncStatus::Completed || operation.GetResults().Status() != AudioGraphCreationStatus::Success)
-									{
-										return;
-									}
-									audioGraph = operation.GetResults().Graph();
-									auto task = audioGraph.CreateDeviceOutputNodeAsync();
-									task.Completed([=](IAsyncOperation<CreateAudioDeviceOutputNodeResult> const& operation, AsyncStatus const status)
-										{
-											if (status != AsyncStatus::Completed || operation.GetResults().Status() != AudioDeviceNodeCreationStatus::Success)
-											{
-												return;
-											}
-										});
-								});
+							CreateAudioGraph();
 						}
-						if (key_dest == key_game)
+						if (mouseinitialized)
 						{
-							RegisterMouseMoved();
+							if (key_dest == key_game)
+							{
+								RegisterMouseMoved();
+							}
+							key_dest_was_game = (key_dest == key_game);
 						}
-						key_dest_was_game = (key_dest == key_game);
 						Window::Current().CoreWindow().KeyDown([](IInspectable const&, KeyEventArgs const& e)
 							{
 								auto virtualKey = (int)e.VirtualKey();
@@ -420,52 +415,85 @@ namespace winrt::SlipNFrag_Windows::implementation
 									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
 								}
 							});
-						Window::Current().CoreWindow().PointerPressed([](IInspectable const&, PointerEventArgs const& e)
+						if (mouseinitialized)
+						{
+							Window::Current().CoreWindow().PointerPressed([](IInspectable const&, PointerEventArgs const& e)
+								{
+									auto properties = e.CurrentPoint().Properties();
+									try
+									{
+										if (properties.IsLeftButtonPressed())
+										{
+											Key_Event(K_MOUSE1, true);
+										}
+										if (properties.IsMiddleButtonPressed())
+										{
+											Key_Event(K_MOUSE3, true);
+										}
+										if (properties.IsRightButtonPressed())
+										{
+											Key_Event(K_MOUSE2, true);
+										}
+									}
+									catch (...)
+									{
+										// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
+									}
+								});
+							Window::Current().CoreWindow().PointerReleased([](IInspectable const&, PointerEventArgs const& e)
+								{
+									auto properties = e.CurrentPoint().Properties();
+									try
+									{
+										if (!properties.IsLeftButtonPressed())
+										{
+											Key_Event(K_MOUSE1, false);
+										}
+										if (!properties.IsMiddleButtonPressed())
+										{
+											Key_Event(K_MOUSE3, false);
+										}
+										if (!properties.IsRightButtonPressed())
+										{
+											Key_Event(K_MOUSE2, false);
+										}
+									}
+									catch (...)
+									{
+										// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
+									}
+								});
+						}
+						if (joy_initialized)
+						{
+							for (auto const& controller : RawGameController::RawGameControllers())
 							{
-								auto properties = e.CurrentPoint().Properties();
-								try
+								if (controller.AxisCount() >= 2 && controller.ButtonCount() >= 2)
 								{
-									if (properties.IsLeftButtonPressed())
-									{
-										Key_Event(K_MOUSE1, true);
-									}
-									if (properties.IsMiddleButtonPressed())
-									{
-										Key_Event(K_MOUSE3, true);
-									}
-									if (properties.IsRightButtonPressed())
-									{
-										Key_Event(K_MOUSE2, true);
-									}
+									joystick = controller;
+									joy_avail = true;
+									break;
 								}
-								catch (...)
+							}
+							RawGameController::RawGameControllerAdded([this](IInspectable const&, RawGameController const& e)
 								{
-									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
-								}
-							});
-						Window::Current().CoreWindow().PointerReleased([](IInspectable const&, PointerEventArgs const& e)
-							{
-								auto properties = e.CurrentPoint().Properties();
-								try
+									if (joystick == nullptr && e.AxisCount() >= 2 && e.ButtonCount() >= 2)
+									{
+										joystick = e;
+										joy_avail = true;
+									}
+								});
+							RawGameController::RawGameControllerRemoved([this](IInspectable const&, RawGameController const& e)
 								{
-									if (!properties.IsLeftButtonPressed())
+									if (joystick != nullptr && joystick.NonRoamableId() == e.NonRoamableId())
 									{
-										Key_Event(K_MOUSE1, false);
+										joystick = nullptr;
+										joy_avail = false;
+										delete[] previousJoystickButtons;
+										previousJoystickButtonsLength = 0;
 									}
-									if (!properties.IsMiddleButtonPressed())
-									{
-										Key_Event(K_MOUSE3, false);
-									}
-									if (!properties.IsRightButtonPressed())
-									{
-										Key_Event(K_MOUSE2, false);
-									}
-								}
-								catch (...)
-								{
-									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
-								}
-							});
+								});
+						}
 						auto fullscreen_check = true;
 						if (values.HasKey(L"fullscreen_check"))
 						{
@@ -1056,21 +1084,63 @@ namespace winrt::SlipNFrag_Windows::implementation
 			VID_Resize();
 			firstResize = false;
 		}
-		if (key_dest_was_game && key_dest != key_game)
+		if (mouseinitialized)
 		{
-			swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
-				{
-					UnregisterMouseMoved();
-				});
+			if (key_dest_was_game && key_dest != key_game)
+			{
+				swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
+					{
+						UnregisterMouseMoved();
+					});
+			}
+			else if (!key_dest_was_game && key_dest == key_game)
+			{
+				swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
+					{
+						RegisterMouseMoved();
+					});
+			}
+			key_dest_was_game = (key_dest == key_game);
 		}
-		else if (!key_dest_was_game && key_dest == key_game)
+		if (joy_initialized && joy_avail)
 		{
-			swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
+			auto buttons = new bool[joystick.ButtonCount()];
+			std::vector<GameControllerSwitchPosition> switches(joystick.SwitchCount());
+			std::vector<double> axes(joystick.AxisCount());
+			joystick.GetCurrentReading(array_view(buttons, buttons + joystick.ButtonCount()), switches, axes);
+			for (auto i = 0; i < JOY_MAX_AXES; i++)
+			{
+				if (i < axes.size())
 				{
-					RegisterMouseMoved();
-				});
+					pdwRawValue[i] = (float)(2 * (axes[i] - 0.5));
+				}
+				else
+				{
+					pdwRawValue[i] = 0;
+				}
+			}
+			if (previousJoystickButtonsLength == joystick.ButtonCount())
+			{
+				for (auto i = 0; i < 36; i++)
+				{
+					if (i >= joystick.ButtonCount())
+					{
+						break;
+					}
+					if (previousJoystickButtons[i] && !buttons[i])
+					{
+						Key_Event(203 + i, false);
+					}
+					else if (!previousJoystickButtons[i] && buttons[i])
+					{
+						Key_Event(203 + i, true);
+					}
+				}
+			}
+			delete[] previousJoystickButtons;
+			previousJoystickButtons = buttons;
+			previousJoystickButtonsLength = joystick.ButtonCount();
 		}
-		key_dest_was_game = (key_dest == key_game);
 		Sys_Frame(elapsed);
 		if (DisplaySysErrorIfNeeded() || sys_quitcalled)
 		{
@@ -1903,5 +1973,68 @@ namespace winrt::SlipNFrag_Windows::implementation
 	{
 		Window::Current().CoreWindow().PointerCursor(CoreCursor(CoreCursorType::Arrow, 0));
 		MouseDevice::GetForCurrentView().MouseMoved(mouseMovedToken);
+	}
+
+	void MainPage::CreateAudioGraph()
+	{
+		AudioGraphSettings settings(AudioRenderCategory::Media);
+		auto task = AudioGraph::CreateAsync(settings);
+		task.Completed([=](IAsyncOperation<CreateAudioGraphResult> const& operation, AsyncStatus const status)
+			{
+				if (status != AsyncStatus::Completed || operation.GetResults().Status() != AudioGraphCreationStatus::Success)
+				{
+					return;
+				}
+				audioGraph = operation.GetResults().Graph();
+				CreateAudioOutput();
+			});
+	}
+
+	void MainPage::CreateAudioOutput()
+	{
+		auto task = audioGraph.CreateDeviceOutputNodeAsync();
+		task.Completed([=](IAsyncOperation<CreateAudioDeviceOutputNodeResult> const& operation, AsyncStatus const status)
+			{
+				if (status != AsyncStatus::Completed || operation.GetResults().Status() != AudioDeviceNodeCreationStatus::Success)
+				{
+					return;
+				}
+				audioOutput = operation.GetResults().DeviceOutputNode();
+				CreateAudioInput();
+			});
+	}
+
+	void MainPage::CreateAudioInput()
+	{
+		AudioEncodingProperties properties = AudioEncodingProperties::CreatePcm(shm->speed, shm->channels, shm->samplebits);
+		audioInput = audioGraph.CreateFrameInputNode(properties);
+		audioInput.AddOutgoingConnection(audioOutput);
+		audioInput.Stop();
+		audioInput.QuantumStarted([this](AudioFrameInputNode const&, FrameInputNodeQuantumStartedEventArgs const& e)
+			{
+				auto samples = e.RequiredSamples();
+				if (samples > 0 && shm != nullptr)
+				{
+					auto bufferSize = samples << 2;
+					AudioFrame frame(bufferSize);
+					{
+						auto buffer = frame.LockBuffer(AudioBufferAccessMode::Write);
+						auto reference = buffer.CreateReference();
+						auto byteAccess = reference.as<IMemoryBufferByteAccess>();
+						byte* data;
+						unsigned int capacity;
+						byteAccess->GetBuffer(&data, &capacity);
+						memcpy(data, shm->buffer.data() + (snd_current_sample_pos << 1), capacity);
+						snd_current_sample_pos += (samples << 1);
+						if (snd_current_sample_pos >= shm->samples)
+						{
+							snd_current_sample_pos = 0;
+						}
+					}
+					audioInput.AddFrame(frame);
+				}
+			});
+		audioGraph.Start();
+		audioInput.Start();
 	}
 }

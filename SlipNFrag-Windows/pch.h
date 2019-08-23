@@ -22,8 +22,10 @@
 #include <winrt/Windows.Devices.Input.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
+#include <winrt/Windows.Gaming.Input.h>
 #include <winrt/Windows.Graphics.Display.h>
 #include <winrt/Windows.Media.Audio.h>
+#include <winrt/Windows.Media.MediaProperties.h>
 #include <winrt/Windows.Media.Render.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.Storage.AccessCache.h>
