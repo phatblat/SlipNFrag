@@ -16,6 +16,7 @@
 #include <d3d12.h>
 #include <pix.h>
 #include <DirectXColors.h>
+#include <chrono>
 #include <winrt/Windows.ApplicationModel.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.ApplicationModel.Activation.h>

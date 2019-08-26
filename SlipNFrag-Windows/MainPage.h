@@ -65,12 +65,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 		D3D12_TEXTURE_COPY_LOCATION paletteUploadLocation;
 		bool key_dest_was_game;
 		event_token mouseMovedToken;
-		Windows::Gaming::Input::RawGameController joystick = nullptr;
+		winrt::Windows::Gaming::Input::RawGameController joystick = nullptr;
+		winrt::Windows::Gaming::Input::Gamepad gamepad = nullptr;
 		bool* previousJoystickButtons = nullptr;
 		int previousJoystickButtonsLength = 0;
-		Windows::Media::Audio::AudioGraph audioGraph = nullptr;
-		Windows::Media::Audio::AudioDeviceOutputNode audioOutput = nullptr;
-		Windows::Media::Audio::AudioFrameInputNode audioInput = nullptr;
+		winrt::Windows::Media::Audio::AudioGraph audioGraph = nullptr;
+		winrt::Windows::Media::Audio::AudioDeviceOutputNode audioOutput = nullptr;
+		winrt::Windows::Media::Audio::AudioFrameInputNode audioInput = nullptr;
+		bool previousGamepadButtonsWereRead = false;
+		unsigned int previousGamepadButtons;
 
 		MainPage();
 		void UpdateTitleBarLayout(Windows::ApplicationModel::Core::CoreApplicationViewTitleBar const& titleBar);
@@ -115,6 +118,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void CreateAudioGraph();
 		void CreateAudioOutput();
 		void CreateAudioInput();
+		void AddJoystickAxis(winrt::Windows::Foundation::Collections::IPropertySet const& values, winrt::hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments);
 	};
 }
 

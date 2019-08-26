@@ -23,4 +23,10 @@ extern float mx, my;
 extern qboolean mouseinitialized;
 extern qboolean joy_initialized, joy_avail;
 
+extern float   in_forwardmove;
+extern float   in_sidestepmove;
+
+extern float   in_pitchangle;
+extern float   in_rollangle;
+
 void Joy_AdvancedUpdate_f(void);

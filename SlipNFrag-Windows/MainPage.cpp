@@ -19,6 +19,7 @@ using namespace Windows::ApplicationModel;
 using namespace Windows::ApplicationModel::Core;
 using namespace Windows::Devices::Input;
 using namespace Windows::Foundation;
+using namespace Windows::Foundation::Collections;
 using namespace Windows::Gaming::Input;
 using namespace Windows::Graphics::Display;
 using namespace Windows::Media;
@@ -320,6 +321,45 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 					}
 				}
+				auto joystick_check = false;
+				if (values.HasKey(L"joystick_check"))
+				{
+					auto value = values.Lookup(L"joystick_check");
+					joystick_check = unbox_value<bool>(value);
+				}
+				if (joystick_check)
+				{
+					arguments.emplace_back("+joystick");
+					arguments.emplace_back("1");
+					auto joy_standard_radio = false;
+					auto joy_advanced_radio = false;
+					if (values.HasKey(L"joy_standard_radio"))
+					{
+						auto value = values.Lookup(L"joy_standard_radio");
+						joy_standard_radio = unbox_value<bool>(value);
+					}
+					if (values.HasKey(L"joy_advanced_radio"))
+					{
+						auto value = values.Lookup(L"joy_advanced_radio");
+						joy_advanced_radio = unbox_value<bool>(value);
+					}
+					if (joy_standard_radio)
+					{
+						arguments.emplace_back("+joyadvanced");
+						arguments.emplace_back("0");
+					}
+					else if (joy_advanced_radio)
+					{
+						arguments.emplace_back("+joyadvanced");
+						arguments.emplace_back("1");
+						AddJoystickAxis(values, L"joy_axis_x_combo", "+joyadvaxisx", arguments);
+						AddJoystickAxis(values, L"joy_axis_y_combo", "+joyadvaxisy", arguments);
+						AddJoystickAxis(values, L"joy_axis_z_combo", "+joyadvaxisz", arguments);
+						AddJoystickAxis(values, L"joy_axis_r_combo", "+joyadvaxisr", arguments);
+						AddJoystickAxis(values, L"joy_axis_u_combo", "+joyadvaxisu", arguments);
+						AddJoystickAxis(values, L"joy_axis_v_combo", "+joyadvaxisv", arguments);
+					}
+				}
 				if (values.HasKey(L"command_line_text"))
 				{
 					auto value = values.Lookup(L"command_line_text");
@@ -466,18 +506,46 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 						if (joy_initialized)
 						{
-							for (auto const& controller : RawGameController::RawGameControllers())
+							if (Gamepad::Gamepads().Size() > 0)
 							{
-								if (controller.AxisCount() >= 2 && controller.ButtonCount() >= 2)
+								gamepad = Gamepad::Gamepads().GetAt(0);
+								joy_avail = true;
+							}
+							if (!joy_avail)
+							{
+								for (auto const& controller : RawGameController::RawGameControllers())
 								{
-									joystick = controller;
-									joy_avail = true;
-									break;
+									if (controller.AxisCount() >= 2 && controller.ButtonCount() >= 4)
+									{
+										joystick = controller;
+										joy_avail = true;
+										break;
+									}
 								}
 							}
+							Gamepad::GamepadAdded([this](IInspectable const&, Gamepad const& e)
+								{
+									if (gamepad == nullptr && joystick == nullptr)
+									{
+										gamepad = e;
+										joy_avail = true;
+									}
+								});
+							Gamepad::GamepadRemoved([this](IInspectable const&, Gamepad const& e)
+								{
+									if (gamepad != nullptr && gamepad == e)
+									{
+										in_forwardmove = 0.0;
+										in_sidestepmove = 0.0;
+										in_rollangle = 0.0;
+										in_pitchangle = 0.0;
+										gamepad = nullptr;
+										joy_avail = false;
+									}
+								});
 							RawGameController::RawGameControllerAdded([this](IInspectable const&, RawGameController const& e)
 								{
-									if (joystick == nullptr && e.AxisCount() >= 2 && e.ButtonCount() >= 2)
+									if (gamepad == nullptr && joystick == nullptr && e.AxisCount() >= 2 && e.ButtonCount() >= 4)
 									{
 										joystick = e;
 										joy_avail = true;
@@ -487,6 +555,10 @@ namespace winrt::SlipNFrag_Windows::implementation
 								{
 									if (joystick != nullptr && joystick.NonRoamableId() == e.NonRoamableId())
 									{
+										in_forwardmove = 0.0;
+										in_sidestepmove = 0.0;
+										in_rollangle = 0.0;
+										in_pitchangle = 0.0;
 										joystick = nullptr;
 										joy_avail = false;
 										delete[] previousJoystickButtons;
@@ -1104,42 +1176,76 @@ namespace winrt::SlipNFrag_Windows::implementation
 		}
 		if (joy_initialized && joy_avail)
 		{
-			auto buttons = new bool[joystick.ButtonCount()];
-			std::vector<GameControllerSwitchPosition> switches(joystick.SwitchCount());
-			std::vector<double> axes(joystick.AxisCount());
-			joystick.GetCurrentReading(array_view(buttons, buttons + joystick.ButtonCount()), switches, axes);
-			for (auto i = 0; i < JOY_MAX_AXES; i++)
+			if (gamepad != nullptr)
 			{
-				if (i < axes.size())
+				auto reading = gamepad.GetCurrentReading();
+				pdwRawValue[JOY_AXIS_X] = (float)reading.LeftThumbstickX;
+				pdwRawValue[JOY_AXIS_Y] = (float)-reading.LeftThumbstickY;
+				pdwRawValue[JOY_AXIS_Z] = (float)reading.RightThumbstickX;
+				pdwRawValue[JOY_AXIS_R] = (float)-reading.RightThumbstickY;
+				pdwRawValue[JOY_AXIS_U] = (float)reading.LeftTrigger;
+				pdwRawValue[JOY_AXIS_V] = (float)reading.RightTrigger;
+				auto buttons = (unsigned int)reading.Buttons;
+				if (previousGamepadButtonsWereRead)
 				{
-					pdwRawValue[i] = (float)(2 * (axes[i] - 0.5));
+					auto key = 203;
+					unsigned int mask = 1;
+					for (auto i = 0; i < 30; i++)
+					{
+						if ((buttons & ~mask) == mask && (previousGamepadButtons & ~mask) != mask)
+						{
+							Key_Event(key, true);
+						}
+						else if ((buttons & ~mask) != mask && (previousGamepadButtons & ~mask) == mask)
+						{
+							Key_Event(key, false);
+						}
+						key++;
+						mask <<= 1;
+					}
 				}
-				else
-				{
-					pdwRawValue[i] = 0;
-				}
+				previousGamepadButtons = buttons;
+				previousGamepadButtonsWereRead = true;
 			}
-			if (previousJoystickButtonsLength == joystick.ButtonCount())
+			if (joystick != nullptr)
 			{
-				for (auto i = 0; i < 36; i++)
+				auto buttons = new bool[joystick.ButtonCount()];
+				std::vector<GameControllerSwitchPosition> switches(joystick.SwitchCount());
+				std::vector<double> axes(joystick.AxisCount());
+				joystick.GetCurrentReading(array_view(buttons, buttons + joystick.ButtonCount()), switches, axes);
+				for (auto i = 0; i < JOY_MAX_AXES; i++)
 				{
-					if (i >= joystick.ButtonCount())
+					if (i < axes.size())
 					{
-						break;
+						pdwRawValue[i] = (float)(2 * (axes[i] - 0.5));
 					}
-					if (previousJoystickButtons[i] && !buttons[i])
+					else
 					{
-						Key_Event(203 + i, false);
-					}
-					else if (!previousJoystickButtons[i] && buttons[i])
-					{
-						Key_Event(203 + i, true);
+						pdwRawValue[i] = 0;
 					}
 				}
+				if (previousJoystickButtonsLength == joystick.ButtonCount())
+				{
+					for (auto i = 0; i < 36; i++)
+					{
+						if (i >= joystick.ButtonCount())
+						{
+							break;
+						}
+						if (previousJoystickButtons[i] && !buttons[i])
+						{
+							Key_Event(203 + i, false);
+						}
+						else if (!previousJoystickButtons[i] && buttons[i])
+						{
+							Key_Event(203 + i, true);
+						}
+					}
+				}
+				delete[] previousJoystickButtons;
+				previousJoystickButtons = buttons;
+				previousJoystickButtonsLength = joystick.ButtonCount();
 			}
-			delete[] previousJoystickButtons;
-			previousJoystickButtons = buttons;
-			previousJoystickButtonsLength = joystick.ButtonCount();
 		}
 		Sys_Frame(elapsed);
 		if (DisplaySysErrorIfNeeded() || sys_quitcalled)
@@ -2036,5 +2142,30 @@ namespace winrt::SlipNFrag_Windows::implementation
 			});
 		audioGraph.Start();
 		audioInput.Start();
+	}
+
+	void MainPage::AddJoystickAxis(IPropertySet const& values, hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments)
+	{
+		if (values.HasKey(stickName))
+		{
+			auto value = values.Lookup(stickName);
+			std::wstring text(unbox_value<hstring>(value));
+			if (text.size() > 0)
+			{
+				if (text[0] != '\"')
+				{
+					try
+					{
+						auto index = std::stoi(text);
+						arguments.emplace_back(axisName);
+						arguments.emplace_back(std::to_string(index));
+					}
+					catch (...)
+					{
+						// Do nothing. Value will be set to none.
+					}
+				}
+			}
+		}
 	}
 }
