@@ -54,7 +54,6 @@
                 </StackPanel>
                 <TextBlock />
                 <TextBlock>Stick configuration:</TextBlock>
-                <TextBlock />
                 <RadioButton x:Name="joy_standard_radio" IsChecked="False" IsTabStop="False" GroupName="joy_group" Checked="Joy_standard_radio_Checked">Standard</RadioButton>
                 <RadioButton x:Name="joy_advanced_radio" IsChecked="False" IsTabStop="False" GroupName="joy_group" Checked="Joy_advanced_radio_Checked">Advanced:</RadioButton>
                 <Grid>
@@ -72,10 +71,12 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition />
+                                <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_x_progress" VerticalAlignment="Stretch" />
                             <TextBlock VerticalAlignment="Center">JOY_AXIS_X</TextBlock>
                             <ComboBox x:Name="joy_axis_x_combo" Grid.Column="1" IsTabStop="False" />
+                            <CheckBox x:Name="joy_axis_x_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
                     </Grid>
                     <Grid Grid.Column="1">
@@ -83,10 +84,12 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition />
+                                <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_y_progress" VerticalAlignment="Stretch" />
                             <TextBlock VerticalAlignment="Center">JOY_AXIS_Y</TextBlock>
                             <ComboBox x:Name="joy_axis_y_combo" Grid.Column="1" IsTabStop="False" />
+                            <CheckBox x:Name="joy_axis_y_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
                     </Grid>
                     <Grid Grid.Row="1">
@@ -94,10 +97,12 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition />
+                                <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_z_progress" VerticalAlignment="Stretch" />
                             <TextBlock VerticalAlignment="Center">JOY_AXIS_Z</TextBlock>
                             <ComboBox x:Name="joy_axis_z_combo" Grid.Column="1" IsTabStop="False" />
+                            <CheckBox x:Name="joy_axis_z_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
                     </Grid>
                     <Grid Grid.Row="1" Grid.Column="1">
@@ -105,10 +110,12 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition />
+                                <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_r_progress" VerticalAlignment="Stretch" />
                             <TextBlock VerticalAlignment="Center">JOY_AXIS_R</TextBlock>
                             <ComboBox x:Name="joy_axis_r_combo" Grid.Column="1" IsTabStop="False" />
+                            <CheckBox x:Name="joy_axis_r_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
                     </Grid>
                     <Grid Grid.Row="2">
@@ -116,10 +123,12 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition />
+                                <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_u_progress" VerticalAlignment="Stretch" />
                             <TextBlock VerticalAlignment="Center">JOY_AXIS_U</TextBlock>
                             <ComboBox x:Name="joy_axis_u_combo" Grid.Column="1" IsTabStop="False" />
+                            <CheckBox x:Name="joy_axis_u_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
                     </Grid>
                     <Grid Grid.Row="2" Grid.Column="1">
@@ -127,10 +136,12 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition />
                                 <ColumnDefinition />
+                                <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_v_progress" VerticalAlignment="Stretch" />
                             <TextBlock VerticalAlignment="Center">JOY_AXIS_V</TextBlock>
                             <ComboBox x:Name="joy_axis_v_combo" Grid.Column="1" IsTabStop="False" />
+                            <CheckBox x:Name="joy_axis_v_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
                     </Grid>
                 </Grid>

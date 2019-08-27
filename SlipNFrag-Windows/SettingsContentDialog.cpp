@@ -261,63 +261,126 @@ namespace winrt::SlipNFrag_Windows::implementation
 		buttonComboBoxes.push_back(k_aux30_combo());
 		buttonComboBoxes.push_back(k_aux31_combo());
 		buttonComboBoxes.push_back(k_aux32_combo());
+		stickCheckBoxes.push_back(joy_axis_x_check());
+		stickCheckBoxes.push_back(joy_axis_y_check());
+		stickCheckBoxes.push_back(joy_axis_z_check());
+		stickCheckBoxes.push_back(joy_axis_r_check());
+		stickCheckBoxes.push_back(joy_axis_u_check());
+		stickCheckBoxes.push_back(joy_axis_v_check());
 		stickComboBoxItems.push_back(L"None");
 		stickComboBoxItems.push_back(L"Forward / Backward");
 		stickComboBoxItems.push_back(L"Look Up / Down");
 		stickComboBoxItems.push_back(L"Step Left / Right");
 		stickComboBoxItems.push_back(L"Turn Left / Right");
-		stickComboBoxItems.push_back(L"Attack");
-		stickComboBoxItems.push_back(L"Change weapon");
-		stickComboBoxItems.push_back(L"Jump / Swim up");
-		stickComboBoxItems.push_back(L"Walk forward");
-		stickComboBoxItems.push_back(L"Backpedal");
-		stickComboBoxItems.push_back(L"Turn left");
-		stickComboBoxItems.push_back(L"Turn right");
-		stickComboBoxItems.push_back(L"Run");
-		stickComboBoxItems.push_back(L"Step left");
-		stickComboBoxItems.push_back(L"Step right");
-		stickComboBoxItems.push_back(L"Sidestep");
-		stickComboBoxItems.push_back(L"Look up");
-		stickComboBoxItems.push_back(L"Look down");
-		stickComboBoxItems.push_back(L"Center view");
-		stickComboBoxItems.push_back(L"Mouse look");
-		stickComboBoxItems.push_back(L"Keyboard look");
-		stickComboBoxItems.push_back(L"Swim up");
-		stickComboBoxItems.push_back(L"Swim down");
-		stickComboBoxItems.push_back(L"Bind to...");
-		LoadButtonComboBoxes(values);
+		buttonComboBoxItems.push_back(L"None");
+		buttonComboBoxItems.push_back(L"Attack");
+		buttonComboBoxItems.push_back(L"Change weapon");
+		buttonComboBoxItems.push_back(L"Jump / Swim up");
+		buttonComboBoxItems.push_back(L"Walk forward");
+		buttonComboBoxItems.push_back(L"Backpedal");
+		buttonComboBoxItems.push_back(L"Turn left");
+		buttonComboBoxItems.push_back(L"Turn right");
+		buttonComboBoxItems.push_back(L"Run");
+		buttonComboBoxItems.push_back(L"Step left");
+		buttonComboBoxItems.push_back(L"Step right");
+		buttonComboBoxItems.push_back(L"Sidestep");
+		buttonComboBoxItems.push_back(L"Look up");
+		buttonComboBoxItems.push_back(L"Look down");
+		buttonComboBoxItems.push_back(L"Center view");
+		buttonComboBoxItems.push_back(L"Mouse look");
+		buttonComboBoxItems.push_back(L"Keyboard look");
+		buttonComboBoxItems.push_back(L"Swim up");
+		buttonComboBoxItems.push_back(L"Swim down");
+		buttonComboBoxItems.push_back(L"ENTER Key");
+		buttonComboBoxItems.push_back(L"ESC Key");
+		buttonComboBoxItems.push_back(L"Up Arrow");
+		buttonComboBoxItems.push_back(L"Left Arrow");
+		buttonComboBoxItems.push_back(L"Right Arrow");
+		buttonComboBoxItems.push_back(L"Down Arrow");
+		buttonComboBoxItems.push_back(L"impulse 1");
+		buttonComboBoxItems.push_back(L"impulse 2");
+		buttonComboBoxItems.push_back(L"impulse 3");
+		buttonComboBoxItems.push_back(L"impulse 4");
+		buttonComboBoxItems.push_back(L"impulse 5");
+		buttonComboBoxItems.push_back(L"impulse 6");
+		buttonComboBoxItems.push_back(L"impulse 7");
+		buttonComboBoxItems.push_back(L"impulse 8");
+		for (auto i = 1; i < (int)buttonComboBoxItems.size(); i++)
+		{
+			stickComboBoxItems.push_back(buttonComboBoxItems[i]);
+		}
+		LoadStickSettings(values);
+		for (auto i = 0; i < (int)buttonComboBoxes.size(); i++)
+		{
+			buttonComboBoxes[i].Items().Clear();
+			for (auto j = 0; j < (int)buttonComboBoxItems.size(); j++)
+			{
+				buttonComboBoxes[i].Items().Append(box_value(buttonComboBoxItems[j]));
+			}
+			auto found = false;
+			if (values.HasKey(buttonComboBoxes[i].Name()))
+			{
+				auto value = values.Lookup(buttonComboBoxes[i].Name());
+				std::wstring text(unbox_value<hstring>(value));
+				if (text.size() > 0)
+				{
+					try
+					{
+						auto index = std::stoi(text);
+						if (index >= 0 && index < (int)buttonComboBoxItems.size())
+						{
+							buttonComboBoxes[i].SelectedIndex(index);
+							found = true;
+						}
+					}
+					catch (...)
+					{
+						// Do nothing. Value will be set to none.
+					}
+				}
+			}
+			if (!found)
+			{
+				buttonComboBoxes[i].SelectedIndex(0);
+			}
+		}
 		for (auto i = 0; i < (int)stickComboBoxes.size(); i++)
 		{
 			stickComboBoxes[i].SelectionChanged([this](IInspectable const& source, SelectionChangedEventArgs const&) 
 				{
+					if (is_loading)
+					{
+						return;
+					}
 					auto values = ApplicationData::Current().LocalSettings().Values();
 					auto comboBox = source.as<ComboBox>();
 					auto index = comboBox.SelectedIndex();
-					if (index < (int)stickComboBoxItems.size() - 1)
-					{
-						values.Insert(comboBox.Name(), box_value(to_hstring(index)));
-						comboBox.IsEditable(false);
-					}
-					else
-					{
-						values.Remove(comboBox.Name());
-						comboBox.IsEditable(true);
-						comboBox.Text(L"");
-					}
+					values.Insert(comboBox.Name(), box_value(to_hstring(index)));
 				});
-			stickComboBoxes[i].TextSubmitted([this](IInspectable const& source, ComboBoxTextSubmittedEventArgs const&) 
+		}
+		for (auto i = 0; i < (int)stickCheckBoxes.size(); i++)
+		{
+			stickCheckBoxes[i].Checked([this](IInspectable const& source, RoutedEventArgs const&)
 				{
+					SaveStickCheck(source);
+				});
+			stickCheckBoxes[i].Unchecked([this](IInspectable const& source, RoutedEventArgs const&)
+				{
+					SaveStickCheck(source);
+				});
+		}
+		for (auto i = 0; i < (int)buttonComboBoxes.size(); i++)
+		{
+			buttonComboBoxes[i].SelectionChanged([this](IInspectable const& source, SelectionChangedEventArgs const&)
+				{
+					if (is_loading)
+					{
+						return;
+					}
 					auto values = ApplicationData::Current().LocalSettings().Values();
 					auto comboBox = source.as<ComboBox>();
-					auto text = comboBox.Text();
-					if (text.size() > 0)
-					{
-						values.Insert(comboBox.Name(), box_value(hstring(L"\"") + text + L"\""));
-					}
-					else
-					{
-						values.Remove(comboBox.Name());
-					}
+					auto index = comboBox.SelectedIndex();
+					values.Insert(comboBox.Name(), box_value(to_hstring(index)));
 				});
 		}
 		timer.Interval(std::chrono::milliseconds(100));
@@ -518,7 +581,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		timer.Stop();
 	}
 
-	void SettingsContentDialog::LoadButtonComboBoxes(IPropertySet& values)
+	void SettingsContentDialog::LoadStickSettings(IPropertySet& values)
 	{
 		for (auto i = 0; i < (int)stickComboBoxes.size(); i++)
 		{
@@ -542,7 +605,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 				}
 				else if (i == 4)
 				{
-					stickComboBoxes[i].SelectedIndex(6); // +impulse 10
+					stickComboBoxes[i].SelectedIndex(6); // impulse 10
 				}
 				else if (i == 5)
 				{
@@ -554,12 +617,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 				}
 				stickComboBoxes[i].IsEnabled(false);
 			}
+			for (auto i = 0; i < (int)stickCheckBoxes.size(); i++)
+			{
+				stickCheckBoxes[i].IsChecked(false);
+				stickCheckBoxes[i].IsEnabled(false);
+			}
 		}
 		else
 		{
 			for (auto i = 0; i < (int)stickComboBoxes.size(); i++)
 			{
-				stickComboBoxes[i].IsEnabled(true);
 				auto found = false;
 				if (values.HasKey(stickComboBoxes[i].Name()))
 				{
@@ -567,34 +634,40 @@ namespace winrt::SlipNFrag_Windows::implementation
 					std::wstring text(unbox_value<hstring>(value));
 					if (text.size() > 0)
 					{
-						if (text[0] == '\"')
+						try
 						{
-							stickComboBoxes[i].SelectedIndex(5);
-							stickComboBoxes[i].IsEditable(true);
-							stickComboBoxes[i].Text(text.substr(1, text.length() - 2));
-							found = true;
-						}
-						else
-						{
-							try
+							auto index = std::stoi(text);
+							if (index >= 0 && index < (int)stickComboBoxItems.size())
 							{
-								auto index = std::stoi(text);
 								stickComboBoxes[i].SelectedIndex(index);
-								stickComboBoxes[i].IsEditable(false);
 								found = true;
 							}
-							catch (...)
-							{
-								// Do nothing. Value will be set to none.
-							}
+						}
+						catch (...)
+						{
+							// Do nothing. Value will be set to none.
 						}
 					}
 				}
 				if (!found)
 				{
 					stickComboBoxes[i].SelectedIndex(0);
-					stickComboBoxes[i].IsEditable(false);
 				}
+				stickComboBoxes[i].IsEnabled(true);
+			}
+			for (auto i = 0; i < (int)stickCheckBoxes.size(); i++)
+			{
+				auto found = false;
+				if (values.HasKey(stickCheckBoxes[i].Name()))
+				{
+					auto value = values.Lookup(stickCheckBoxes[i].Name());
+					stickCheckBoxes[i].IsChecked(unbox_value<bool>(value));
+				}
+				if (!found)
+				{
+					stickCheckBoxes[i].IsChecked(false);
+				}
+				stickCheckBoxes[i].IsEnabled(true);
 			}
 		}
 	}
@@ -603,14 +676,18 @@ namespace winrt::SlipNFrag_Windows::implementation
 	{
 		auto values = ApplicationData::Current().LocalSettings().Values();
 		SaveJoystickRadioButtons(values);
-		LoadButtonComboBoxes(values);
+		is_loading = true;
+		LoadStickSettings(values);
+		is_loading = false;
 	}
 
 	void SettingsContentDialog::Joy_advanced_radio_Checked(IInspectable const&, RoutedEventArgs const&)
 	{
 		auto values = ApplicationData::Current().LocalSettings().Values();
 		SaveJoystickRadioButtons(values);
-		LoadButtonComboBoxes(values);
+		is_loading = true;
+		LoadStickSettings(values);
+		is_loading = false;
 	}
 
 	void SettingsContentDialog::SaveJoystickRadioButtons(IPropertySet& values)
@@ -641,5 +718,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 		}
 		auto values = ApplicationData::Current().LocalSettings().Values();
 		values.Insert(L"joystick_check", joystick_check().IsChecked());
+	}
+
+	void SettingsContentDialog::SaveStickCheck(IInspectable const& source)
+	{
+		if (is_loading)
+		{
+			return;
+		}
+		auto values = ApplicationData::Current().LocalSettings().Values();
+		auto checkbox = source.as<CheckBox>();
+		values.Insert(checkbox.Name(), checkbox.IsChecked());
 	}
 }

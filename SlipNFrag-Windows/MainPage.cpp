@@ -343,31 +343,77 @@ namespace winrt::SlipNFrag_Windows::implementation
 						auto value = values.Lookup(L"joy_advanced_radio");
 						joy_advanced_radio = unbox_value<bool>(value);
 					}
+					joyCommandsForAxes.clear();
+					joyCommandsForAxes.resize(5);
+					joyCommandsForAxes.push_back("+attack");
+					joyCommandsForAxes.push_back("impulse 10");
+					joyCommandsForAxes.push_back("+jump");
+					joyCommandsForAxes.push_back("+forward");
+					joyCommandsForAxes.push_back("+back");
+					joyCommandsForAxes.push_back("+left");
+					joyCommandsForAxes.push_back("+right");
+					joyCommandsForAxes.push_back("+speed");
+					joyCommandsForAxes.push_back("+moveleft");
+					joyCommandsForAxes.push_back("+moveright");
+					joyCommandsForAxes.push_back("+strafe");
+					joyCommandsForAxes.push_back("+lookup");
+					joyCommandsForAxes.push_back("+lookdown");
+					joyCommandsForAxes.push_back("centerview");
+					joyCommandsForAxes.push_back("+mlook");
+					joyCommandsForAxes.push_back("+klook");
+					joyCommandsForAxes.push_back("+moveup");
+					joyCommandsForAxes.push_back("+movedown");
+					joyCommandsForAxes.push_back("K_ENTER");
+					joyCommandsForAxes.push_back("K_ESCAPE");
+					joyCommandsForAxes.push_back("K_UPARROW");
+					joyCommandsForAxes.push_back("K_LEFTARROW");
+					joyCommandsForAxes.push_back("K_RIGHTARROW");
+					joyCommandsForAxes.push_back("K_DOWNARROW");
+					joyCommandsForAxes.push_back("impulse 1");
+					joyCommandsForAxes.push_back("impulse 2");
+					joyCommandsForAxes.push_back("impulse 3");
+					joyCommandsForAxes.push_back("impulse 4");
+					joyCommandsForAxes.push_back("impulse 5");
+					joyCommandsForAxes.push_back("impulse 6");
+					joyCommandsForAxes.push_back("impulse 7");
+					joyCommandsForAxes.push_back("impulse 8");
+					joyAxesAsButtons.clear();
+					joyAxesAsButtonsOnRelease.clear();
 					if (joy_standard_radio)
 					{
 						arguments.emplace_back("+joyadvanced");
 						arguments.emplace_back("0");
+						joyAxesAsButtons.resize(4);
+						joyAxesAsButtons.push_back(joyCommandsForAxes[6]);
+						joyAxesAsButtons.push_back(joyCommandsForAxes[5]);
+						joyAxesAsButtonsOnRelease.resize(4);
+						joyAxesAsButtonsOnRelease.push_back(joyCommandsForAxes[6]);
+						joyAxesAsButtonsOnRelease.push_back(std::string("-") + joyCommandsForAxes[5].substr(1));
 					}
 					else if (joy_advanced_radio)
 					{
 						arguments.emplace_back("+joyadvanced");
 						arguments.emplace_back("1");
-						AddJoystickAxis(values, L"joy_axis_x_combo", "+joyadvaxisx", arguments);
-						AddJoystickAxis(values, L"joy_axis_y_combo", "+joyadvaxisy", arguments);
-						AddJoystickAxis(values, L"joy_axis_z_combo", "+joyadvaxisz", arguments);
-						AddJoystickAxis(values, L"joy_axis_r_combo", "+joyadvaxisr", arguments);
-						AddJoystickAxis(values, L"joy_axis_u_combo", "+joyadvaxisu", arguments);
-						AddJoystickAxis(values, L"joy_axis_v_combo", "+joyadvaxisv", arguments);
+						AddJoystickAxis(values, L"joy_axis_x_combo", "+joyadvaxisx", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
+						AddJoystickAxis(values, L"joy_axis_y_combo", "+joyadvaxisy", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
+						AddJoystickAxis(values, L"joy_axis_z_combo", "+joyadvaxisz", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
+						AddJoystickAxis(values, L"joy_axis_r_combo", "+joyadvaxisr", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
+						AddJoystickAxis(values, L"joy_axis_u_combo", "+joyadvaxisu", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
+						AddJoystickAxis(values, L"joy_axis_v_combo", "+joyadvaxisv", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
 					}
+					previousGamepadButtonsWereRead = false;
+					previousJoyAxesAsButtonValuesWereRead = false;
+					previousJoyAxesAsButtonValues.resize(joyAxesAsButtons.size());
 				}
 				if (values.HasKey(L"command_line_text"))
 				{
 					auto value = values.Lookup(L"command_line_text");
 					auto value_as_string = unbox_value<hstring>(value);
 					std::string one_command;
+					auto within_quotes = false;
 					for (auto c : value_as_string)
 					{
-						if (c == ' ')
+						if (c == ' ' && !within_quotes)
 						{
 							if (one_command.length() > 0)
 							{
@@ -377,6 +423,10 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 						else
 						{
+							if (c == '\"')
+							{
+								within_quotes = !within_quotes;
+							}
 							one_command.push_back((char)c);
 						}
 					}
@@ -1185,6 +1235,41 @@ namespace winrt::SlipNFrag_Windows::implementation
 				pdwRawValue[JOY_AXIS_R] = (float)-reading.RightThumbstickY;
 				pdwRawValue[JOY_AXIS_U] = (float)reading.LeftTrigger;
 				pdwRawValue[JOY_AXIS_V] = (float)reading.RightTrigger;
+				if (previousJoyAxesAsButtonValuesWereRead)
+				{
+					for (auto i = 0; i < joyAxesAsButtons.size(); i++)
+					{
+						auto previous = fabs(previousJoyAxesAsButtonValues[i]);
+						auto current = fabs(pdwRawValue[i]);
+						if (previous < 0.15 && current >= 0.15)
+						{
+							if (joyAxesAsButtons[i].size() > 0)
+							{
+								Cbuf_AddText(joyAxesAsButtons[i].c_str());
+							}
+							else if (joyAxesAsKeys[i] > 0)
+							{
+								Key_Event(joyAxesAsKeys[i], true);
+							}
+						}
+						else if (previous >= 0.15 && current < 0.15)
+						{
+							if (joyAxesAsButtons[i].size() > 0)
+							{
+								Cbuf_AddText(joyAxesAsButtonsOnRelease[i].c_str());
+							}
+							else if (joyAxesAsKeys[i] > 0)
+							{
+								Key_Event(joyAxesAsKeys[i], false);
+							}
+						}
+					}
+				}
+				for (auto i = 0; i < joyAxesAsButtons.size(); i++)
+				{
+					previousJoyAxesAsButtonValues[i] = pdwRawValue[i];
+				}
+				previousJoyAxesAsButtonValuesWereRead = true;
 				auto buttons = (unsigned int)reading.Buttons;
 				if (previousGamepadButtonsWereRead)
 				{
@@ -2144,7 +2229,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		audioInput.Start();
 	}
 
-	void MainPage::AddJoystickAxis(IPropertySet const& values, hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments)
+	void MainPage::AddJoystickAxis(IPropertySet const& values, hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments, std::vector<std::string>& commandsForAxes, std::vector<std::string>& axesAsButtons, std::vector<std::string>& axesAsButtonsOnRelease, std::vector<int>& axesAsKeys)
 	{
 		if (values.HasKey(stickName))
 		{
@@ -2152,18 +2237,76 @@ namespace winrt::SlipNFrag_Windows::implementation
 			std::wstring text(unbox_value<hstring>(value));
 			if (text.size() > 0)
 			{
-				if (text[0] != '\"')
+				try
 				{
-					try
+					auto index = std::stoi(text);
+					if (index < 5)
 					{
-						auto index = std::stoi(text);
 						arguments.emplace_back(axisName);
 						arguments.emplace_back(std::to_string(index));
+						axesAsButtons.emplace_back();
+						axesAsButtonsOnRelease.emplace_back();
+						axesAsKeys.push_back(-1);
 					}
-					catch (...)
+					else 
 					{
-						// Do nothing. Value will be set to none.
+						auto command = commandsForAxes[index];
+						if (command == "K_ENTER")
+						{
+							axesAsButtons.emplace_back();
+							axesAsButtonsOnRelease.emplace_back();
+							axesAsKeys.push_back(13);
+						}
+						else if (command == "K_ESCAPE")
+						{
+							axesAsButtons.emplace_back();
+							axesAsButtonsOnRelease.emplace_back();
+							axesAsKeys.push_back(27);
+						}
+						else if (command == "K_UPARROW")
+						{
+							axesAsButtons.emplace_back();
+							axesAsButtonsOnRelease.emplace_back();
+							axesAsKeys.push_back(128);
+						}
+						else if (command == "K_LEFTARROW")
+						{
+							axesAsButtons.emplace_back();
+							axesAsButtonsOnRelease.emplace_back();
+							axesAsKeys.push_back(130);
+						}
+						else if (command == "K_RIGHTARROW")
+						{
+							axesAsButtons.emplace_back();
+							axesAsButtonsOnRelease.emplace_back();
+							axesAsKeys.push_back(131);
+						}
+						else if (command == "K_DOWNARROW")
+						{
+							axesAsButtons.emplace_back();
+							axesAsButtonsOnRelease.emplace_back();
+							axesAsKeys.push_back(129);
+						}
+						else
+						{
+							axesAsButtons.push_back(command);
+							if (command[0] == '+')
+							{
+								axesAsButtonsOnRelease.push_back(std::string("-") + command.substr(1));
+							}
+							else
+							{
+								axesAsButtonsOnRelease.emplace_back();
+							}
+							axesAsKeys.push_back(-1);
+						}
 					}
+				}
+				catch (...)
+				{
+					axesAsButtons.emplace_back();
+					axesAsButtonsOnRelease.emplace_back();
+					axesAsKeys.push_back(-1);
 				}
 			}
 		}

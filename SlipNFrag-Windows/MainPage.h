@@ -74,6 +74,12 @@ namespace winrt::SlipNFrag_Windows::implementation
 		winrt::Windows::Media::Audio::AudioFrameInputNode audioInput = nullptr;
 		bool previousGamepadButtonsWereRead = false;
 		unsigned int previousGamepadButtons;
+		std::vector<std::string> joyCommandsForAxes;
+		std::vector<std::string> joyAxesAsButtons;
+		std::vector<std::string> joyAxesAsButtonsOnRelease;
+		std::vector<int> joyAxesAsKeys;
+		bool previousJoyAxesAsButtonValuesWereRead = false;
+		std::vector<float> previousJoyAxesAsButtonValues;
 
 		MainPage();
 		void UpdateTitleBarLayout(Windows::ApplicationModel::Core::CoreApplicationViewTitleBar const& titleBar);
@@ -118,7 +124,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void CreateAudioGraph();
 		void CreateAudioOutput();
 		void CreateAudioInput();
-		void AddJoystickAxis(winrt::Windows::Foundation::Collections::IPropertySet const& values, winrt::hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments);
+		void AddJoystickAxis(winrt::Windows::Foundation::Collections::IPropertySet const& values, winrt::hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments, std::vector<std::string>& commandsForAxes, std::vector<std::string>& axesAsButtons, std::vector<std::string>& axesAsButtonsOnRelease, std::vector<int>& axesAsKeys);
 	};
 }
 

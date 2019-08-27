@@ -14,7 +14,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		std::vector<winrt::Windows::UI::Xaml::Controls::ProgressBar> buttonProgressBars;
 		std::vector<winrt::Windows::UI::Xaml::Controls::ComboBox> stickComboBoxes;
 		std::vector<winrt::Windows::UI::Xaml::Controls::ComboBox> buttonComboBoxes;
+		std::vector<winrt::Windows::UI::Xaml::Controls::CheckBox> stickCheckBoxes;
 		std::vector<winrt::hstring> stickComboBoxItems;
+		std::vector<winrt::hstring> buttonComboBoxItems;
 
 		SettingsContentDialog();
 		void Basedir_choose_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
@@ -31,13 +33,14 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void General_button_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void Joystick_button_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void ContentDialog_Closing(winrt::Windows::UI::Xaml::Controls::ContentDialog const&, winrt::Windows::UI::Xaml::Controls::ContentDialogClosingEventArgs const&);
-		void LoadButtonComboBoxes(winrt::Windows::Foundation::Collections::IPropertySet& values);
+		void LoadStickSettings(winrt::Windows::Foundation::Collections::IPropertySet& values);
 		void Joy_standard_radio_Checked(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void Joy_advanced_radio_Checked(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void SaveJoystickRadioButtons(winrt::Windows::Foundation::Collections::IPropertySet& values);
 		void Joystick_check_Checked(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void Joystick_check_Unchecked(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void SaveJoystickCheck();
+		void SaveStickCheck(winrt::Windows::Foundation::IInspectable const& source);
 	};
 }
 
