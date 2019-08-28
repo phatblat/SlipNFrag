@@ -343,40 +343,40 @@ namespace winrt::SlipNFrag_Windows::implementation
 						auto value = values.Lookup(L"joy_advanced_radio");
 						joy_advanced_radio = unbox_value<bool>(value);
 					}
-					joyCommandsForAxes.clear();
-					joyCommandsForAxes.resize(5);
-					joyCommandsForAxes.push_back("+attack");
-					joyCommandsForAxes.push_back("impulse 10");
-					joyCommandsForAxes.push_back("+jump");
-					joyCommandsForAxes.push_back("+forward");
-					joyCommandsForAxes.push_back("+back");
-					joyCommandsForAxes.push_back("+left");
-					joyCommandsForAxes.push_back("+right");
-					joyCommandsForAxes.push_back("+speed");
-					joyCommandsForAxes.push_back("+moveleft");
-					joyCommandsForAxes.push_back("+moveright");
-					joyCommandsForAxes.push_back("+strafe");
-					joyCommandsForAxes.push_back("+lookup");
-					joyCommandsForAxes.push_back("+lookdown");
-					joyCommandsForAxes.push_back("centerview");
-					joyCommandsForAxes.push_back("+mlook");
-					joyCommandsForAxes.push_back("+klook");
-					joyCommandsForAxes.push_back("+moveup");
-					joyCommandsForAxes.push_back("+movedown");
-					joyCommandsForAxes.push_back("K_ENTER");
-					joyCommandsForAxes.push_back("K_ESCAPE");
-					joyCommandsForAxes.push_back("K_UPARROW");
-					joyCommandsForAxes.push_back("K_LEFTARROW");
-					joyCommandsForAxes.push_back("K_RIGHTARROW");
-					joyCommandsForAxes.push_back("K_DOWNARROW");
-					joyCommandsForAxes.push_back("impulse 1");
-					joyCommandsForAxes.push_back("impulse 2");
-					joyCommandsForAxes.push_back("impulse 3");
-					joyCommandsForAxes.push_back("impulse 4");
-					joyCommandsForAxes.push_back("impulse 5");
-					joyCommandsForAxes.push_back("impulse 6");
-					joyCommandsForAxes.push_back("impulse 7");
-					joyCommandsForAxes.push_back("impulse 8");
+					joyCommands.clear();
+					joyCommands.resize(5);
+					joyCommands.push_back("+attack");
+					joyCommands.push_back("impulse 10");
+					joyCommands.push_back("+jump");
+					joyCommands.push_back("+forward");
+					joyCommands.push_back("+back");
+					joyCommands.push_back("+left");
+					joyCommands.push_back("+right");
+					joyCommands.push_back("+speed");
+					joyCommands.push_back("+moveleft");
+					joyCommands.push_back("+moveright");
+					joyCommands.push_back("+strafe");
+					joyCommands.push_back("+lookup");
+					joyCommands.push_back("+lookdown");
+					joyCommands.push_back("centerview");
+					joyCommands.push_back("+mlook");
+					joyCommands.push_back("+klook");
+					joyCommands.push_back("+moveup");
+					joyCommands.push_back("+movedown");
+					joyCommands.push_back("K_ENTER");
+					joyCommands.push_back("K_ESCAPE");
+					joyCommands.push_back("K_UPARROW");
+					joyCommands.push_back("K_LEFTARROW");
+					joyCommands.push_back("K_RIGHTARROW");
+					joyCommands.push_back("K_DOWNARROW");
+					joyCommands.push_back("impulse 1");
+					joyCommands.push_back("impulse 2");
+					joyCommands.push_back("impulse 3");
+					joyCommands.push_back("impulse 4");
+					joyCommands.push_back("impulse 5");
+					joyCommands.push_back("impulse 6");
+					joyCommands.push_back("impulse 7");
+					joyCommands.push_back("impulse 8");
 					joyAxesAsButtons.clear();
 					joyAxesAsButtonsOnRelease.clear();
 					if (joy_standard_radio)
@@ -384,22 +384,90 @@ namespace winrt::SlipNFrag_Windows::implementation
 						arguments.emplace_back("+joyadvanced");
 						arguments.emplace_back("0");
 						joyAxesAsButtons.resize(4);
-						joyAxesAsButtons.push_back(joyCommandsForAxes[6]);
-						joyAxesAsButtons.push_back(joyCommandsForAxes[5]);
-						joyAxesAsButtonsOnRelease.resize(4);
-						joyAxesAsButtonsOnRelease.push_back(joyCommandsForAxes[6]);
-						joyAxesAsButtonsOnRelease.push_back(std::string("-") + joyCommandsForAxes[5].substr(1));
+						joyAxesAsButtons.push_back(joyCommands[6]);
+						joyAxesAsButtons.push_back(joyCommands[5]);
+						joyAxesAsButtonsOnRelease.resize(5);
+						joyAxesAsButtonsOnRelease.push_back(std::string("-") + joyCommands[5].substr(1));
+						joyAxesAsKeys.resize(6);
 					}
 					else if (joy_advanced_radio)
 					{
 						arguments.emplace_back("+joyadvanced");
 						arguments.emplace_back("1");
-						AddJoystickAxis(values, L"joy_axis_x_combo", "+joyadvaxisx", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
-						AddJoystickAxis(values, L"joy_axis_y_combo", "+joyadvaxisy", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
-						AddJoystickAxis(values, L"joy_axis_z_combo", "+joyadvaxisz", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
-						AddJoystickAxis(values, L"joy_axis_r_combo", "+joyadvaxisr", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
-						AddJoystickAxis(values, L"joy_axis_u_combo", "+joyadvaxisu", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
-						AddJoystickAxis(values, L"joy_axis_v_combo", "+joyadvaxisv", arguments, joyCommandsForAxes, joyAxesAsButtons, joyAxesAsButtonsOnRelease, joyAxesAsKeys);
+						AddJoystickAxis(values, L"joy_axis_x_combo", "+joyadvaxisx", arguments);
+						AddJoystickAxis(values, L"joy_axis_y_combo", "+joyadvaxisy", arguments);
+						AddJoystickAxis(values, L"joy_axis_z_combo", "+joyadvaxisz", arguments);
+						AddJoystickAxis(values, L"joy_axis_r_combo", "+joyadvaxisr", arguments);
+						AddJoystickAxis(values, L"joy_axis_u_combo", "+joyadvaxisu", arguments);
+						AddJoystickAxis(values, L"joy_axis_v_combo", "+joyadvaxisv", arguments);
+					}
+					joyButtonsAsKeys.clear();
+					for (auto i = 0; i < 36; i++)
+					{
+						auto found = false;
+						hstring name;
+						if (i < 4)
+						{
+							name = L"k_joy" + to_hstring(i + 1) + L"_combo";
+						}
+						else
+						{
+							name = L"k_aux" + to_hstring(i - 3) + L"_combo";
+						}
+						if (values.HasKey(name))
+						{
+							auto value = values.Lookup(name);
+							std::wstring text(unbox_value<hstring>(value));
+							if (text.size() > 0)
+							{
+								try
+								{
+									auto index = std::stoi(text);
+									if (index >= 1 && index < (int)joyCommands.size() - 5)
+									{
+										auto command = joyCommands[index + 4];
+										if (command == "K_ENTER")
+										{
+											joyButtonsAsKeys.push_back(13);
+											found = true;
+										}
+										else if (command == "K_ESCAPE")
+										{
+											joyButtonsAsKeys.push_back(27);
+											found = true;
+										}
+										else if (command == "K_UPARROW")
+										{
+											joyButtonsAsKeys.push_back(128);
+											found = true;
+										}
+										else if (command == "K_LEFTARROW")
+										{
+											joyButtonsAsKeys.push_back(130);
+											found = true;
+										}
+										else if (command == "K_RIGHTARROW")
+										{
+											joyButtonsAsKeys.push_back(131);
+											found = true;
+										}
+										else if (command == "K_DOWNARROW")
+										{
+											joyButtonsAsKeys.push_back(129);
+											found = true;
+										}
+									}
+								}
+								catch (...)
+								{
+									// Do nothing. The key will be set automatically to -1.
+								}
+							}
+						}
+						if (!found)
+						{
+							joyButtonsAsKeys.push_back(-1);
+						}
 					}
 					previousGamepadButtonsWereRead = false;
 					previousJoyAxesAsButtonValuesWereRead = false;
@@ -1277,13 +1345,103 @@ namespace winrt::SlipNFrag_Windows::implementation
 					unsigned int mask = 1;
 					for (auto i = 0; i < 30; i++)
 					{
-						if ((buttons & ~mask) == mask && (previousGamepadButtons & ~mask) != mask)
+						if ((buttons & mask) == mask && (previousGamepadButtons & mask) != mask)
 						{
-							Key_Event(key, true);
+							if (key_dest == key_game)
+							{
+								if (joyButtonsAsKeys[i] >= 0)
+								{
+									Key_Event(joyButtonsAsKeys[i], true);
+								}
+								else
+								{
+									Key_Event(key, true);
+								}
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::A)
+							{
+								Key_Event(13, true);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::B)
+							{
+								Key_Event(27, true);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadUp)
+							{
+								Key_Event(128, true);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadDown)
+							{
+								Key_Event(129, true);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadLeft)
+							{
+								Key_Event(130, true);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadRight)
+							{
+								Key_Event(131, true);
+							}
+							else
+							{
+								if (joyButtonsAsKeys[i] >= 0)
+								{
+									Key_Event(joyButtonsAsKeys[i], true);
+								}
+								else
+								{
+									Key_Event(key, true);
+								}
+							}
 						}
-						else if ((buttons & ~mask) != mask && (previousGamepadButtons & ~mask) == mask)
+						else if ((buttons & mask) != mask && (previousGamepadButtons & mask) == mask)
 						{
-							Key_Event(key, false);
+							if (key_dest == key_game)
+							{
+								if (joyButtonsAsKeys[i] >= 0)
+								{
+									Key_Event(joyButtonsAsKeys[i], false);
+								}
+								else
+								{
+									Key_Event(key, false);
+								}
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::A)
+							{
+								Key_Event(13, false);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::B)
+							{
+								Key_Event(27, false);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadUp)
+							{
+								Key_Event(128, false);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadDown)
+							{
+								Key_Event(129, false);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadLeft)
+							{
+								Key_Event(130, false);
+							}
+							else if ((GamepadButtons)mask == GamepadButtons::DPadRight)
+							{
+								Key_Event(131, false);
+							}
+							else
+							{
+								if (joyButtonsAsKeys[i] >= 0)
+								{
+									Key_Event(joyButtonsAsKeys[i], false);
+								}
+								else
+								{
+									Key_Event(key, false);
+								}
+							}
 						}
 						key++;
 						mask <<= 1;
@@ -2229,7 +2387,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		audioInput.Start();
 	}
 
-	void MainPage::AddJoystickAxis(IPropertySet const& values, hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments, std::vector<std::string>& commandsForAxes, std::vector<std::string>& axesAsButtons, std::vector<std::string>& axesAsButtonsOnRelease, std::vector<int>& axesAsKeys)
+	void MainPage::AddJoystickAxis(IPropertySet const& values, hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments)
 	{
 		if (values.HasKey(stickName))
 		{
@@ -2244,69 +2402,69 @@ namespace winrt::SlipNFrag_Windows::implementation
 					{
 						arguments.emplace_back(axisName);
 						arguments.emplace_back(std::to_string(index));
-						axesAsButtons.emplace_back();
-						axesAsButtonsOnRelease.emplace_back();
-						axesAsKeys.push_back(-1);
+						joyAxesAsButtons.emplace_back();
+						joyAxesAsButtonsOnRelease.emplace_back();
+						joyAxesAsKeys.push_back(-1);
 					}
 					else 
 					{
-						auto command = commandsForAxes[index];
+						auto command = joyCommands[index];
 						if (command == "K_ENTER")
 						{
-							axesAsButtons.emplace_back();
-							axesAsButtonsOnRelease.emplace_back();
-							axesAsKeys.push_back(13);
+							joyAxesAsButtons.emplace_back();
+							joyAxesAsButtonsOnRelease.emplace_back();
+							joyAxesAsKeys.push_back(13);
 						}
 						else if (command == "K_ESCAPE")
 						{
-							axesAsButtons.emplace_back();
-							axesAsButtonsOnRelease.emplace_back();
-							axesAsKeys.push_back(27);
+							joyAxesAsButtons.emplace_back();
+							joyAxesAsButtonsOnRelease.emplace_back();
+							joyAxesAsKeys.push_back(27);
 						}
 						else if (command == "K_UPARROW")
 						{
-							axesAsButtons.emplace_back();
-							axesAsButtonsOnRelease.emplace_back();
-							axesAsKeys.push_back(128);
+							joyAxesAsButtons.emplace_back();
+							joyAxesAsButtonsOnRelease.emplace_back();
+							joyAxesAsKeys.push_back(128);
 						}
 						else if (command == "K_LEFTARROW")
 						{
-							axesAsButtons.emplace_back();
-							axesAsButtonsOnRelease.emplace_back();
-							axesAsKeys.push_back(130);
+							joyAxesAsButtons.emplace_back();
+							joyAxesAsButtonsOnRelease.emplace_back();
+							joyAxesAsKeys.push_back(130);
 						}
 						else if (command == "K_RIGHTARROW")
 						{
-							axesAsButtons.emplace_back();
-							axesAsButtonsOnRelease.emplace_back();
-							axesAsKeys.push_back(131);
+							joyAxesAsButtons.emplace_back();
+							joyAxesAsButtonsOnRelease.emplace_back();
+							joyAxesAsKeys.push_back(131);
 						}
 						else if (command == "K_DOWNARROW")
 						{
-							axesAsButtons.emplace_back();
-							axesAsButtonsOnRelease.emplace_back();
-							axesAsKeys.push_back(129);
+							joyAxesAsButtons.emplace_back();
+							joyAxesAsButtonsOnRelease.emplace_back();
+							joyAxesAsKeys.push_back(129);
 						}
 						else
 						{
-							axesAsButtons.push_back(command);
+							joyAxesAsButtons.push_back(command);
 							if (command[0] == '+')
 							{
-								axesAsButtonsOnRelease.push_back(std::string("-") + command.substr(1));
+								joyAxesAsButtonsOnRelease.push_back(std::string("-") + command.substr(1));
 							}
 							else
 							{
-								axesAsButtonsOnRelease.emplace_back();
+								joyAxesAsButtonsOnRelease.emplace_back();
 							}
-							axesAsKeys.push_back(-1);
+							joyAxesAsKeys.push_back(-1);
 						}
 					}
 				}
 				catch (...)
 				{
-					axesAsButtons.emplace_back();
-					axesAsButtonsOnRelease.emplace_back();
-					axesAsKeys.push_back(-1);
+					joyAxesAsButtons.emplace_back();
+					joyAxesAsButtonsOnRelease.emplace_back();
+					joyAxesAsKeys.push_back(-1);
 				}
 			}
 		}

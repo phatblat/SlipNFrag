@@ -4,6 +4,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:SlipNFrag_Windows">
     <Application.Resources>
-        <x:Double x:Key="ContentDialogMaxWidth">1024</x:Double>
+        <x:Double x:Key="ContentDialogMaxWidth">1280</x:Double>
     </Application.Resources>
 </Application>

@@ -7,14 +7,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 	struct SettingsContentDialog : SettingsContentDialogT<SettingsContentDialog>
 	{
 		bool is_loading = false;
-		winrt::Windows::Gaming::Input::RawGameController joystick = nullptr;
-		winrt::Windows::Gaming::Input::Gamepad gamepad = nullptr;
-		winrt::Windows::UI::Xaml::DispatcherTimer timer;
 		std::vector<winrt::Windows::UI::Xaml::Controls::ProgressBar> stickProgressBars;
 		std::vector<winrt::Windows::UI::Xaml::Controls::ProgressBar> buttonProgressBars;
+		std::vector<winrt::Windows::UI::Xaml::Controls::TextBlock> buttonTextBlocks;
 		std::vector<winrt::Windows::UI::Xaml::Controls::ComboBox> stickComboBoxes;
 		std::vector<winrt::Windows::UI::Xaml::Controls::ComboBox> buttonComboBoxes;
 		std::vector<winrt::Windows::UI::Xaml::Controls::CheckBox> stickCheckBoxes;
+		winrt::weak_ref<winrt::Windows::Gaming::Input::RawGameController> joystick;
+		winrt::weak_ref<winrt::Windows::Gaming::Input::Gamepad> gamepad;
+		winrt::Windows::UI::Xaml::DispatcherTimer timer;
 		std::vector<winrt::hstring> stickComboBoxItems;
 		std::vector<winrt::hstring> buttonComboBoxItems;
 
@@ -41,6 +42,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void Joystick_check_Unchecked(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 		void SaveJoystickCheck();
 		void SaveStickCheck(winrt::Windows::Foundation::IInspectable const& source);
+		void LoadTextBlocks();
 	};
 }
 

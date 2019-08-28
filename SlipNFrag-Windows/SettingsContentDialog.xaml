@@ -74,7 +74,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_x_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">JOY_AXIS_X</TextBlock>
+                            <TextBlock x:Name="joy_axis_x_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="joy_axis_x_combo" Grid.Column="1" IsTabStop="False" />
                             <CheckBox x:Name="joy_axis_x_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
@@ -87,7 +87,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_y_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">JOY_AXIS_Y</TextBlock>
+                            <TextBlock x:Name="joy_axis_y_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="joy_axis_y_combo" Grid.Column="1" IsTabStop="False" />
                             <CheckBox x:Name="joy_axis_y_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
@@ -100,7 +100,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_z_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">JOY_AXIS_Z</TextBlock>
+                            <TextBlock x:Name="joy_axis_z_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="joy_axis_z_combo" Grid.Column="1" IsTabStop="False" />
                             <CheckBox x:Name="joy_axis_z_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
@@ -113,7 +113,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_r_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">JOY_AXIS_R</TextBlock>
+                            <TextBlock x:Name="joy_axis_r_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="joy_axis_r_combo" Grid.Column="1" IsTabStop="False" />
                             <CheckBox x:Name="joy_axis_r_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
@@ -126,7 +126,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_u_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">JOY_AXIS_U</TextBlock>
+                            <TextBlock x:Name="joy_axis_u_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="joy_axis_u_combo" Grid.Column="1" IsTabStop="False" />
                             <CheckBox x:Name="joy_axis_u_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
@@ -139,7 +139,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="joy_axis_v_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">JOY_AXIS_V</TextBlock>
+                            <TextBlock x:Name="joy_axis_v_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="joy_axis_v_combo" Grid.Column="1" IsTabStop="False" />
                             <CheckBox x:Name="joy_axis_v_check" Grid.Column="2" IsTabStop="False">Inverted</CheckBox>
                         </Grid>
@@ -171,7 +171,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_joy1_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_JOY1</TextBlock>
+                            <TextBlock x:Name="k_joy1_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_joy1_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -182,7 +182,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_joy2_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_JOY2</TextBlock>
+                            <TextBlock x:Name="k_joy2_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_joy2_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -193,7 +193,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_joy3_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_JOY3</TextBlock>
+                            <TextBlock x:Name="k_joy3_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_joy3_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -204,7 +204,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_joy4_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_JOY4</TextBlock>
+                            <TextBlock x:Name="k_joy4_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_joy4_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -215,7 +215,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux1_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX1</TextBlock>
+                            <TextBlock x:Name="k_aux1_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux1_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -226,7 +226,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux2_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX2</TextBlock>
+                            <TextBlock x:Name="k_aux2_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux2_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -237,7 +237,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux3_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX3</TextBlock>
+                            <TextBlock x:Name="k_aux3_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux3_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -248,7 +248,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux4_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX4</TextBlock>
+                            <TextBlock x:Name="k_aux4_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux4_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -259,7 +259,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux5_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX5</TextBlock>
+                            <TextBlock x:Name="k_aux5_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux5_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -270,7 +270,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux6_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX6</TextBlock>
+                            <TextBlock x:Name="k_aux6_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux6_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -281,7 +281,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux7_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX7</TextBlock>
+                            <TextBlock x:Name="k_aux7_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux7_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -292,7 +292,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux8_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX8</TextBlock>
+                            <TextBlock x:Name="k_aux8_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux8_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -303,7 +303,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux9_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX9</TextBlock>
+                            <TextBlock x:Name="k_aux9_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux9_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -314,7 +314,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux10_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX10</TextBlock>
+                            <TextBlock x:Name="k_aux10_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux10_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -325,7 +325,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux11_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX11</TextBlock>
+                            <TextBlock x:Name="k_aux11_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux11_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -336,7 +336,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux12_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX12</TextBlock>
+                            <TextBlock x:Name="k_aux12_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux12_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -347,7 +347,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux13_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX13</TextBlock>
+                            <TextBlock x:Name="k_aux13_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux13_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -358,7 +358,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux14_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX14</TextBlock>
+                            <TextBlock x:Name="k_aux14_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux14_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -369,7 +369,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux15_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX15</TextBlock>
+                            <TextBlock x:Name="k_aux15_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux15_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -380,7 +380,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux16_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX16</TextBlock>
+                            <TextBlock x:Name="k_aux16_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux16_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -391,7 +391,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux17_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX17</TextBlock>
+                            <TextBlock x:Name="k_aux17_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux17_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -402,7 +402,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux18_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX18</TextBlock>
+                            <TextBlock x:Name="k_aux18_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux18_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -413,7 +413,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux19_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX19</TextBlock>
+                            <TextBlock x:Name="k_aux19_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux19_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -424,7 +424,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux20_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX20</TextBlock>
+                            <TextBlock x:Name="k_aux20_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux20_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -435,7 +435,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux21_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX21</TextBlock>
+                            <TextBlock x:Name="k_aux21_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux21_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -446,7 +446,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux22_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX22</TextBlock>
+                            <TextBlock x:Name="k_aux22_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux22_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -457,7 +457,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux23_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX23</TextBlock>
+                            <TextBlock x:Name="k_aux23_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux23_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -468,7 +468,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux24_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX24</TextBlock>
+                            <TextBlock x:Name="k_aux24_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux24_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -479,7 +479,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux25_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX25</TextBlock>
+                            <TextBlock x:Name="k_aux25_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux25_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -490,7 +490,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux26_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX26</TextBlock>
+                            <TextBlock x:Name="k_aux26_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux26_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -501,7 +501,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux27_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX27</TextBlock>
+                            <TextBlock x:Name="k_aux27_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux27_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -512,7 +512,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux28_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX28</TextBlock>
+                            <TextBlock x:Name="k_aux28_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux28_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -523,7 +523,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux29_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX29</TextBlock>
+                            <TextBlock x:Name="k_aux29_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux29_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -534,7 +534,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux30_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX30</TextBlock>
+                            <TextBlock x:Name="k_aux30_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux30_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -545,7 +545,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux31_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX31</TextBlock>
+                            <TextBlock x:Name="k_aux31_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux31_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>
@@ -556,7 +556,7 @@
                                 <ColumnDefinition />
                             </Grid.ColumnDefinitions>
                             <ProgressBar x:Name="k_aux32_progress" VerticalAlignment="Stretch" />
-                            <TextBlock VerticalAlignment="Center">K_AUX32</TextBlock>
+                            <TextBlock x:Name="k_aux32_text" VerticalAlignment="Center" />
                             <ComboBox x:Name="k_aux32_combo" Grid.Column="1" IsTabStop="False" />
                         </Grid>
                     </Grid>

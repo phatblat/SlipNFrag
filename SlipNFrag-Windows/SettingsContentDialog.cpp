@@ -24,6 +24,174 @@ namespace winrt::SlipNFrag_Windows::implementation
 	{
 		InitializeComponent();
 		is_loading = true;
+		stickProgressBars.push_back(joy_axis_x_progress());
+		stickProgressBars.push_back(joy_axis_y_progress());
+		stickProgressBars.push_back(joy_axis_z_progress());
+		stickProgressBars.push_back(joy_axis_r_progress());
+		stickProgressBars.push_back(joy_axis_u_progress());
+		stickProgressBars.push_back(joy_axis_v_progress());
+		buttonProgressBars.push_back(k_joy1_progress());
+		buttonProgressBars.push_back(k_joy2_progress());
+		buttonProgressBars.push_back(k_joy3_progress());
+		buttonProgressBars.push_back(k_joy4_progress());
+		buttonProgressBars.push_back(k_aux1_progress());
+		buttonProgressBars.push_back(k_aux2_progress());
+		buttonProgressBars.push_back(k_aux3_progress());
+		buttonProgressBars.push_back(k_aux4_progress());
+		buttonProgressBars.push_back(k_aux5_progress());
+		buttonProgressBars.push_back(k_aux6_progress());
+		buttonProgressBars.push_back(k_aux7_progress());
+		buttonProgressBars.push_back(k_aux8_progress());
+		buttonProgressBars.push_back(k_aux9_progress());
+		buttonProgressBars.push_back(k_aux10_progress());
+		buttonProgressBars.push_back(k_aux11_progress());
+		buttonProgressBars.push_back(k_aux12_progress());
+		buttonProgressBars.push_back(k_aux13_progress());
+		buttonProgressBars.push_back(k_aux14_progress());
+		buttonProgressBars.push_back(k_aux15_progress());
+		buttonProgressBars.push_back(k_aux16_progress());
+		buttonProgressBars.push_back(k_aux17_progress());
+		buttonProgressBars.push_back(k_aux18_progress());
+		buttonProgressBars.push_back(k_aux19_progress());
+		buttonProgressBars.push_back(k_aux20_progress());
+		buttonProgressBars.push_back(k_aux21_progress());
+		buttonProgressBars.push_back(k_aux22_progress());
+		buttonProgressBars.push_back(k_aux23_progress());
+		buttonProgressBars.push_back(k_aux24_progress());
+		buttonProgressBars.push_back(k_aux25_progress());
+		buttonProgressBars.push_back(k_aux26_progress());
+		buttonProgressBars.push_back(k_aux27_progress());
+		buttonProgressBars.push_back(k_aux28_progress());
+		buttonProgressBars.push_back(k_aux29_progress());
+		buttonProgressBars.push_back(k_aux30_progress());
+		buttonProgressBars.push_back(k_aux31_progress());
+		buttonProgressBars.push_back(k_aux32_progress());
+		buttonTextBlocks.push_back(k_joy1_text());
+		buttonTextBlocks.push_back(k_joy2_text());
+		buttonTextBlocks.push_back(k_joy3_text());
+		buttonTextBlocks.push_back(k_joy4_text());
+		buttonTextBlocks.push_back(k_aux1_text());
+		buttonTextBlocks.push_back(k_aux2_text());
+		buttonTextBlocks.push_back(k_aux3_text());
+		buttonTextBlocks.push_back(k_aux4_text());
+		buttonTextBlocks.push_back(k_aux5_text());
+		buttonTextBlocks.push_back(k_aux6_text());
+		buttonTextBlocks.push_back(k_aux7_text());
+		buttonTextBlocks.push_back(k_aux8_text());
+		buttonTextBlocks.push_back(k_aux9_text());
+		buttonTextBlocks.push_back(k_aux10_text());
+		buttonTextBlocks.push_back(k_aux11_text());
+		buttonTextBlocks.push_back(k_aux12_text());
+		buttonTextBlocks.push_back(k_aux13_text());
+		buttonTextBlocks.push_back(k_aux14_text());
+		buttonTextBlocks.push_back(k_aux15_text());
+		buttonTextBlocks.push_back(k_aux16_text());
+		buttonTextBlocks.push_back(k_aux17_text());
+		buttonTextBlocks.push_back(k_aux18_text());
+		buttonTextBlocks.push_back(k_aux19_text());
+		buttonTextBlocks.push_back(k_aux20_text());
+		buttonTextBlocks.push_back(k_aux21_text());
+		buttonTextBlocks.push_back(k_aux22_text());
+		buttonTextBlocks.push_back(k_aux23_text());
+		buttonTextBlocks.push_back(k_aux24_text());
+		buttonTextBlocks.push_back(k_aux25_text());
+		buttonTextBlocks.push_back(k_aux26_text());
+		buttonTextBlocks.push_back(k_aux27_text());
+		buttonTextBlocks.push_back(k_aux28_text());
+		buttonTextBlocks.push_back(k_aux29_text());
+		buttonTextBlocks.push_back(k_aux30_text());
+		buttonTextBlocks.push_back(k_aux31_text());
+		buttonTextBlocks.push_back(k_aux32_text());
+		stickComboBoxes.push_back(joy_axis_x_combo());
+		stickComboBoxes.push_back(joy_axis_y_combo());
+		stickComboBoxes.push_back(joy_axis_z_combo());
+		stickComboBoxes.push_back(joy_axis_r_combo());
+		stickComboBoxes.push_back(joy_axis_u_combo());
+		stickComboBoxes.push_back(joy_axis_v_combo());
+		buttonComboBoxes.push_back(k_joy1_combo());
+		buttonComboBoxes.push_back(k_joy2_combo());
+		buttonComboBoxes.push_back(k_joy3_combo());
+		buttonComboBoxes.push_back(k_joy4_combo());
+		buttonComboBoxes.push_back(k_aux1_combo());
+		buttonComboBoxes.push_back(k_aux2_combo());
+		buttonComboBoxes.push_back(k_aux3_combo());
+		buttonComboBoxes.push_back(k_aux4_combo());
+		buttonComboBoxes.push_back(k_aux5_combo());
+		buttonComboBoxes.push_back(k_aux6_combo());
+		buttonComboBoxes.push_back(k_aux7_combo());
+		buttonComboBoxes.push_back(k_aux8_combo());
+		buttonComboBoxes.push_back(k_aux9_combo());
+		buttonComboBoxes.push_back(k_aux10_combo());
+		buttonComboBoxes.push_back(k_aux11_combo());
+		buttonComboBoxes.push_back(k_aux12_combo());
+		buttonComboBoxes.push_back(k_aux13_combo());
+		buttonComboBoxes.push_back(k_aux14_combo());
+		buttonComboBoxes.push_back(k_aux15_combo());
+		buttonComboBoxes.push_back(k_aux16_combo());
+		buttonComboBoxes.push_back(k_aux17_combo());
+		buttonComboBoxes.push_back(k_aux18_combo());
+		buttonComboBoxes.push_back(k_aux19_combo());
+		buttonComboBoxes.push_back(k_aux20_combo());
+		buttonComboBoxes.push_back(k_aux21_combo());
+		buttonComboBoxes.push_back(k_aux22_combo());
+		buttonComboBoxes.push_back(k_aux23_combo());
+		buttonComboBoxes.push_back(k_aux24_combo());
+		buttonComboBoxes.push_back(k_aux25_combo());
+		buttonComboBoxes.push_back(k_aux26_combo());
+		buttonComboBoxes.push_back(k_aux27_combo());
+		buttonComboBoxes.push_back(k_aux28_combo());
+		buttonComboBoxes.push_back(k_aux29_combo());
+		buttonComboBoxes.push_back(k_aux30_combo());
+		buttonComboBoxes.push_back(k_aux31_combo());
+		buttonComboBoxes.push_back(k_aux32_combo());
+		stickCheckBoxes.push_back(joy_axis_x_check());
+		stickCheckBoxes.push_back(joy_axis_y_check());
+		stickCheckBoxes.push_back(joy_axis_z_check());
+		stickCheckBoxes.push_back(joy_axis_r_check());
+		stickCheckBoxes.push_back(joy_axis_u_check());
+		stickCheckBoxes.push_back(joy_axis_v_check());
+		stickComboBoxItems.push_back(L"None");
+		stickComboBoxItems.push_back(L"Forward / Backward");
+		stickComboBoxItems.push_back(L"Look Up / Down");
+		stickComboBoxItems.push_back(L"Step Left / Right");
+		stickComboBoxItems.push_back(L"Turn Left / Right");
+		buttonComboBoxItems.push_back(L"None");
+		buttonComboBoxItems.push_back(L"Attack");
+		buttonComboBoxItems.push_back(L"Change weapon");
+		buttonComboBoxItems.push_back(L"Jump / Swim up");
+		buttonComboBoxItems.push_back(L"Walk forward");
+		buttonComboBoxItems.push_back(L"Backpedal");
+		buttonComboBoxItems.push_back(L"Turn left");
+		buttonComboBoxItems.push_back(L"Turn right");
+		buttonComboBoxItems.push_back(L"Run");
+		buttonComboBoxItems.push_back(L"Step left");
+		buttonComboBoxItems.push_back(L"Step right");
+		buttonComboBoxItems.push_back(L"Sidestep");
+		buttonComboBoxItems.push_back(L"Look up");
+		buttonComboBoxItems.push_back(L"Look down");
+		buttonComboBoxItems.push_back(L"Center view");
+		buttonComboBoxItems.push_back(L"Mouse look");
+		buttonComboBoxItems.push_back(L"Keyboard look");
+		buttonComboBoxItems.push_back(L"Swim up");
+		buttonComboBoxItems.push_back(L"Swim down");
+		buttonComboBoxItems.push_back(L"ENTER Key");
+		buttonComboBoxItems.push_back(L"ESC Key");
+		buttonComboBoxItems.push_back(L"Up Arrow");
+		buttonComboBoxItems.push_back(L"Left Arrow");
+		buttonComboBoxItems.push_back(L"Right Arrow");
+		buttonComboBoxItems.push_back(L"Down Arrow");
+		buttonComboBoxItems.push_back(L"impulse 1");
+		buttonComboBoxItems.push_back(L"impulse 2");
+		buttonComboBoxItems.push_back(L"impulse 3");
+		buttonComboBoxItems.push_back(L"impulse 4");
+		buttonComboBoxItems.push_back(L"impulse 5");
+		buttonComboBoxItems.push_back(L"impulse 6");
+		buttonComboBoxItems.push_back(L"impulse 7");
+		buttonComboBoxItems.push_back(L"impulse 8");
+		for (auto i = 1; i < (int)buttonComboBoxItems.size(); i++)
+		{
+			stickComboBoxItems.push_back(buttonComboBoxItems[i]);
+		}
 		if (StorageApplicationPermissions::FutureAccessList().ContainsItem(L"basedir_text"))
 		{
 			auto task = StorageApplicationPermissions::FutureAccessList().GetFolderAsync(L"basedir_text");
@@ -121,194 +289,67 @@ namespace winrt::SlipNFrag_Windows::implementation
 			gamepad = Gamepad::Gamepads().GetAt(0);
 			connected_controller_text().Text(L"Xbox One / 360 gamepad or compatible");
 		}
-		if (gamepad == nullptr)
+		if (gamepad.get() == nullptr)
 		{
 			for (auto const& controller : RawGameController::RawGameControllers())
 			{
 				if (controller.AxisCount() >= 2 && controller.ButtonCount() >= 4)
 				{
 					joystick = controller;
-					connected_controller_text().Text(joystick.DisplayName());
+					connected_controller_text().Text(joystick.get().DisplayName());
 					break;
 				}
 			}
 		}
+		LoadTextBlocks();
 		Gamepad::GamepadAdded([this](IInspectable const&, Gamepad const& e)
 			{
-				if (gamepad == nullptr && joystick == nullptr)
+				if (gamepad.get() == nullptr && joystick.get() == nullptr)
 				{
 					gamepad = e;
 					connected_controller_text().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
 						{
 							connected_controller_text().Text(L"Xbox One / 360 gamepad or compatible");
+							LoadTextBlocks();
 						});
 				}
 			});
 		Gamepad::GamepadRemoved([this](IInspectable const&, Gamepad const& e)
 			{
-				if (gamepad != nullptr && gamepad == e)
+				if (gamepad.get() != nullptr && gamepad.get() == e)
 				{
 					gamepad = nullptr;
 					connected_controller_text().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
 						{
 							connected_controller_text().Text(L"(none)");
+							LoadTextBlocks();
 						});
 				}
 			});
 		RawGameController::RawGameControllerAdded([this](IInspectable const&, RawGameController const& e)
 			{
-				if (gamepad == nullptr && joystick == nullptr && e.AxisCount() >= 2 && e.ButtonCount() >= 4)
+				if (gamepad.get() == nullptr && joystick.get() == nullptr && e.AxisCount() >= 2 && e.ButtonCount() >= 4)
 				{
 					joystick = e;
 					connected_controller_text().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
 						{
-							connected_controller_text().Text(joystick.DisplayName());
+							connected_controller_text().Text(joystick.get().DisplayName());
+							LoadTextBlocks();
 						});
 				}
 			});
 		RawGameController::RawGameControllerRemoved([this](IInspectable const&, RawGameController const& e)
 			{
-				if (joystick != nullptr && joystick.NonRoamableId() == e.NonRoamableId())
+				if (joystick.get() != nullptr && joystick.get().NonRoamableId() == e.NonRoamableId())
 				{
 					joystick = nullptr;
 					connected_controller_text().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
 						{
 							connected_controller_text().Text(L"(none)");
+							LoadTextBlocks();
 						});
 				}
 			});
-		stickProgressBars.push_back(joy_axis_x_progress());
-		stickProgressBars.push_back(joy_axis_y_progress());
-		stickProgressBars.push_back(joy_axis_z_progress());
-		stickProgressBars.push_back(joy_axis_r_progress());
-		stickProgressBars.push_back(joy_axis_u_progress());
-		stickProgressBars.push_back(joy_axis_v_progress());
-		buttonProgressBars.push_back(k_joy1_progress());
-		buttonProgressBars.push_back(k_joy2_progress());
-		buttonProgressBars.push_back(k_joy3_progress());
-		buttonProgressBars.push_back(k_joy4_progress());
-		buttonProgressBars.push_back(k_aux1_progress());
-		buttonProgressBars.push_back(k_aux2_progress());
-		buttonProgressBars.push_back(k_aux3_progress());
-		buttonProgressBars.push_back(k_aux4_progress());
-		buttonProgressBars.push_back(k_aux5_progress());
-		buttonProgressBars.push_back(k_aux6_progress());
-		buttonProgressBars.push_back(k_aux7_progress());
-		buttonProgressBars.push_back(k_aux8_progress());
-		buttonProgressBars.push_back(k_aux9_progress());
-		buttonProgressBars.push_back(k_aux10_progress());
-		buttonProgressBars.push_back(k_aux11_progress());
-		buttonProgressBars.push_back(k_aux12_progress());
-		buttonProgressBars.push_back(k_aux13_progress());
-		buttonProgressBars.push_back(k_aux14_progress());
-		buttonProgressBars.push_back(k_aux15_progress());
-		buttonProgressBars.push_back(k_aux16_progress());
-		buttonProgressBars.push_back(k_aux17_progress());
-		buttonProgressBars.push_back(k_aux18_progress());
-		buttonProgressBars.push_back(k_aux19_progress());
-		buttonProgressBars.push_back(k_aux20_progress());
-		buttonProgressBars.push_back(k_aux21_progress());
-		buttonProgressBars.push_back(k_aux22_progress());
-		buttonProgressBars.push_back(k_aux23_progress());
-		buttonProgressBars.push_back(k_aux24_progress());
-		buttonProgressBars.push_back(k_aux25_progress());
-		buttonProgressBars.push_back(k_aux26_progress());
-		buttonProgressBars.push_back(k_aux27_progress());
-		buttonProgressBars.push_back(k_aux28_progress());
-		buttonProgressBars.push_back(k_aux29_progress());
-		buttonProgressBars.push_back(k_aux30_progress());
-		buttonProgressBars.push_back(k_aux31_progress());
-		buttonProgressBars.push_back(k_aux32_progress());
-		stickComboBoxes.push_back(joy_axis_x_combo());
-		stickComboBoxes.push_back(joy_axis_y_combo());
-		stickComboBoxes.push_back(joy_axis_z_combo());
-		stickComboBoxes.push_back(joy_axis_r_combo());
-		stickComboBoxes.push_back(joy_axis_u_combo());
-		stickComboBoxes.push_back(joy_axis_v_combo());
-		buttonComboBoxes.push_back(k_joy1_combo());
-		buttonComboBoxes.push_back(k_joy2_combo());
-		buttonComboBoxes.push_back(k_joy3_combo());
-		buttonComboBoxes.push_back(k_joy4_combo());
-		buttonComboBoxes.push_back(k_aux1_combo());
-		buttonComboBoxes.push_back(k_aux2_combo());
-		buttonComboBoxes.push_back(k_aux3_combo());
-		buttonComboBoxes.push_back(k_aux4_combo());
-		buttonComboBoxes.push_back(k_aux5_combo());
-		buttonComboBoxes.push_back(k_aux6_combo());
-		buttonComboBoxes.push_back(k_aux7_combo());
-		buttonComboBoxes.push_back(k_aux8_combo());
-		buttonComboBoxes.push_back(k_aux9_combo());
-		buttonComboBoxes.push_back(k_aux10_combo());
-		buttonComboBoxes.push_back(k_aux11_combo());
-		buttonComboBoxes.push_back(k_aux12_combo());
-		buttonComboBoxes.push_back(k_aux13_combo());
-		buttonComboBoxes.push_back(k_aux14_combo());
-		buttonComboBoxes.push_back(k_aux15_combo());
-		buttonComboBoxes.push_back(k_aux16_combo());
-		buttonComboBoxes.push_back(k_aux17_combo());
-		buttonComboBoxes.push_back(k_aux18_combo());
-		buttonComboBoxes.push_back(k_aux19_combo());
-		buttonComboBoxes.push_back(k_aux20_combo());
-		buttonComboBoxes.push_back(k_aux21_combo());
-		buttonComboBoxes.push_back(k_aux22_combo());
-		buttonComboBoxes.push_back(k_aux23_combo());
-		buttonComboBoxes.push_back(k_aux24_combo());
-		buttonComboBoxes.push_back(k_aux25_combo());
-		buttonComboBoxes.push_back(k_aux26_combo());
-		buttonComboBoxes.push_back(k_aux27_combo());
-		buttonComboBoxes.push_back(k_aux28_combo());
-		buttonComboBoxes.push_back(k_aux29_combo());
-		buttonComboBoxes.push_back(k_aux30_combo());
-		buttonComboBoxes.push_back(k_aux31_combo());
-		buttonComboBoxes.push_back(k_aux32_combo());
-		stickCheckBoxes.push_back(joy_axis_x_check());
-		stickCheckBoxes.push_back(joy_axis_y_check());
-		stickCheckBoxes.push_back(joy_axis_z_check());
-		stickCheckBoxes.push_back(joy_axis_r_check());
-		stickCheckBoxes.push_back(joy_axis_u_check());
-		stickCheckBoxes.push_back(joy_axis_v_check());
-		stickComboBoxItems.push_back(L"None");
-		stickComboBoxItems.push_back(L"Forward / Backward");
-		stickComboBoxItems.push_back(L"Look Up / Down");
-		stickComboBoxItems.push_back(L"Step Left / Right");
-		stickComboBoxItems.push_back(L"Turn Left / Right");
-		buttonComboBoxItems.push_back(L"None");
-		buttonComboBoxItems.push_back(L"Attack");
-		buttonComboBoxItems.push_back(L"Change weapon");
-		buttonComboBoxItems.push_back(L"Jump / Swim up");
-		buttonComboBoxItems.push_back(L"Walk forward");
-		buttonComboBoxItems.push_back(L"Backpedal");
-		buttonComboBoxItems.push_back(L"Turn left");
-		buttonComboBoxItems.push_back(L"Turn right");
-		buttonComboBoxItems.push_back(L"Run");
-		buttonComboBoxItems.push_back(L"Step left");
-		buttonComboBoxItems.push_back(L"Step right");
-		buttonComboBoxItems.push_back(L"Sidestep");
-		buttonComboBoxItems.push_back(L"Look up");
-		buttonComboBoxItems.push_back(L"Look down");
-		buttonComboBoxItems.push_back(L"Center view");
-		buttonComboBoxItems.push_back(L"Mouse look");
-		buttonComboBoxItems.push_back(L"Keyboard look");
-		buttonComboBoxItems.push_back(L"Swim up");
-		buttonComboBoxItems.push_back(L"Swim down");
-		buttonComboBoxItems.push_back(L"ENTER Key");
-		buttonComboBoxItems.push_back(L"ESC Key");
-		buttonComboBoxItems.push_back(L"Up Arrow");
-		buttonComboBoxItems.push_back(L"Left Arrow");
-		buttonComboBoxItems.push_back(L"Right Arrow");
-		buttonComboBoxItems.push_back(L"Down Arrow");
-		buttonComboBoxItems.push_back(L"impulse 1");
-		buttonComboBoxItems.push_back(L"impulse 2");
-		buttonComboBoxItems.push_back(L"impulse 3");
-		buttonComboBoxItems.push_back(L"impulse 4");
-		buttonComboBoxItems.push_back(L"impulse 5");
-		buttonComboBoxItems.push_back(L"impulse 6");
-		buttonComboBoxItems.push_back(L"impulse 7");
-		buttonComboBoxItems.push_back(L"impulse 8");
-		for (auto i = 1; i < (int)buttonComboBoxItems.size(); i++)
-		{
-			stickComboBoxItems.push_back(buttonComboBoxItems[i]);
-		}
 		LoadStickSettings(values);
 		for (auto i = 0; i < (int)buttonComboBoxes.size(); i++)
 		{
@@ -386,9 +427,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		timer.Interval(std::chrono::milliseconds(100));
 		timer.Tick([this](IInspectable const&, IInspectable const&) 
 			{
-				if (gamepad != nullptr)
+				if (gamepad.get() != nullptr)
 				{
-					auto reading = gamepad.GetCurrentReading();
+					auto reading = gamepad.get().GetCurrentReading();
 					joy_axis_x_progress().Value(reading.LeftThumbstickX * 50 + 50);
 					joy_axis_y_progress().Value(reading.LeftThumbstickY * 50 + 50);
 					joy_axis_z_progress().Value(reading.RightThumbstickX * 50 + 50);
@@ -408,13 +449,13 @@ namespace winrt::SlipNFrag_Windows::implementation
 						mask <<= 1;
 					}
 				}
-				if (joystick != nullptr)
+				if (joystick.get() != nullptr)
 				{
-					auto buttonCount = joystick.ButtonCount();
+					auto buttonCount = joystick.get().ButtonCount();
 					auto buttons = new bool[buttonCount];
-					std::vector<GameControllerSwitchPosition> switches(joystick.SwitchCount());
-					std::vector<double> axes(joystick.AxisCount());
-					joystick.GetCurrentReading(array_view(buttons, buttons + joystick.ButtonCount()), switches, axes);
+					std::vector<GameControllerSwitchPosition> switches(joystick.get().SwitchCount());
+					std::vector<double> axes(joystick.get().AxisCount());
+					joystick.get().GetCurrentReading(array_view(buttons, buttons + joystick.get().ButtonCount()), switches, axes);
 					for (auto i = 0; i < (int)stickProgressBars.size(); i++)
 					{
 						if (axes.size() > i)
@@ -438,7 +479,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 					}
 				}
-				if (gamepad == nullptr && joystick == nullptr)
+				if (gamepad.get() == nullptr && joystick.get() == nullptr)
 				{
 					for (auto& progressBar : stickProgressBars)
 					{
@@ -729,5 +770,60 @@ namespace winrt::SlipNFrag_Windows::implementation
 		auto values = ApplicationData::Current().LocalSettings().Values();
 		auto checkbox = source.as<CheckBox>();
 		values.Insert(checkbox.Name(), checkbox.IsChecked());
+	}
+
+	void SettingsContentDialog::LoadTextBlocks()
+	{
+		if (gamepad.get() != nullptr)
+		{
+			joy_axis_x_text().Text(L"Left Thumbstick X");
+			joy_axis_y_text().Text(L"Left Thumbstick Y");
+			joy_axis_z_text().Text(L"Right Thumbstick X");
+			joy_axis_r_text().Text(L"Right Thumbstick Y");
+			joy_axis_u_text().Text(L"Left Trigger");
+			joy_axis_v_text().Text(L"Right Trigger");
+			k_joy1_text().Text(L"Menu");
+			k_joy2_text().Text(L"View");
+			k_joy3_text().Text(L"A");
+			k_joy4_text().Text(L"B");
+			k_aux1_text().Text(L"X");
+			k_aux2_text().Text(L"Y");
+			k_aux3_text().Text(L"D-pad Up");
+			k_aux4_text().Text(L"D-pad Down");
+			k_aux5_text().Text(L"D-pad Left");
+			k_aux6_text().Text(L"D-pad Right");
+			k_aux7_text().Text(L"Left Shoulder");
+			k_aux8_text().Text(L"Right Shoulder");
+			k_aux9_text().Text(L"Left Thumbstick");
+			k_aux10_text().Text(L"Right Thumbstick");
+			k_aux11_text().Text(L"Paddle 1");
+			k_aux12_text().Text(L"Paddle 2");
+			k_aux13_text().Text(L"Paddle 3");
+			k_aux14_text().Text(L"Paddle 4");
+			for (auto i = 18; i < buttonTextBlocks.size(); i++)
+			{
+				buttonTextBlocks[i].Text(L"K_AUX" + to_hstring(i - 3));
+			}
+		}
+		else
+		{
+			joy_axis_x_text().Text(L"JOY_AXIS_X");
+			joy_axis_y_text().Text(L"JOY_AXIS_Y");
+			joy_axis_z_text().Text(L"JOY_AXIS_Z");
+			joy_axis_r_text().Text(L"JOY_AXIS_R");
+			joy_axis_u_text().Text(L"JOY_AXIS_U");
+			joy_axis_v_text().Text(L"JOY_AXIS_V");
+			for (auto i = 0; i < buttonTextBlocks.size(); i++)
+			{
+				if (i < 4)
+				{
+					buttonTextBlocks[i].Text(L"K_JOY" + to_hstring(i + 1));
+				}
+				else
+				{
+					buttonTextBlocks[i].Text(L"K_AUX" + to_hstring(i - 3));
+				}
+			}
+		}
 	}
 }
