@@ -65,8 +65,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		D3D12_TEXTURE_COPY_LOCATION paletteUploadLocation;
 		bool key_dest_was_game;
 		event_token mouseMovedToken;
-		winrt::Windows::Gaming::Input::RawGameController joystick = nullptr;
-		winrt::Windows::Gaming::Input::Gamepad gamepad = nullptr;
+		winrt::weak_ref<winrt::Windows::Gaming::Input::RawGameController> joystick = nullptr;
+		winrt::weak_ref<winrt::Windows::Gaming::Input::Gamepad> gamepad = nullptr;
 		bool* previousJoystickButtons = nullptr;
 		int previousJoystickButtonsLength = 0;
 		winrt::Windows::Media::Audio::AudioGraph audioGraph = nullptr;
@@ -78,6 +78,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		std::vector<std::string> joyAxesAsButtons;
 		std::vector<std::string> joyAxesAsButtonsOnRelease;
 		std::vector<int> joyAxesAsKeys;
+		std::vector<float> joyAxesInverted;
 		bool previousJoyAxesAsButtonValuesWereRead = false;
 		std::vector<float> previousJoyAxesAsButtonValues;
 		std::vector<int> joyButtonsAsKeys;

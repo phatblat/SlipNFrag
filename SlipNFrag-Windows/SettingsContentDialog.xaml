@@ -55,7 +55,14 @@
                 <TextBlock />
                 <TextBlock>Stick configuration:</TextBlock>
                 <RadioButton x:Name="joy_standard_radio" IsChecked="False" IsTabStop="False" GroupName="joy_group" Checked="Joy_standard_radio_Checked">Standard</RadioButton>
-                <RadioButton x:Name="joy_advanced_radio" IsChecked="False" IsTabStop="False" GroupName="joy_group" Checked="Joy_advanced_radio_Checked">Advanced:</RadioButton>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <RadioButton x:Name="joy_advanced_radio" IsChecked="False" IsTabStop="False" GroupName="joy_group" Checked="Joy_advanced_radio_Checked">Advanced:</RadioButton>
+                    <HyperlinkButton x:Name="load_default_axes_button" Grid.Column="1" IsTabStop="False" Click="Load_default_axes_button_Click">Load defaults</HyperlinkButton>
+                </Grid>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition />
@@ -146,7 +153,14 @@
                     </Grid>
                 </Grid>
                 <TextBlock />
-                <TextBlock>Buttons:</TextBlock>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock>Buttons:</TextBlock>
+                    <HyperlinkButton x:Name="load_default_buttons_button" Grid.Column="1" IsTabStop="False" Click="Load_default_buttons_button_Click">Load defaults</HyperlinkButton>
+                </Grid>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition />

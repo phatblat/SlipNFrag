@@ -43,6 +43,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void SaveJoystickCheck();
 		void SaveStickCheck(winrt::Windows::Foundation::IInspectable const& source);
 		void LoadTextBlocks();
+		void Load_default_axes_button_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
+		void Load_default_buttons_button_Click(winrt::Windows::Foundation::IInspectable const&, winrt::Windows::UI::Xaml::RoutedEventArgs const&);
 	};
 }
 

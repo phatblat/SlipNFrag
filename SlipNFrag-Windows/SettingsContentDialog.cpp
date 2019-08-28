@@ -638,23 +638,23 @@ namespace winrt::SlipNFrag_Windows::implementation
 			{
 				if (i == 0)
 				{
-					stickComboBoxes[i].SelectedIndex(4); // AxisTurn
+					stickComboBoxes[i].SelectedIndex(4); // Turn Left / Right
 				}
 				else if (i == 1)
 				{
-					stickComboBoxes[i].SelectedIndex(1); // AxisForward
+					stickComboBoxes[i].SelectedIndex(1); // Forward / Backward
 				}
 				else if (i == 4)
 				{
-					stickComboBoxes[i].SelectedIndex(6); // impulse 10
+					stickComboBoxes[i].SelectedIndex(5); // Attack
 				}
 				else if (i == 5)
 				{
-					stickComboBoxes[i].SelectedIndex(5); // +attack
+					stickComboBoxes[i].SelectedIndex(5); // Attack
 				}
 				else
 				{
-					stickComboBoxes[i].SelectedIndex(0); // AxisNada
+					stickComboBoxes[i].SelectedIndex(0);
 				}
 				stickComboBoxes[i].IsEnabled(false);
 			}
@@ -663,6 +663,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 				stickCheckBoxes[i].IsChecked(false);
 				stickCheckBoxes[i].IsEnabled(false);
 			}
+			load_default_axes_button().IsEnabled(false);
 		}
 		else
 		{
@@ -698,18 +699,18 @@ namespace winrt::SlipNFrag_Windows::implementation
 			}
 			for (auto i = 0; i < (int)stickCheckBoxes.size(); i++)
 			{
-				auto found = false;
 				if (values.HasKey(stickCheckBoxes[i].Name()))
 				{
 					auto value = values.Lookup(stickCheckBoxes[i].Name());
 					stickCheckBoxes[i].IsChecked(unbox_value<bool>(value));
 				}
-				if (!found)
+				else
 				{
 					stickCheckBoxes[i].IsChecked(false);
 				}
 				stickCheckBoxes[i].IsEnabled(true);
 			}
+			load_default_axes_button().IsEnabled(true);
 		}
 	}
 
@@ -824,6 +825,44 @@ namespace winrt::SlipNFrag_Windows::implementation
 					buttonTextBlocks[i].Text(L"K_AUX" + to_hstring(i - 3));
 				}
 			}
+		}
+	}
+
+	void SettingsContentDialog::Load_default_axes_button_Click(IInspectable const&, RoutedEventArgs const&)
+	{
+		joy_axis_x_combo().SelectedIndex(1); // Forward / Backward
+		joy_axis_x_check().IsChecked(false);
+		joy_axis_y_combo().SelectedIndex(3); // Step Left / Right
+		joy_axis_y_check().IsChecked(true); // Inverted step
+		joy_axis_z_combo().SelectedIndex(4); // Turn Left / Right
+		joy_axis_z_check().IsChecked(false);
+		joy_axis_r_combo().SelectedIndex(2); // Look Up / Down
+		joy_axis_r_check().IsChecked(false);
+		joy_axis_u_combo().SelectedIndex(5); // Attack
+		joy_axis_u_check().IsChecked(false);
+		joy_axis_v_combo().SelectedIndex(5); // Attack
+		joy_axis_v_check().IsChecked(false);
+	}
+
+	void SettingsContentDialog::Load_default_buttons_button_Click(IInspectable const&, RoutedEventArgs const&)
+	{
+		k_joy1_combo().SelectedIndex(20); // ESC Key
+		k_joy2_combo().SelectedIndex(0);
+		k_joy3_combo().SelectedIndex(3); // Jump / Swim up
+		k_joy4_combo().SelectedIndex(18); // Swim down
+		k_aux1_combo().SelectedIndex(8); // Run
+		k_aux2_combo().SelectedIndex(2); // Change weapon
+		k_aux3_combo().SelectedIndex(26); // impulse 2
+		k_aux4_combo().SelectedIndex(28); // impulse 4
+		k_aux5_combo().SelectedIndex(25); // impulse 1 
+		k_aux6_combo().SelectedIndex(27); // impulse 3
+		k_aux7_combo().SelectedIndex(2); // Change weapon
+		k_aux8_combo().SelectedIndex(3); // Jump / Swim down 
+		k_aux9_combo().SelectedIndex(8); // Run
+		k_aux10_combo().SelectedIndex(14); // Center view
+		for (auto i = 14; i < (int)buttonComboBoxes.size(); i++)
+		{
+			buttonComboBoxes[i].SelectedIndex(0);
 		}
 	}
 }

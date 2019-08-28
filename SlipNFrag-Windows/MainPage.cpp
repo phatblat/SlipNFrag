@@ -381,25 +381,28 @@ namespace winrt::SlipNFrag_Windows::implementation
 					joyAxesAsButtonsOnRelease.clear();
 					if (joy_standard_radio)
 					{
-						arguments.emplace_back("+joyadvanced");
-						arguments.emplace_back("0");
 						joyAxesAsButtons.resize(4);
 						joyAxesAsButtons.push_back(joyCommands[6]);
 						joyAxesAsButtons.push_back(joyCommands[5]);
 						joyAxesAsButtonsOnRelease.resize(5);
 						joyAxesAsButtonsOnRelease.push_back(std::string("-") + joyCommands[5].substr(1));
 						joyAxesAsKeys.resize(6);
+						joyAxesInverted.resize(6);
+						for (auto i = 0; i < (int)joyAxesInverted.size(); i++)
+						{
+							joyAxesInverted[i] = 1;
+						}
 					}
 					else if (joy_advanced_radio)
 					{
 						arguments.emplace_back("+joyadvanced");
 						arguments.emplace_back("1");
-						AddJoystickAxis(values, L"joy_axis_x_combo", "+joyadvaxisx", arguments);
-						AddJoystickAxis(values, L"joy_axis_y_combo", "+joyadvaxisy", arguments);
-						AddJoystickAxis(values, L"joy_axis_z_combo", "+joyadvaxisz", arguments);
-						AddJoystickAxis(values, L"joy_axis_r_combo", "+joyadvaxisr", arguments);
-						AddJoystickAxis(values, L"joy_axis_u_combo", "+joyadvaxisu", arguments);
-						AddJoystickAxis(values, L"joy_axis_v_combo", "+joyadvaxisv", arguments);
+						AddJoystickAxis(values, L"joy_axis_x", "+joyadvaxisx", arguments);
+						AddJoystickAxis(values, L"joy_axis_y", "+joyadvaxisy", arguments);
+						AddJoystickAxis(values, L"joy_axis_z", "+joyadvaxisz", arguments);
+						AddJoystickAxis(values, L"joy_axis_r", "+joyadvaxisr", arguments);
+						AddJoystickAxis(values, L"joy_axis_u", "+joyadvaxisu", arguments);
+						AddJoystickAxis(values, L"joy_axis_v", "+joyadvaxisv", arguments);
 					}
 					joyButtonsAsKeys.clear();
 					for (auto i = 0; i < 36; i++)
@@ -643,7 +646,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 							}
 							Gamepad::GamepadAdded([this](IInspectable const&, Gamepad const& e)
 								{
-									if (gamepad == nullptr && joystick == nullptr)
+									if (gamepad.get() == nullptr && joystick.get() == nullptr)
 									{
 										gamepad = e;
 										joy_avail = true;
@@ -651,7 +654,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 								});
 							Gamepad::GamepadRemoved([this](IInspectable const&, Gamepad const& e)
 								{
-									if (gamepad != nullptr && gamepad == e)
+									if (gamepad.get() != nullptr && gamepad.get() == e)
 									{
 										in_forwardmove = 0.0;
 										in_sidestepmove = 0.0;
@@ -663,7 +666,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 								});
 							RawGameController::RawGameControllerAdded([this](IInspectable const&, RawGameController const& e)
 								{
-									if (gamepad == nullptr && joystick == nullptr && e.AxisCount() >= 2 && e.ButtonCount() >= 4)
+									if (gamepad.get() == nullptr && joystick.get() == nullptr && e.AxisCount() >= 2 && e.ButtonCount() >= 4)
 									{
 										joystick = e;
 										joy_avail = true;
@@ -671,7 +674,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 								});
 							RawGameController::RawGameControllerRemoved([this](IInspectable const&, RawGameController const& e)
 								{
-									if (joystick != nullptr && joystick.NonRoamableId() == e.NonRoamableId())
+									if (joystick.get() != nullptr && joystick.get().NonRoamableId() == e.NonRoamableId())
 									{
 										in_forwardmove = 0.0;
 										in_sidestepmove = 0.0;
@@ -1294,15 +1297,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 		}
 		if (joy_initialized && joy_avail)
 		{
-			if (gamepad != nullptr)
+			if (gamepad.get() != nullptr)
 			{
-				auto reading = gamepad.GetCurrentReading();
-				pdwRawValue[JOY_AXIS_X] = (float)reading.LeftThumbstickX;
-				pdwRawValue[JOY_AXIS_Y] = (float)-reading.LeftThumbstickY;
-				pdwRawValue[JOY_AXIS_Z] = (float)reading.RightThumbstickX;
-				pdwRawValue[JOY_AXIS_R] = (float)-reading.RightThumbstickY;
-				pdwRawValue[JOY_AXIS_U] = (float)reading.LeftTrigger;
-				pdwRawValue[JOY_AXIS_V] = (float)reading.RightTrigger;
+				auto reading = gamepad.get().GetCurrentReading();
+				pdwRawValue[JOY_AXIS_X] = (float)reading.LeftThumbstickX * joyAxesInverted[0];
+				pdwRawValue[JOY_AXIS_Y] = (float)-reading.LeftThumbstickY * joyAxesInverted[1];
+				pdwRawValue[JOY_AXIS_Z] = (float)reading.RightThumbstickX * joyAxesInverted[2];
+				pdwRawValue[JOY_AXIS_R] = (float)-reading.RightThumbstickY * joyAxesInverted[3];
+				pdwRawValue[JOY_AXIS_U] = (float)reading.LeftTrigger * joyAxesInverted[4];
+				pdwRawValue[JOY_AXIS_V] = (float)reading.RightTrigger * joyAxesInverted[5];
 				if (previousJoyAxesAsButtonValuesWereRead)
 				{
 					for (auto i = 0; i < joyAxesAsButtons.size(); i++)
@@ -1450,12 +1453,12 @@ namespace winrt::SlipNFrag_Windows::implementation
 				previousGamepadButtons = buttons;
 				previousGamepadButtonsWereRead = true;
 			}
-			if (joystick != nullptr)
+			if (joystick.get() != nullptr)
 			{
-				auto buttons = new bool[joystick.ButtonCount()];
-				std::vector<GameControllerSwitchPosition> switches(joystick.SwitchCount());
-				std::vector<double> axes(joystick.AxisCount());
-				joystick.GetCurrentReading(array_view(buttons, buttons + joystick.ButtonCount()), switches, axes);
+				auto buttons = new bool[joystick.get().ButtonCount()];
+				std::vector<GameControllerSwitchPosition> switches(joystick.get().SwitchCount());
+				std::vector<double> axes(joystick.get().AxisCount());
+				joystick.get().GetCurrentReading(array_view(buttons, buttons + joystick.get().ButtonCount()), switches, axes);
 				for (auto i = 0; i < JOY_MAX_AXES; i++)
 				{
 					if (i < axes.size())
@@ -1467,11 +1470,11 @@ namespace winrt::SlipNFrag_Windows::implementation
 						pdwRawValue[i] = 0;
 					}
 				}
-				if (previousJoystickButtonsLength == joystick.ButtonCount())
+				if (previousJoystickButtonsLength == joystick.get().ButtonCount())
 				{
 					for (auto i = 0; i < 36; i++)
 					{
-						if (i >= joystick.ButtonCount())
+						if (i >= joystick.get().ButtonCount())
 						{
 							break;
 						}
@@ -1487,7 +1490,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 				}
 				delete[] previousJoystickButtons;
 				previousJoystickButtons = buttons;
-				previousJoystickButtonsLength = joystick.ButtonCount();
+				previousJoystickButtonsLength = joystick.get().ButtonCount();
 			}
 		}
 		Sys_Frame(elapsed);
@@ -2389,9 +2392,10 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void MainPage::AddJoystickAxis(IPropertySet const& values, hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments)
 	{
-		if (values.HasKey(stickName))
+		auto comboName = stickName + L"_combo";
+		if (values.HasKey(comboName))
 		{
-			auto value = values.Lookup(stickName);
+			auto value = values.Lookup(comboName);
 			std::wstring text(unbox_value<hstring>(value));
 			if (text.size() > 0)
 			{
@@ -2467,6 +2471,21 @@ namespace winrt::SlipNFrag_Windows::implementation
 					joyAxesAsKeys.push_back(-1);
 				}
 			}
+		}
+		auto found = true;
+		auto checkName = stickName + L"_check";
+		if (values.HasKey(checkName))
+		{
+			auto value = values.Lookup(checkName);
+			if (unbox_value<bool>(value))
+			{
+				joyAxesInverted.push_back(-1);
+				found = true;
+			}
+		}
+		if (!found)
+		{
+			joyAxesInverted.push_back(1);
 		}
 	}
 }
