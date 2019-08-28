@@ -265,6 +265,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void MainPage::Start()
 	{
+		if (!StorageApplicationPermissions::FutureAccessList().ContainsItem(L"basedir_text"))
+		{
+			sys_errormessage = "FutureAccessList does not contain an entry for basedir_text";
+			sys_nogamedata = 1;
+			swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
+				{
+					DisplaySysErrorIfNeeded();
+				});
+			return;
+		}
 		auto task = StorageApplicationPermissions::FutureAccessList().GetFolderAsync(L"basedir_text");
 		task.Completed([this](IAsyncOperation<StorageFolder> const& operation, AsyncStatus const status)
 			{
@@ -1831,26 +1841,36 @@ namespace winrt::SlipNFrag_Windows::implementation
 		{
 			if (sys_nogamedata)
 			{
-				MessageDialog msg(L"Go to Preferences and set Game directory (-basedir) to your copy of the game files.", L"Game data not found");
-				Windows::UI::Popups::UICommand goToPreferences(L"Go to Preferences", [this](IUICommand const &) {
-					SettingsContentDialog settings;
-					auto task = settings.ShowAsync(ContentDialogPlacement::InPlace);
-					task.Completed([](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const) {
-						Application::Current().Exit();
-						});
+				ContentDialog dialog;
+				dialog.Title(box_value(L"Game data not found"));
+				dialog.Content(box_value(L"Go to Preferences and set Game directory (-basedir) to your copy of the game files."));
+				dialog.CloseButtonText(L"Go to Preferences");
+				dialog.PrimaryButtonText(L"Where to buy the game");
+				dialog.SecondaryButtonText(L"Where to get shareware episode");
+				auto task = dialog.ShowAsync();
+				task.Completed([this](IAsyncOperation<ContentDialogResult> const& operation, AsyncStatus const&)
+					{
+						auto result = operation.GetResults();
+						if (result == ContentDialogResult::Primary)
+						{
+							Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=buy+quake+1+game"));
+							Application::Current().Exit();
+						}
+						else if (result == ContentDialogResult::Secondary)
+						{
+							Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=download+quake+1+shareware+episode"));
+							Application::Current().Exit();
+						}
+						else
+						{
+							SettingsContentDialog settings;
+							auto task = settings.ShowAsync(ContentDialogPlacement::InPlace);
+							task.Completed([](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const&)
+								{
+									Application::Current().Exit();
+								});
+						}
 					});
-				Windows::UI::Popups::UICommand buyGame(L"Where to buy the game", [this](IUICommand const&) {
-					Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=buy+quake+1+game"));
-					});
-				Windows::UI::Popups::UICommand downloadSharewareGame(L"Where to get shareware episode", [this](IUICommand const&) {
-					Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=download+quake+1+shareware+episode"));
-					});
-				msg.Commands().Append(goToPreferences);
-				msg.Commands().Append(buyGame);
-				msg.Commands().Append(downloadSharewareGame);
-				msg.DefaultCommandIndex(0);
-				msg.CancelCommandIndex(0);
-				msg.ShowAsync();
 			}
 			else
 			{
@@ -1859,14 +1879,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 				{
 					toDisplay.push_back((wchar_t)c);
 				}
-				MessageDialog msg(toDisplay, L"Sys_Error");
-				Windows::UI::Popups::UICommand okButton(L"Ok", [this](IUICommand const&) {
-					Application::Current().Exit();
+				ContentDialog dialog;
+				dialog.Title(box_value(L"Sys_Error"));
+				dialog.Content(box_value(toDisplay));
+				dialog.CloseButtonText(L"Close");
+				auto task = dialog.ShowAsync();
+				task.Completed([this](IAsyncOperation<ContentDialogResult> const& operation, AsyncStatus const&)
+					{
+						Application::Current().Exit();
 					});
-				msg.Commands().Append(okButton);
-				msg.DefaultCommandIndex(0);
-				msg.CancelCommandIndex(0);
-				msg.ShowAsync();
 			}
 			return true;
 		}
