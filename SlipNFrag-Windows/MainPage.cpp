@@ -415,9 +415,11 @@ namespace winrt::SlipNFrag_Windows::implementation
 						AddJoystickAxis(values, L"joy_axis_v", "+joyadvaxisv", arguments);
 					}
 					joyButtonsAsKeys.clear();
+					joyButtonsAsCommands.clear();
 					for (auto i = 0; i < 36; i++)
 					{
-						auto found = false;
+						auto keyFound = false;
+						auto commandFound = false;
 						hstring name;
 						if (i < 4)
 						{
@@ -442,32 +444,37 @@ namespace winrt::SlipNFrag_Windows::implementation
 										if (command == "K_ENTER")
 										{
 											joyButtonsAsKeys.push_back(13);
-											found = true;
+											keyFound = true;
 										}
 										else if (command == "K_ESCAPE")
 										{
 											joyButtonsAsKeys.push_back(27);
-											found = true;
+											keyFound = true;
 										}
 										else if (command == "K_UPARROW")
 										{
 											joyButtonsAsKeys.push_back(128);
-											found = true;
+											keyFound = true;
 										}
 										else if (command == "K_LEFTARROW")
 										{
 											joyButtonsAsKeys.push_back(130);
-											found = true;
+											keyFound = true;
 										}
 										else if (command == "K_RIGHTARROW")
 										{
 											joyButtonsAsKeys.push_back(131);
-											found = true;
+											keyFound = true;
 										}
 										else if (command == "K_DOWNARROW")
 										{
 											joyButtonsAsKeys.push_back(129);
-											found = true;
+											keyFound = true;
+										}
+										else
+										{
+											joyButtonsAsCommands.push_back(command);
+											commandFound = true;
 										}
 									}
 								}
@@ -477,9 +484,13 @@ namespace winrt::SlipNFrag_Windows::implementation
 								}
 							}
 						}
-						if (!found)
+						if (!keyFound)
 						{
 							joyButtonsAsKeys.push_back(-1);
+						}
+						if (!commandFound)
+						{
+							joyButtonsAsCommands.emplace_back();
 						}
 					}
 					previousGamepadButtonsWereRead = false;
@@ -539,6 +550,27 @@ namespace winrt::SlipNFrag_Windows::implementation
 						if (DisplaySysErrorIfNeeded())
 						{
 							return;
+						}
+						if (joy_initialized)
+						{
+							for (auto i = 0; i < joyButtonsAsCommands.size(); i++)
+							{
+								auto& command = joyButtonsAsCommands[i];
+								if (command.size() > 0)
+								{
+									std::string text = "bind ";
+									if (i < 4)
+									{
+										text += "JOY" + std::to_string(i + 1);
+									}
+									else
+									{
+										text += "AUX" + std::to_string(i - 3);
+									}
+									text += " \"" + command + "\"\n";
+									Cbuf_AddText(text.c_str());
+								}
+							}
 						}
 						if (snd_initialized)
 						{
@@ -1884,7 +1916,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 				dialog.Content(box_value(toDisplay));
 				dialog.CloseButtonText(L"Close");
 				auto task = dialog.ShowAsync();
-				task.Completed([this](IAsyncOperation<ContentDialogResult> const& operation, AsyncStatus const&)
+				task.Completed([this](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const&)
 					{
 						Application::Current().Exit();
 					});
