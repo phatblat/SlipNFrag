@@ -496,6 +496,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 					previousGamepadButtonsWereRead = false;
 					previousJoyAxesAsButtonValuesWereRead = false;
 					previousJoyAxesAsButtonValues.resize(joyAxesAsButtons.size());
+					mlook_enabled = false;
+					if (values.HasKey(L"mlook_check"))
+					{
+						auto value = values.Lookup(L"mlook_check");
+						if (unbox_value<bool>(value))
+						{
+							mlook_enabled = true;
+						}
+					}
 				}
 				if (values.HasKey(L"command_line_text"))
 				{
@@ -571,6 +580,10 @@ namespace winrt::SlipNFrag_Windows::implementation
 									Cbuf_AddText(text.c_str());
 								}
 							}
+						}
+						if (mlook_enabled)
+						{
+							Cbuf_AddText("+mlook");
 						}
 						if (snd_initialized)
 						{
@@ -1505,29 +1518,95 @@ namespace winrt::SlipNFrag_Windows::implementation
 				{
 					if (i < axes.size())
 					{
-						pdwRawValue[i] = (float)(2 * (axes[i] - 0.5));
+						pdwRawValue[i] = (float)(2 * (axes[i] - 0.5)) * joyAxesInverted[i];
 					}
 					else
 					{
 						pdwRawValue[i] = 0;
 					}
 				}
+				if (previousJoyAxesAsButtonValuesWereRead)
+				{
+					for (auto i = 0; i < joyAxesAsButtons.size(); i++)
+					{
+						auto previous = previousJoyAxesAsButtonValues[i];
+						float current;
+						if (i < axes.size())
+						{
+							current = axes[i];
+						}
+						else
+						{
+							current = 0;
+						}
+						if (previous < 0.15 && current >= 0.15)
+						{
+							if (joyAxesAsButtons[i].size() > 0)
+							{
+								Cbuf_AddText(joyAxesAsButtons[i].c_str());
+							}
+							else if (joyAxesAsKeys[i] > 0)
+							{
+								Key_Event(joyAxesAsKeys[i], true);
+							}
+						}
+						else if (previous >= 0.15 && current < 0.15)
+						{
+							if (joyAxesAsButtons[i].size() > 0)
+							{
+								Cbuf_AddText(joyAxesAsButtonsOnRelease[i].c_str());
+							}
+							else if (joyAxesAsKeys[i] > 0)
+							{
+								Key_Event(joyAxesAsKeys[i], false);
+							}
+						}
+					}
+				}
+				for (auto i = 0; i < joyAxesAsButtons.size(); i++)
+				{
+					if (i < axes.size())
+					{
+						previousJoyAxesAsButtonValues[i] = axes[i];
+					}
+					else
+					{
+						previousJoyAxesAsButtonValues[i] = 0;
+					}
+				}
+				previousJoyAxesAsButtonValuesWereRead = true;
 				if (previousJoystickButtonsLength == joystick.get().ButtonCount())
 				{
+					auto key = 203;
 					for (auto i = 0; i < 36; i++)
 					{
 						if (i >= joystick.get().ButtonCount())
 						{
 							break;
 						}
-						if (previousJoystickButtons[i] && !buttons[i])
+						if (buttons[i] && !previousJoystickButtons[i])
 						{
-							Key_Event(203 + i, false);
+							if (joyButtonsAsKeys[i] >= 0)
+							{
+								Key_Event(joyButtonsAsKeys[i], true);
+							}
+							else
+							{
+								Key_Event(key, true);
+							}
 						}
-						else if (!previousJoystickButtons[i] && buttons[i])
+						else if (!buttons[i] && previousJoystickButtons[i])
 						{
-							Key_Event(203 + i, true);
+							if (joyButtonsAsKeys[i] >= 0)
+							{
+								Key_Event(joyButtonsAsKeys[i], false);
+							}
+							else
+							{
+								Key_Event(key, false);
+							}
 						}
+						key++;
 					}
 				}
 				delete[] previousJoystickButtons;
@@ -2525,7 +2604,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 				}
 			}
 		}
-		auto found = true;
+		auto found = false;
 		auto checkName = stickName + L"_check";
 		if (values.HasKey(checkName))
 		{

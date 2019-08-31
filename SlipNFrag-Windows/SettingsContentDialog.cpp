@@ -424,6 +424,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 					values.Insert(comboBox.Name(), box_value(to_hstring(index)));
 				});
 		}
+		if (values.HasKey(L"mlook_check"))
+		{
+			auto value = values.Lookup(L"mlook_check");
+			mlook_check().IsChecked(unbox_value<bool>(value));
+		}
+		else
+		{
+			mlook_check().IsChecked(false);
+		}
 		timer.Interval(std::chrono::milliseconds(100));
 		timer.Tick([this](IInspectable const&, IInspectable const&) 
 			{
@@ -830,14 +839,14 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void SettingsContentDialog::Load_default_axes_button_Click(IInspectable const&, RoutedEventArgs const&)
 	{
-		joy_axis_x_combo().SelectedIndex(1); // Forward / Backward
-		joy_axis_x_check().IsChecked(false);
-		joy_axis_y_combo().SelectedIndex(3); // Step Left / Right
-		joy_axis_y_check().IsChecked(true); // Inverted step
+		joy_axis_x_combo().SelectedIndex(3); // Step Left / Right
+		joy_axis_x_check().IsChecked(true); // Inverted step
+		joy_axis_y_combo().SelectedIndex(1); // Forward / Backward
+		joy_axis_y_check().IsChecked(false);
 		joy_axis_z_combo().SelectedIndex(4); // Turn Left / Right
-		joy_axis_z_check().IsChecked(false);
+		joy_axis_z_check().IsChecked(false); 
 		joy_axis_r_combo().SelectedIndex(2); // Look Up / Down
-		joy_axis_r_check().IsChecked(false);
+		joy_axis_r_check().IsChecked(true); // Inverted look
 		joy_axis_u_combo().SelectedIndex(5); // Attack
 		joy_axis_u_check().IsChecked(false);
 		joy_axis_v_combo().SelectedIndex(5); // Attack
@@ -859,10 +868,31 @@ namespace winrt::SlipNFrag_Windows::implementation
 		k_aux7_combo().SelectedIndex(2); // Change weapon
 		k_aux8_combo().SelectedIndex(3); // Jump / Swim down 
 		k_aux9_combo().SelectedIndex(8); // Run
-		k_aux10_combo().SelectedIndex(14); // Center view
+		k_aux10_combo().SelectedIndex(15); // Mouse look
 		for (auto i = 14; i < (int)buttonComboBoxes.size(); i++)
 		{
 			buttonComboBoxes[i].SelectedIndex(0);
 		}
+		mlook_check().IsChecked(false);
+	}
+
+	void SettingsContentDialog::Mlook_check_Checked(IInspectable const&, RoutedEventArgs const&)
+	{
+		SaveMouseLookCheck();
+	}
+
+	void SettingsContentDialog::Mlook_check_Unchecked(IInspectable const&, RoutedEventArgs const&)
+	{
+		SaveMouseLookCheck();
+	}
+
+	void SettingsContentDialog::SaveMouseLookCheck()
+	{
+		if (is_loading)
+		{
+			return;
+		}
+		auto values = ApplicationData::Current().LocalSettings().Values();
+		values.Insert(L"mlook_check", mlook_check().IsChecked());
 	}
 }

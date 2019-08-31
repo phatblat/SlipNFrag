@@ -83,6 +83,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		std::vector<float> previousJoyAxesAsButtonValues;
 		std::vector<int> joyButtonsAsKeys;
 		std::vector<std::string> joyButtonsAsCommands;
+		bool mlook_enabled = false;
 
 		MainPage();
 		void UpdateTitleBarLayout(Windows::ApplicationModel::Core::CoreApplicationViewTitleBar const& titleBar);
