@@ -31,6 +31,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		winrt::com_ptr<ID3D12Resource> renderTargets[frameCount];
 		winrt::com_ptr<ID3D12Resource> depthStencil;
 		winrt::com_ptr<ID3D12Resource> screen;
+		winrt::com_ptr<ID3D12Resource> console;
 		winrt::com_ptr<ID3D12Resource> palette;
 		D3D12_VIEWPORT viewport;
 		winrt::com_ptr<ID3D12RootSignature> rootSignature;
@@ -50,17 +51,25 @@ namespace winrt::SlipNFrag_Windows::implementation
 		LARGE_INTEGER previousTime = { };
 		bool fileOperationRunning = false;
 		bool firstResize = false;
-		float newWidth;
-		float newHeight;
-		float newRowbytes;
+		float newScreenWidth;
+		float newScreenHeight;
+		float newScreenRowbytes;
+		float newConsoleWidth;
+		float newConsoleHeight;
+		float newConsoleRowbytes;
 		com_ptr<ID3D12Resource> screenUpload;
+		com_ptr<ID3D12Resource> consoleUpload;
 		com_ptr<ID3D12Resource> paletteUpload;
 		D3D12_RESOURCE_DESC screenTextureDesc;
+		D3D12_RESOURCE_DESC consoleTextureDesc;
 		D3D12_RESOURCE_DESC paletteTextureDesc;
 		D3D12_SHADER_RESOURCE_VIEW_DESC screenSrvDesc;
+		D3D12_SHADER_RESOURCE_VIEW_DESC consoleSrvDesc;
 		D3D12_SHADER_RESOURCE_VIEW_DESC paletteSrvDesc;
 		D3D12_TEXTURE_COPY_LOCATION screenLocation;
 		D3D12_TEXTURE_COPY_LOCATION screenUploadLocation;
+		D3D12_TEXTURE_COPY_LOCATION consoleLocation;
+		D3D12_TEXTURE_COPY_LOCATION consoleUploadLocation;
 		D3D12_TEXTURE_COPY_LOCATION paletteLocation;
 		D3D12_TEXTURE_COPY_LOCATION paletteUploadLocation;
 		bool key_dest_was_game;
@@ -129,6 +138,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void CreateAudioOutput();
 		void CreateAudioInput();
 		void AddJoystickAxis(winrt::Windows::Foundation::Collections::IPropertySet const& values, winrt::hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments);
+		void CalculateConsoleDimensions();
 	};
 }
 

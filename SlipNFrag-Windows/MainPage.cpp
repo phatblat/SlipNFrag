@@ -89,7 +89,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		defaultHeapProperties { D3D12_HEAP_TYPE_DEFAULT }, 
 		uploadHeapProperties { D3D12_HEAP_TYPE_UPLOAD },
 		screenTextureDesc { D3D12_RESOURCE_DIMENSION_TEXTURE2D },
-		paletteTextureDesc{ D3D12_RESOURCE_DIMENSION_TEXTURE1D },
+		paletteTextureDesc { D3D12_RESOURCE_DIMENSION_TEXTURE1D },
 		screenSrvDesc { },
 		paletteSrvDesc { },
 		screenLocation { },
@@ -106,6 +106,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		screenTextureDesc.Format = DXGI_FORMAT_R8_UNORM;
 		screenTextureDesc.DepthOrArraySize = 1;
 		screenTextureDesc.SampleDesc.Count = 1;
+		consoleTextureDesc = screenTextureDesc;
 		paletteTextureDesc.MipLevels = 1;
 		paletteTextureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		paletteTextureDesc.Width = 256;
@@ -116,12 +117,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 		screenSrvDesc.Format = screenTextureDesc.Format;
 		screenSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		screenSrvDesc.Texture2D.MipLevels = screenTextureDesc.MipLevels;
+		consoleSrvDesc = screenSrvDesc;
 		paletteSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		paletteSrvDesc.Format = paletteTextureDesc.Format;
 		paletteSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE1D;
 		paletteSrvDesc.Texture1D.MipLevels = paletteTextureDesc.MipLevels;
 		screenLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		consoleLocation = screenLocation;
 		screenUploadLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		consoleUploadLocation = screenUploadLocation;
 		paletteLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 		paletteUploadLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 		auto titleBar = CoreApplication::GetCurrentView().TitleBar();
@@ -545,16 +549,21 @@ namespace winrt::SlipNFrag_Windows::implementation
 				}
 				swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [=]()
 					{
-						newWidth = (float)swapChainPanel().ActualWidth();
-						newHeight = (float)swapChainPanel().ActualHeight();
+						newScreenWidth = (float)swapChainPanel().ActualWidth();
+						newScreenHeight = (float)swapChainPanel().ActualHeight();
+						CalculateConsoleDimensions();
 						CreateDevice();
 						std::thread filesThread([this]()
 							{
 								ProcessFiles();
 							});
 						filesThread.detach();
-						vid_width = (int)newWidth;
-						vid_height = (int)newHeight;
+						vid_width = (int)newScreenWidth;
+						vid_height = (int)newScreenHeight;
+						vid_rowbytes = (int)newScreenRowbytes;
+						con_width = (int)newConsoleWidth;
+						con_height = (int)newConsoleHeight;
+						con_rowbytes = (int)newConsoleRowbytes;
 						Sys_Init(sys_argc, sys_argv);
 						if (DisplaySysErrorIfNeeded())
 						{
@@ -802,7 +811,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		rtvDescriptorSize = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc { D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1 };
 		check_hresult(d3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap)));
-		D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc { D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, frameCount * 3, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE };
+		D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc { D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, frameCount * 4, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE };
 		check_hresult(d3dDevice->CreateDescriptorHeap(&cbvSrvHeapDesc, IID_PPV_ARGS(&cbvSrvHeap)));
 		cbvSrvHeap->SetName(L"cbvSrvHeap");
 		for (auto i = 0; i < frameCount; i++)
@@ -847,7 +856,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		ranges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 		ranges[0].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
 		ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-		ranges[1].NumDescriptors = 2;
+		ranges[1].NumDescriptors = 3;
 		ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 		ranges[1].Flags = D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE;
 		D3D12_ROOT_PARAMETER1 parameters[2] { };
@@ -859,25 +868,22 @@ namespace winrt::SlipNFrag_Windows::implementation
 		parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 		parameters[1].DescriptorTable.NumDescriptorRanges = 1;
 		parameters[1].DescriptorTable.pDescriptorRanges = &ranges[1];
-		D3D12_STATIC_SAMPLER_DESC samplers[2] { };
+		D3D12_STATIC_SAMPLER_DESC samplers[3] { };
 		samplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		samplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		samplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
 		samplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 		samplers[0].MaxLOD = D3D12_FLOAT32_MAX;
 		samplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-		samplers[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplers[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplers[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		samplers[1].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-		samplers[1].MaxLOD = D3D12_FLOAT32_MAX;
+		samplers[1] = samplers[0];
 		samplers[1].ShaderRegister = 1;
-		samplers[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		samplers[2] = samplers[0];
+		samplers[2].ShaderRegister = 2;
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC descRootSignature { };
 		descRootSignature.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		descRootSignature.Desc_1_1.NumParameters = 2;
 		descRootSignature.Desc_1_1.pParameters = &parameters[0];
-		descRootSignature.Desc_1_1.NumStaticSamplers = 2;
+		descRootSignature.Desc_1_1.NumStaticSamplers = 3;
 		descRootSignature.Desc_1_1.pStaticSamplers = &samplers[0];
 		descRootSignature.Desc_1_1.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS | D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
 		com_ptr<ID3DBlob> signature;
@@ -1002,6 +1008,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 			handle.ptr += increment;
 			d3dDevice->CreateShaderResourceView(screen.get(), &screenSrvDesc, handle);
 			handle.ptr += increment;
+			d3dDevice->CreateShaderResourceView(console.get(), &consoleSrvDesc, handle);
+			handle.ptr += increment;
 			d3dDevice->CreateShaderResourceView(palette.get(), &paletteSrvDesc, handle);
 			handle.ptr += increment;
 		}
@@ -1057,8 +1065,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		WaitForGPU(currentFrame, "WaitForGPU failed while resizing swap chain panel");
 		CleanupFrameData();
 		auto displayInformation = DisplayInformation::GetForCurrentView();
-		newWidth = e.NewSize().Width;
-		newHeight = e.NewSize().Height;
+		newScreenWidth = e.NewSize().Width;
+		newScreenHeight = e.NewSize().Height;
+		CalculateConsoleDimensions();
 		Size outputSize;
 		CreateOutputSize(displayInformation, outputSize);
 		DXGI_MODE_ROTATION rotation = DXGI_MODE_ROTATION_UNSPECIFIED;
@@ -1081,7 +1090,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		CreateDepthStencilBuffer(lround(renderTargetSize.Width), lround(renderTargetSize.Height));
 		viewport = { 0, 0, renderTargetSize.Width, renderTargetSize.Height, 0, 1 };
 		screen = nullptr;
+		console = nullptr;
 		screenUpload = nullptr;
+		consoleUpload = nullptr;
 		CreateScreen();
 		auto handle = cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
 		auto increment = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1089,6 +1100,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		for (auto i = 0; i < frameCount; i++)
 		{
 			d3dDevice->CreateShaderResourceView(screen.get(), &screenSrvDesc, handle);
+			handle.ptr += increment;
+			d3dDevice->CreateShaderResourceView(console.get(), &consoleSrvDesc, handle);
 			handle.ptr += increment * 3;
 		}
 		UpdateModelViewProjectionMatrix(orientationTransform3D);
@@ -1104,8 +1117,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		WaitForGPU(currentFrame, "WaitForGPU failed while setting composition scale");
 		CleanupFrameData();
 		auto displayInformation = DisplayInformation::GetForCurrentView();
-		newWidth = (float)swapChainPanel().ActualWidth();
-		newHeight = (float)swapChainPanel().ActualHeight();
+		newScreenWidth = (float)swapChainPanel().ActualWidth();
+		newScreenHeight = (float)swapChainPanel().ActualHeight();
+		CalculateConsoleDimensions();
 		Size outputSize;
 		CreateOutputSize(displayInformation, outputSize);
 		DXGI_MODE_ROTATION rotation = DXGI_MODE_ROTATION_UNSPECIFIED;
@@ -1128,7 +1142,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		CreateDepthStencilBuffer(lround(renderTargetSize.Width), lround(renderTargetSize.Height));
 		viewport = { 0, 0, renderTargetSize.Width, renderTargetSize.Height, 0, 1 };
 		screen = nullptr;
+		console = nullptr;
 		screenUpload = nullptr;
+		consoleUpload = nullptr;
 		CreateScreen();
 		auto handle = cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
 		auto increment = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1136,6 +1152,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		for (auto i = 0; i < frameCount; i++)
 		{
 			d3dDevice->CreateShaderResourceView(screen.get(), &screenSrvDesc, handle);
+			handle.ptr += increment;
+			d3dDevice->CreateShaderResourceView(console.get(), &consoleSrvDesc, handle);
 			handle.ptr += increment * 3;
 		}
 		UpdateModelViewProjectionMatrix(orientationTransform3D);
@@ -1150,8 +1168,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		std::lock_guard lock(renderLoopMutex);
 		WaitForGPU(currentFrame, "WaitForGPU failed while setting screen DPI");
 		CleanupFrameData();
-		newWidth = (float)swapChainPanel().ActualWidth();
-		newHeight = (float)swapChainPanel().ActualHeight();
+		newScreenWidth = (float)swapChainPanel().ActualWidth();
+		newScreenHeight = (float)swapChainPanel().ActualHeight();
+		CalculateConsoleDimensions();
 		Size outputSize;
 		CreateOutputSize(sender, outputSize);
 		DXGI_MODE_ROTATION rotation = DXGI_MODE_ROTATION_UNSPECIFIED;
@@ -1174,7 +1193,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		CreateDepthStencilBuffer(lround(renderTargetSize.Width), lround(renderTargetSize.Height));
 		viewport = { 0, 0, renderTargetSize.Width, renderTargetSize.Height, 0, 1 };
 		screen = nullptr;
+		console = nullptr;
 		screenUpload = nullptr;
+		consoleUpload = nullptr;
 		CreateScreen();
 		auto handle = cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
 		auto increment = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1182,6 +1203,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		for (auto i = 0; i < frameCount; i++)
 		{
 			d3dDevice->CreateShaderResourceView(screen.get(), &screenSrvDesc, handle);
+			handle.ptr += increment;
+			d3dDevice->CreateShaderResourceView(console.get(), &consoleSrvDesc, handle);
 			handle.ptr += increment * 3;
 		}
 		UpdateModelViewProjectionMatrix(orientationTransform3D);
@@ -1196,8 +1219,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		std::lock_guard lock(renderLoopMutex);
 		WaitForGPU(currentFrame, "WaitForGPU failed while setting screen orientation");
 		CleanupFrameData();
-		newWidth = (float)swapChainPanel().ActualWidth();
-		newHeight = (float)swapChainPanel().ActualHeight();
+		newScreenWidth = (float)swapChainPanel().ActualWidth();
+		newScreenHeight = (float)swapChainPanel().ActualHeight();
+		CalculateConsoleDimensions();
 		Size outputSize;
 		CreateOutputSize(sender, outputSize);
 		DXGI_MODE_ROTATION rotation = DXGI_MODE_ROTATION_UNSPECIFIED;
@@ -1220,7 +1244,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		CreateDepthStencilBuffer(lround(renderTargetSize.Width), lround(renderTargetSize.Height));
 		viewport = { 0, 0, renderTargetSize.Width, renderTargetSize.Height, 0, 1 };
 		screen = nullptr;
+		console = nullptr;
 		screenUpload = nullptr;
+		consoleUpload = nullptr;
 		CreateScreen();
 		auto handle = cbvSrvHeap->GetCPUDescriptorHandleForHeapStart();
 		auto increment = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -1228,6 +1254,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 		for (auto i = 0; i < frameCount; i++)
 		{
 			d3dDevice->CreateShaderResourceView(screen.get(), &screenSrvDesc, handle);
+			handle.ptr += increment;
+			d3dDevice->CreateShaderResourceView(console.get(), &consoleSrvDesc, handle);
 			handle.ptr += increment * 3;
 		}
 		UpdateModelViewProjectionMatrix(orientationTransform3D);
@@ -1271,6 +1299,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		{
 			constantBuffer->Unmap(0, nullptr);
 			screen = nullptr;
+			console = nullptr;
 			palette = nullptr;
 			depthStencil = nullptr;
 			CreateDevice();
@@ -1324,11 +1353,14 @@ namespace winrt::SlipNFrag_Windows::implementation
 		auto elapsed = (float)(time.QuadPart - previousTime.QuadPart) / (float)frequency.QuadPart;
 		UINT8* destination = mappedConstantBuffer + currentFrame * alignedConstantBufferSize;
 		memcpy(destination, &constantBufferData, sizeof(constantBufferData));
-		if (firstResize || vid_width != (int)newWidth || vid_height != (int)newHeight || vid_rowbytes != (int)newRowbytes)
+		if (firstResize || vid_width != (int)newScreenWidth || vid_height != (int)newScreenHeight)
 		{
-			vid_width = (int)newWidth;
-			vid_height = (int)newHeight;
-			vid_rowbytes = (int)newRowbytes;
+			vid_width = (int)newScreenWidth;
+			vid_height = (int)newScreenHeight;
+			vid_rowbytes = (int)newScreenRowbytes;
+			con_width = (int)newConsoleWidth;
+			con_height = (int)newConsoleHeight;
+			con_rowbytes = (int)newConsoleRowbytes;
 			VID_Resize();
 			firstResize = false;
 		}
@@ -1533,7 +1565,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						float current;
 						if (i < axes.size())
 						{
-							current = axes[i];
+							current = (float)axes[i];
 						}
 						else
 						{
@@ -1567,7 +1599,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 				{
 					if (i < axes.size())
 					{
-						previousJoyAxesAsButtonValues[i] = axes[i];
+						previousJoyAxesAsButtonValues[i] = (float)axes[i];
 					}
 					else
 					{
@@ -1614,6 +1646,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 				previousJoystickButtonsLength = joystick.get().ButtonCount();
 			}
 		}
+		memset(con_buffer.data(), 255, con_buffer.size());
 		Sys_Frame(elapsed);
 		if (DisplaySysErrorIfNeeded() || sys_quitcalled)
 		{
@@ -1623,6 +1656,9 @@ namespace winrt::SlipNFrag_Windows::implementation
 		check_hresult(screenUpload->Map(0, nullptr, reinterpret_cast<void**>(&data)));
 		memcpy(data, vid_buffer.data(), vid_buffer.size());
 		screenUpload->Unmap(0, nullptr);
+		check_hresult(consoleUpload->Map(0, nullptr, reinterpret_cast<void**>(&data)));
+		memcpy(data, con_buffer.data(), con_buffer.size());
+		consoleUpload->Unmap(0, nullptr);
 		previousTime = time;
 		return true;
 	}
@@ -1637,7 +1673,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		commandList->SetDescriptorHeaps(1, ppHeaps);
 		D3D12_GPU_DESCRIPTOR_HANDLE handle = cbvSrvHeap->GetGPUDescriptorHandleForHeapStart();
 		auto increment = d3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		handle.ptr += currentFrame * 3 * increment;
+		handle.ptr += currentFrame * 4 * increment;
 		commandList->SetGraphicsRootDescriptorTable(0, handle);
 		handle.ptr += increment;
 		commandList->SetGraphicsRootDescriptorTable(1, handle);
@@ -1657,6 +1693,15 @@ namespace winrt::SlipNFrag_Windows::implementation
 		commandList->ResourceBarrier(1, &transition);
 		d3dDevice->GetCopyableFootprints(&screenTextureDesc, 0, 1, 0, &screenUploadLocation.PlacedFootprint, nullptr, nullptr, nullptr);
 		commandList->CopyTextureRegion(&screenLocation, 0, 0, 0, &screenUploadLocation, nullptr);
+		transition.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+		transition.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		commandList->ResourceBarrier(1, &transition);
+		transition.Transition.pResource = console.get();
+		transition.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		transition.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+		commandList->ResourceBarrier(1, &transition);
+		d3dDevice->GetCopyableFootprints(&consoleTextureDesc, 0, 1, 0, &consoleUploadLocation.PlacedFootprint, nullptr, nullptr, nullptr);
+		commandList->CopyTextureRegion(&consoleLocation, 0, 0, 0, &consoleUploadLocation, nullptr);
 		transition.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 		transition.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &transition);
@@ -1776,8 +1821,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void MainPage::CreateOutputSize(DisplayInformation const& displayInformation, Size& outputSize)
 	{
-		auto width = max(1, floor(newWidth * displayInformation.LogicalDpi() / 96 + 0.5f));
-		auto height = max(1, floor(newHeight * displayInformation.LogicalDpi() / 96 + 0.5f));
+		auto width = max(1, floor(newScreenWidth * displayInformation.LogicalDpi() / 96 + 0.5f));
+		auto height = max(1, floor(newScreenHeight * displayInformation.LogicalDpi() / 96 + 0.5f));
 		outputSize.Width = width;
 		outputSize.Height = height;
 	}
@@ -1911,8 +1956,8 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void MainPage::CreateScreen()
 	{
-		screenTextureDesc.Width = lround(newWidth);
-		screenTextureDesc.Height = lround(newHeight);
+		screenTextureDesc.Width = lround(newScreenWidth);
+		screenTextureDesc.Height = lround(newScreenHeight);
 		check_hresult(d3dDevice->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &screenTextureDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&screen)));
 		screen->SetName(L"screen");
 		screenLocation.pResource = screen.get();
@@ -1929,7 +1974,20 @@ namespace winrt::SlipNFrag_Windows::implementation
 		screenUpload->SetName(L"screenUpload");
 		screenUploadLocation.pResource = screenUpload.get();
 		d3dDevice->GetCopyableFootprints(&screenTextureDesc, 0, 1, 0, &screenLocation.PlacedFootprint, nullptr, nullptr, nullptr);
-		newRowbytes = (float)screenLocation.PlacedFootprint.Footprint.RowPitch;
+		newScreenRowbytes = (float)screenLocation.PlacedFootprint.Footprint.RowPitch;
+		consoleTextureDesc.Width = lround(newConsoleWidth);
+		consoleTextureDesc.Height = lround(newConsoleHeight);
+		check_hresult(d3dDevice->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &consoleTextureDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&console)));
+		console->SetName(L"console");
+		consoleLocation.pResource = console.get();
+		uploadBufferSize = 0;
+		d3dDevice->GetCopyableFootprints(&consoleTextureDesc, 0, 1, 0, nullptr, nullptr, nullptr, &uploadBufferSize);
+		uploadBufferDesc.Width = uploadBufferSize;
+		check_hresult(d3dDevice->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE, &uploadBufferDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&consoleUpload)));
+		consoleUpload->SetName(L"consoleUpload");
+		consoleUploadLocation.pResource = consoleUpload.get();
+		d3dDevice->GetCopyableFootprints(&consoleTextureDesc, 0, 1, 0, &consoleLocation.PlacedFootprint, nullptr, nullptr, nullptr);
+		newConsoleRowbytes = (float)consoleLocation.PlacedFootprint.Footprint.RowPitch;
 	}
 
 	void MainPage::UpdateModelViewProjectionMatrix(XMFLOAT4X4 const& orientationTransform3D)
@@ -2618,6 +2676,19 @@ namespace winrt::SlipNFrag_Windows::implementation
 		if (!found)
 		{
 			joyAxesInverted.push_back(1);
+		}
+	}
+
+	void MainPage::CalculateConsoleDimensions()
+	{
+		auto factor = newScreenWidth / 320;
+		newConsoleWidth = 320;
+		newConsoleHeight = newScreenHeight / factor;
+		if (newConsoleHeight < 200)
+		{
+			factor = newScreenHeight / 200;
+			newConsoleHeight = 200;
+			newConsoleWidth = newScreenWidth / factor;
 		}
 	}
 }
