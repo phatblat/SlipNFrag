@@ -20,7 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // net_dgrm.c
 
 // This is enables a simple IP banning mechanism
-#define BAN_TEST
+//#define BAN_TEST
 
 #ifdef BAN_TEST
 #if defined(_WIN32)
@@ -79,8 +79,8 @@ struct
 
 std::vector<byte> packetBuffer;
 
-extern int m_return_state;
-extern int m_state;
+extern m_state_t m_return_state;
+extern m_state_t m_state;
 extern qboolean m_return_onerror;
 extern char m_return_reason[32];
 
