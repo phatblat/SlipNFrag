@@ -170,7 +170,7 @@ void M_BuildTranslationTable(int top, int bottom)
 
 void M_DrawTransPicTranslate (int x, int y, qpic_t *pic)
 {
-	Draw_TransPicTranslateOnConsole (x + ((vid.width - 320)>>1), y, pic, translationTable);
+	Draw_TransPicTranslateOnConsole (x + ((vid.conwidth - 320)>>1), y, pic, translationTable);
 }
 
 
