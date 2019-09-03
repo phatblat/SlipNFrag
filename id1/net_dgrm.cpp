@@ -1221,8 +1221,8 @@ void Datagram_SearchForHosts (qboolean xmit)
 
 static qsocket_t *_Datagram_Connect (const char *host)
 {
-	struct qsockaddr sendaddr;
-	struct qsockaddr readaddr;
+	struct qsockaddr sendaddr { };
+	struct qsockaddr readaddr { };
 	qsocket_t	*sock;
 	int			newsock;
 	int			ret;
