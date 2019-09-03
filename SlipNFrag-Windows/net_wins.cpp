@@ -23,7 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <windows.h>
 #include <winsock2.h>
 
-#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "Ws2_32.lib")
 
 extern cvar_t hostname;
 
@@ -83,9 +83,9 @@ int WINS_Init (void)
 
 	if (winsock_initialized == 0)
 	{
-		wVersionRequested = MAKEWORD(1, 1); 
+		wVersionRequested = MAKEWORD(2, 2); 
 
-		r = WSAStartup (MAKEWORD(1, 1), &winsockdata);
+		r = WSAStartup (MAKEWORD(2, 2), &winsockdata);
 
 		if (r)
 		{
@@ -432,11 +432,11 @@ int WINS_GetNameFromAddr (struct qsockaddr *addr, std::string& name)
 	hostentry = gethostbyaddr ((char *)&((struct sockaddr_in *)addr)->sin_addr, sizeof(struct in_addr), AF_INET);
 	if (hostentry)
 	{
-		Q_strncpy ((char*)name.c_str(), (char *)hostentry->h_name, NET_NAMELEN - 1);
+		name = hostentry->h_name;
 		return 0;
 	}
 
-	Q_strcpy ((char*)name.c_str(), WINS_AddrToString (addr));
+	name = WINS_AddrToString (addr);
 	return 0;
 }
 

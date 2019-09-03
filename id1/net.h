@@ -21,9 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 struct qsockaddr
 {
-    byte sa_len;
-	byte sa_family;
-	unsigned char sa_data[14];
+    byte sa_len = 0;
+	byte sa_family = 2; //AF_INET
+	unsigned char sa_data[14] = { };
 };
 
 
