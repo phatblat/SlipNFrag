@@ -609,7 +609,7 @@ static void Test_f (void)
 					continue;
 				net_landriverlevel = hostcache[n].ldriver;
 				max = hostcache[n].maxusers;
-				Q_memcpy(&sendaddr, &hostcache[n].addr, sizeof(struct qsockaddr));
+				sendaddr = hostcache[n].addr;
 				break;
 			}
 		if (n < hostCacheCount)
@@ -734,7 +734,7 @@ static void Test2_f (void)
 				if (hostcache[n].driver != myDriverLevel)
 					continue;
 				net_landriverlevel = hostcache[n].ldriver;
-				Q_memcpy(&sendaddr, &hostcache[n].addr, sizeof(struct qsockaddr));
+				sendaddr = hostcache[n].addr;
 				break;
 			}
 		if (n < hostCacheCount)
@@ -1181,7 +1181,7 @@ static void _Datagram_SearchForHosts (qboolean xmit)
 			Q_strcpy(hostcache[n].name, "*");
 			Q_strcat(hostcache[n].name, hostcache[n].cname);
 		}
-		Q_memcpy(&hostcache[n].addr, &readaddr, sizeof(struct qsockaddr));
+		hostcache[n].addr = readaddr;
 		hostcache[n].driver = net_driverlevel;
 		hostcache[n].ldriver = net_landriverlevel;
 		Q_strcpy(hostcache[n].cname, dfunc.AddrToString(&readaddr));
@@ -1344,7 +1344,7 @@ static qsocket_t *_Datagram_Connect (const char *host)
 
 	if (ret == CCREP_ACCEPT)
 	{
-		Q_memcpy(&sock->addr, &sendaddr, sizeof(struct qsockaddr));
+		sock->addr = sendaddr;
 		dfunc.SetSocketPort (&sock->addr, MSG_ReadLong());
 	}
 	else
