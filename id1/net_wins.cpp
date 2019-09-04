@@ -153,11 +153,11 @@ int WINS_Init (void)
 		return -1;
 	}
 
-	broadcastaddr.data.resize(sizeof(sockaddr));
-	auto addr_in = (sockaddr_in*)broadcastaddr.data.data();
-	addr_in->sin_family = AF_INET;
-	addr_in->sin_addr.s_addr = INADDR_BROADCAST;
-	addr_in->sin_port = htons((unsigned short)net_hostport);
+	broadcastaddr.data.resize(sizeof(sockaddr_in));
+	auto address = (sockaddr_in*)broadcastaddr.data.data();
+	address->sin_family = AF_INET;
+	address->sin_addr.s_addr = INADDR_BROADCAST;
+	address->sin_port = htons((unsigned short)net_hostport);
 
 	Con_Printf("Winsock TCP/IP Initialized\n");
 	tcpipAvailable = true;
@@ -202,7 +202,7 @@ void WINS_Listen (qboolean state)
 int WINS_OpenSocket (int port)
 {
 	int newsocket;
-	struct sockaddr_in address;
+	qsockaddr addr;
 	u_long _true = 1;
 
 	if ((newsocket = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
@@ -211,13 +211,15 @@ int WINS_OpenSocket (int port)
 	if (ioctlsocket (newsocket, FIONBIO, &_true) == -1)
 		goto ErrorReturn;
 
-	address.sin_family = AF_INET;
-	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons((unsigned short)port);
-	if( bind (newsocket, (const sockaddr *)&address, sizeof(address)) == 0)
+	addr.data.resize(sizeof(sockaddr_in));
+	auto address = (sockaddr_in*)addr.data.data();
+	address->sin_family = AF_INET;
+	address->sin_addr.s_addr = INADDR_ANY;
+	address->sin_port = htons((unsigned short)port);
+	if( bind (newsocket, (const sockaddr*)address, (int)addr.data.size()) == 0)
 		return newsocket;
 
-	Sys_Error ("Unable to bind to %s", WINS_AddrToString((struct qsockaddr *)&address));
+	Sys_Error ("Unable to bind to %s", WINS_AddrToString(&addr));
 ErrorReturn:
 	closesocket (newsocket);
 	return -1;
@@ -284,12 +286,11 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 	else
 		port = net_hostport;
 
-	hostaddr->data.resize(sizeof(sockaddr));
-	auto address = (sockaddr*)hostaddr->data.data();
-	address->sa_family = AF_INET;
-	auto addr_in = (sockaddr_in*)address;
-	addr_in->sin_port = htons((short)port);
-	addr_in->sin_addr.s_addr = (myAddr & htonl(mask)) | htonl(addr);
+	hostaddr->data.resize(sizeof(sockaddr_in));
+	auto address = (sockaddr_in*)hostaddr->data.data();
+	address->sin_family = AF_INET;
+	address->sin_port = htons((short)port);
+	address->sin_addr.s_addr = (myAddr & htonl(mask)) | htonl(addr);
 	
 	return 0;
 }
@@ -332,7 +333,7 @@ int WINS_Read (int socket, std::vector<byte>& buf, struct qsockaddr *addr)
 	}
 	auto len = (int)available;
 	buf.resize(len);
-	auto addrlen = (int)sizeof(sockaddr);
+	auto addrlen = (int)sizeof(sockaddr_in);
 	addr->data.resize(addrlen);
 	recvfrom(socket, (char*)buf.data(), len, 0, (sockaddr*)addr->data.data(), &addrlen);
 	return len;
@@ -412,12 +413,11 @@ int WINS_StringToAddr (char *string, struct qsockaddr *addr)
 	sscanf(string, "%d.%d.%d.%d:%d", &ha1, &ha2, &ha3, &ha4, &hp);
 	ipaddr = (ha1 << 24) | (ha2 << 16) | (ha3 << 8) | ha4;
 
-	addr->data.resize(sizeof(sockaddr));
-	auto address = (sockaddr*)addr->data.data();
-	address->sa_family = AF_INET;
-	auto addr_in = (sockaddr_in*)address;
-	addr_in->sin_addr.s_addr = htonl(ipaddr);
-	addr_in->sin_port = htons((unsigned short)hp);
+	addr->data.resize(sizeof(sockaddr_in));
+	auto address = (sockaddr_in*)addr->data.data();
+	address->sin_family = AF_INET;
+	address->sin_addr.s_addr = htonl(ipaddr);
+	address->sin_port = htons((unsigned short)hp);
 	return 0;
 }
 
@@ -427,12 +427,11 @@ int WINS_GetSocketAddr (int socket, struct qsockaddr *addr)
 {
 	int addrlen = sizeof(struct qsockaddr);
 	addr->data.resize(addrlen);
-	auto address = (sockaddr*)addr->data.data();
-	getsockname(socket, address, &addrlen);
-	auto addr_in = (sockaddr_in*)address;
-	auto a = addr_in->sin_addr.s_addr;
+	auto address = (sockaddr_in*)addr->data.data();
+	getsockname(socket, (sockaddr*)address, &addrlen);
+	auto a = address->sin_addr.s_addr;
 	if (a == 0 || a == inet_addr("127.0.0.1"))
-		addr_in->sin_addr.s_addr = myAddr;
+		address->sin_addr.s_addr = myAddr;
 
 	return 0;
 }
@@ -477,7 +476,7 @@ int WINS_GetAddrFromName(const char *name, struct qsockaddr *addr)
 		return -1;
 	}
 
-	addr->data.resize(sizeof(sockaddr));
+	addr->data.resize(sizeof(sockaddr_in));
 	memcpy(addr->data.data(), results->ai_addr, addr->data.size());
 
 	return 0;
@@ -487,19 +486,16 @@ int WINS_GetAddrFromName(const char *name, struct qsockaddr *addr)
 
 int WINS_AddrCompare (struct qsockaddr *addr1, struct qsockaddr *addr2)
 {
-	auto sockaddr1 = (sockaddr*)addr1->data.data();
-	auto sockaddr2 = (sockaddr*)addr2->data.data();
+	auto address1 = (sockaddr_in*)addr1->data.data();
+	auto address2 = (sockaddr_in*)addr2->data.data();
 	
-	if (sockaddr1->sa_family != sockaddr1->sa_family)
+	if (address1->sin_family != address2->sin_family)
 		return -1;
 
-	auto addr_in1 = (sockaddr_in*)sockaddr1;
-	auto addr_in2 = (sockaddr_in*)sockaddr2;
-
-	if (addr_in1->sin_addr.s_addr != addr_in2->sin_addr.s_addr)
+	if (address1->sin_addr.s_addr != address2->sin_addr.s_addr)
 		return -1;
 
-	if (addr_in1->sin_port != addr_in2->sin_port)
+	if (address1->sin_port != address2->sin_port)
 		return 1;
 
 	return 0;
