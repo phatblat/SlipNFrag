@@ -23,7 +23,7 @@ struct qsockaddr
 {
     byte sa_len = 0;
 	byte sa_family = 2; //AF_INET
-	unsigned char sa_data[64] = { };
+	unsigned char sa_data[14] = { };
 };
 
 

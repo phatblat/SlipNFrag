@@ -315,27 +315,26 @@ int WINS_CheckNewConnections (void)
 
 int WINS_Read (int socket, std::vector<byte>& buf, struct qsockaddr *addr)
 {
+	u_long available = 0;
+	auto err = ioctlsocket(socket, FIONREAD, &available);
+	if (err < 0)
+	{
+		return err;
+	}
+	if (available == 0)
+	{
+		return 0;
+	}
+	auto len = (int)available;
+	buf.resize(len);
 	sockaddr returned { };
-	int addrlen = sizeof(returned);
-	int ret;
-	buf.resize(40000);
-	ret = recvfrom (socket, (char*)buf.data(), (int)buf.size(), 0, &returned, &addrlen);
-	if (ret == -1)
-	{
-		int result = WSAGetLastError();
-
-		if (result == WSAEWOULDBLOCK || result == WSAECONNREFUSED)
-			return 0;
-
-	}
-	if (ret >= 0)
-	{
-		addr->sa_len = 0;
-		addr->sa_family = returned.sa_family;
-		memcpy(addr->sa_data, &returned.sa_data, sizeof(addr));
-		buf.resize(ret);
-	}
-	return ret;
+	auto addrlen = (int)sizeof(returned);
+	buf.resize(len);
+	recvfrom(socket, (char*)buf.data(), len, 0, &returned, &addrlen);
+	addr->sa_len = 0;
+	addr->sa_family = returned.sa_family;
+	memcpy(addr->sa_data, returned.sa_data, sizeof(addr->sa_data));
+	return len;
 }
 
 //=============================================================================
@@ -379,19 +378,16 @@ int WINS_Broadcast (int socket, byte *buf, int len)
 int WINS_Write (int socket, byte *buf, int len, struct qsockaddr *addr)
 {
 	int ret;
-
 	sockaddr to_send { };
 	to_send.sa_family = addr->sa_family;
-	((sockaddr_in*)&to_send)->sin_port = htons(26000);
-	((sockaddr_in*)&to_send)->sin_addr.S_un.S_un_b.s_b1 = 138;
-	((sockaddr_in*)&to_send)->sin_addr.S_un.S_un_b.s_b2 = 197;
-	((sockaddr_in*)&to_send)->sin_addr.S_un.S_un_b.s_b3 = 138;
-	((sockaddr_in*)&to_send)->sin_addr.S_un.S_un_b.s_b4 = 140; // == quake.nctech.ca
+	memcpy(to_send.sa_data, addr->sa_data, sizeof(to_send.sa_data));
 	ret = sendto (socket, (char*)buf, len, 0, (struct sockaddr *)&to_send, sizeof(struct qsockaddr));
 	if (ret == -1)
-		if (WSAGetLastError() == WSAEWOULDBLOCK)
+	{
+		auto err = WSAGetLastError();
+		if (err == WSAEWOULDBLOCK)
 			return 0;
-
+	}
 	return ret;
 }
 
