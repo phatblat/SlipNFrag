@@ -1104,7 +1104,7 @@ void Sbar_DeathmatchOverlay (void)
 // draw the text
 	l = scoreboardlines;
 
-	x = 80 + ((vid.width - 320)>>1);
+	x = 80 + ((vid.conwidth - 320)>>1);
 	y = 40;
 	for (i=0 ; i<l ; i++)
 	{
@@ -1119,8 +1119,8 @@ void Sbar_DeathmatchOverlay (void)
 		top = Sbar_ColorForMap (top);
 		bottom = Sbar_ColorForMap (bottom);
 
-		Draw_Fill ( x, y, 40, 4, top);
-		Draw_Fill ( x, y+4, 40, 4, bottom);
+		Draw_FillOnConsole ( x, y, 40, 4, top);
+		Draw_FillOnConsole ( x, y+4, 40, 4, bottom);
 
 	// draw number
 		f = s->frags;

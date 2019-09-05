@@ -38,6 +38,7 @@ void Draw_BeginDisc (void);
 void Draw_EndDisc (void);
 void Draw_TileClear (int x, int y, int w, int h);
 void Draw_Fill (int x, int y, int w, int h, int c);
+void Draw_FillOnConsole (int x, int y, int w, int h, int c);
 void Draw_FadeScreen (void);
 void Draw_String (int x, int y, const char *str);
 void Draw_StringOnScreen (int x, int y, const char *str);

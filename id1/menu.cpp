@@ -2906,9 +2906,9 @@ void M_ServerList_Draw (void)
 				for (j = i+1; j < hostCacheCount; j++)
 					if (strcmp(hostcache[j].name, hostcache[i].name) < 0)
 					{
-						Q_memcpy(&temp, &hostcache[j], sizeof(hostcache_t));
-						Q_memcpy(&hostcache[j], &hostcache[i], sizeof(hostcache_t));
-						Q_memcpy(&hostcache[i], &temp, sizeof(hostcache_t));
+						temp = hostcache[j];
+						hostcache[j] = hostcache[i];
+						hostcache[i] = temp;
 					}
 		}
 		slist_sorted = true;

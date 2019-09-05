@@ -1164,6 +1164,39 @@ void Draw_Fill (int x, int y, int w, int h, int c)
 				pusdest[u] = uc;
 	}
 }
+
+
+/*
+=============
+Draw_FillOnConsole
+
+Fills a box of pixels with a single color in console space
+=============
+*/
+void Draw_FillOnConsole(int x, int y, int w, int h, int c)
+{
+	byte* dest;
+	unsigned short* pusdest;
+	unsigned		uc;
+	int				u, v;
+
+	if (r_pixbytes == 1)
+	{
+		dest = vid.conbuffer + y * vid.conrowbytes + x;
+		for (v = 0; v < h; v++, dest += vid.conrowbytes)
+			for (u = 0; u < w; u++)
+				dest[u] = c;
+	}
+	else
+	{
+		uc = d_8to16table[c];
+
+		pusdest = (unsigned short*)vid.conbuffer + y * (vid.conrowbytes >> 1) + x;
+		for (v = 0; v < h; v++, pusdest += (vid.conrowbytes >> 1))
+			for (u = 0; u < w; u++)
+				pusdest[u] = uc;
+	}
+}
 //=============================================================================
 
 /*
