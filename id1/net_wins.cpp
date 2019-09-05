@@ -35,7 +35,8 @@ static int net_controlsocket;
 static int net_broadcastsocket = 0;
 static struct qsockaddr broadcastaddr;
 
-static unsigned long myAddr;
+static in6_addr myAddr;
+static bool myAddr_initialized = false;
 
 qboolean	winsock_lib_initialized;
 
@@ -54,20 +55,70 @@ void WINS_GetLocalAddress()
 	char			buff[MAXHOSTNAMELEN];
 	unsigned long	addr;
 
-	if (myAddr != INADDR_ANY)
+	if (myAddr_initialized)
+	{
 		return;
+	}
 
 	if (gethostname(buff, MAXHOSTNAMELEN) == SOCKET_ERROR)
 		return;
 
-	local = gethostbyname(buff);
-	if (local == NULL)
+	addrinfo hints{ };
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+
+	addrinfo* results = nullptr;
+	auto err = getaddrinfo(buff, "0", &hints, &results);
+	if (err < 0)
+	{
 		return;
+	}
 
-	myAddr = *(int *)local->h_addr_list[0];
+	addrinfo* result;
+	for (result = results; result != nullptr; result = result->ai_next)
+	{
+		if (result->ai_family == AF_INET6)
+		{
+			auto is_local = true;
+			for (auto i = 0; i < 16; i++)
+			{
+				if (((sockaddr_in6*)result->ai_addr)->sin6_addr.u.Byte[i] != in6addr_loopback.u.Byte[i])
+				{
+					is_local = false;
+					break;
+				}
+			}
+			if (!is_local)
+			{
+				myAddr = ((sockaddr_in6*)result->ai_addr)->sin6_addr;
+				myAddr_initialized = true;
+				inet_ntop(AF_INET6, &myAddr, my_tcpip_address, NET_NAMELEN);
+				break;
+			}
+		}
+	}
 
-	addr = ntohl(myAddr);
-	sprintf(my_tcpip_address, "%d.%d.%d.%d", (addr >> 24) & 0xff, (addr >> 16) & 0xff, (addr >> 8) & 0xff, addr & 0xff);
+	if (result == nullptr)
+	{
+		for (result = results; result != nullptr; result = result->ai_next)
+		{
+			if (result->ai_family == AF_INET)
+			{
+				auto addr = ntohl(((sockaddr_in*)result->ai_addr)->sin_addr.s_addr);
+				myAddr = in6addr_v4mappedprefix;
+				myAddr.u.Byte[12] = addr >> 24;
+				myAddr.u.Byte[13] = (addr >> 16) & 255;
+				myAddr.u.Byte[14] = (addr >> 8) & 255;
+				myAddr.u.Byte[15] = addr & 255;
+				myAddr_initialized = true;
+				sprintf(my_tcpip_address, "%d.%d.%d.%d", (addr >> 24) & 0xff, (addr >> 16) & 0xff, (addr >> 8) & 0xff, addr & 0xff);
+				break;
+			}
+		}
+	}
+
+	freeaddrinfo(results);
 }
 
 
@@ -131,9 +182,26 @@ int WINS_Init (void)
 	{
 		if (i < com_argc-1)
 		{
-			myAddr = inet_addr(com_argv[i+1]);
-			if (myAddr == INADDR_NONE)
-				Sys_Error ("%s is not a valid IP address", com_argv[i+1]);
+			auto err = inet_pton(AF_INET6, com_argv[i+1], &myAddr);
+			if (err < 0)
+			{
+				unsigned long addr = 0;
+				err = inet_pton(AF_INET, com_argv[i+1], &addr);
+				if (err < 0)
+				{
+					Sys_Error("%s is not a valid IP address", com_argv[i + 1]);
+				}
+				myAddr = in6addr_v4mappedprefix;
+				myAddr.u.Byte[12] = addr >> 24;
+				myAddr.u.Byte[13] = (addr >> 16) & 255;
+				myAddr.u.Byte[14] = (addr >> 8) & 255;
+				myAddr.u.Byte[15] = addr & 255;
+				myAddr_initialized = true;
+			}
+			else
+			{
+				myAddr_initialized = true;
+			}
 			strcpy(my_tcpip_address, com_argv[i+1]);
 		}
 		else
@@ -143,8 +211,8 @@ int WINS_Init (void)
 	}
 	else
 	{
-		myAddr = INADDR_ANY;
-		strcpy(my_tcpip_address, "INADDR_ANY");
+		myAddr = in6addr_any;
+		strcpy(my_tcpip_address, "in6addr_any");
 	}
 
 	if ((net_controlsocket = WINS_OpenIPV4Socket (0)) == -1)
@@ -206,12 +274,12 @@ int WINS_OpenSocket (int port)
 	int newsocket;
 	qsockaddr addr;
 	u_long _true = 1;
-	char off = 0;
+	int off = 0;
 
-	if ((newsocket = socket (AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	if ((newsocket = socket (PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		return -1;
 
-	if (setsockopt(newsocket, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(char)) == -1)
+	if (setsockopt(newsocket, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&off, sizeof(off)) == -1)
 		goto ErrorReturn;
 
 	if (ioctlsocket (newsocket, FIONBIO, &_true) == -1)
@@ -288,6 +356,14 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 	int run;
 	int port;
 	
+	for (auto i = 0; i < 12; i++)
+	{
+		if (myAddr.u.Byte[i] != in6addr_v4mappedprefix.u.Byte[i])
+		{
+			return -1;
+		}
+	}
+
 	buff[0] = '.';
 	b = buff;
 	strcpy(buff+1, in);
@@ -320,8 +396,10 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 	else
 		port = net_hostport;
 
-	auto fulladdr = (myAddr & htonl(mask)) | htonl(addr);
+	auto ipv4addr = (unsigned long)(myAddr.u.Byte[12] << 24) | (unsigned long)((myAddr.u.Byte[13] << 16) & 255) | (unsigned long)((myAddr.u.Byte[14] << 8) & 255) | (unsigned long)(myAddr.u.Byte[15] & 255);
+	auto fulladdr = (ipv4addr & htonl(mask)) | htonl(addr);
 
+	hostaddr->data.clear();
 	hostaddr->data.resize(sizeof(sockaddr_in6));
 	auto address = (sockaddr_in6*)hostaddr->data.data();
 	address->sin6_family = AF_INET6;
@@ -442,7 +520,7 @@ int WINS_Write (int socket, byte *buf, int len, struct qsockaddr *addr)
 
 char *WINS_AddrToString (struct qsockaddr *addr)
 {
-	static char buffer[128];
+	static char buffer[64];
 
 	if (addr->data.size() == sizeof(sockaddr_in6))
 	{
@@ -464,17 +542,20 @@ char *WINS_AddrToString (struct qsockaddr *addr)
 
 int WINS_StringToAddr (char *string, struct qsockaddr *addr)
 {
-	int ha1, ha2, ha3, ha4, hp;
-	int ipaddr;
+	int ha1 = 0, ha2 = 0, ha3 = 0, ha4 = 0, hp = 0;
 
 	sscanf(string, "%d.%d.%d.%d:%d", &ha1, &ha2, &ha3, &ha4, &hp);
-	ipaddr = (ha1 << 24) | (ha2 << 16) | (ha3 << 8) | ha4;
 
-	addr->data.resize(sizeof(sockaddr_in));
-	auto address = (sockaddr_in*)addr->data.data();
-	address->sin_family = AF_INET;
-	address->sin_addr.s_addr = htonl(ipaddr);
-	address->sin_port = htons((unsigned short)hp);
+	addr->data.clear();
+	addr->data.resize(sizeof(sockaddr_in6));
+	auto address = (sockaddr_in6*)addr->data.data();
+	address->sin6_family = AF_INET6;
+	address->sin6_addr = in6addr_v4mappedprefix;
+	address->sin6_addr.u.Byte[12] = ha1;
+	address->sin6_addr.u.Byte[13] = ha2;
+	address->sin6_addr.u.Byte[14] = ha3;
+	address->sin6_addr.u.Byte[15] = ha4;
+	address->sin6_port = htons((unsigned short)hp);
 	return 0;
 }
 
@@ -482,14 +563,57 @@ int WINS_StringToAddr (char *string, struct qsockaddr *addr)
 
 int WINS_GetSocketAddr (int socket, struct qsockaddr *addr)
 {
-	int addrlen = sizeof(struct qsockaddr);
+	int addrlen;
+	if (socket == net_controlsocket)
+	{
+		addrlen = (int)sizeof(sockaddr_in);
+	}
+	else
+	{
+		addrlen = (int)sizeof(sockaddr_in6);
+	}
 	addr->data.resize(addrlen);
-	auto address = (sockaddr_in*)addr->data.data();
-	getsockname(socket, (sockaddr*)address, &addrlen);
-	auto a = address->sin_addr.s_addr;
-	if (a == 0 || a == inet_addr("127.0.0.1"))
-		address->sin_addr.s_addr = myAddr;
-
+	auto err = getsockname(socket, (sockaddr*)addr->data.data(), &addrlen);
+	if (err < 0)
+	{
+		return err;
+	}
+	if (socket == net_controlsocket)
+	{
+		auto address = (sockaddr_in*)addr->data.data();
+		auto a = address->sin_addr.s_addr;
+		if (a == 0 || a == inet_addr("127.0.0.1"))
+		{
+			auto ipv4addr = (unsigned long)(myAddr.u.Byte[12] << 24) | (unsigned long)((myAddr.u.Byte[13] << 16) & 255) | (unsigned long)((myAddr.u.Byte[14] << 8) & 255) | (unsigned long)(myAddr.u.Byte[15] & 255);
+			address->sin_addr.s_addr = htonl(ipv4addr);
+		}
+	}
+	else
+	{
+		auto address = (sockaddr_in6*)addr->data.data();
+		auto a = address->sin6_addr;
+		auto is_local = true;
+		auto is_none = true;
+		for (auto i = 0; i < 16; i++)
+		{
+			if (is_local && a.u.Byte[i] != in6addr_loopback.u.Byte[i])
+			{
+				is_local = false;
+			}
+			if (is_none && a.u.Byte[i] != 0)
+			{
+				is_none = false;
+			}
+			if (!is_local && !is_none)
+			{
+				break;
+			}
+		}
+		if (is_none || is_local)
+		{
+			address->sin6_addr = myAddr;
+		}
+	}
 	return 0;
 }
 
@@ -518,7 +642,7 @@ int WINS_GetAddrFromName(const char *name, struct qsockaddr *addr)
 		return PartialIPAddress ((char*)name, addr);
 	
 	addrinfo hints { };
-	hints.ai_family = AF_INET;
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 
@@ -526,15 +650,48 @@ int WINS_GetAddrFromName(const char *name, struct qsockaddr *addr)
 	auto err = getaddrinfo(name, std::to_string(net_hostport).c_str(), &hints, &results);
 	if (err < 0)
 	{
-		return err;
+		return -1;
 	}
+
+	addrinfo* result;
+	for (result = results; result != nullptr; result = result->ai_next)
+	{
+		if (result->ai_family == AF_INET6)
+		{
+			addr->data.resize(sizeof(sockaddr_in6));
+			memcpy(addr->data.data(), result->ai_addr, addr->data.size());
+			break;
+		}
+	}
+
+	if (result == nullptr)
+	{
+		for (result = results; result != nullptr; result = result->ai_next)
+		{
+			if (result->ai_family == AF_INET)
+			{
+				addr->data.clear();
+				addr->data.resize(sizeof(sockaddr_in6));
+				auto address = (sockaddr_in6*)addr->data.data();
+				address->sin6_family = AF_INET6;
+				auto ipv4address = (sockaddr_in*)result->ai_addr;
+				address->sin6_port = ipv4address->sin_port;
+				address->sin6_addr = in6addr_v4mappedprefix;
+				address->sin6_addr.u.Byte[12] = ipv4address->sin_addr.S_un.S_un_b.s_b1;
+				address->sin6_addr.u.Byte[13] = ipv4address->sin_addr.S_un.S_un_b.s_b2;
+				address->sin6_addr.u.Byte[14] = ipv4address->sin_addr.S_un.S_un_b.s_b3;
+				address->sin6_addr.u.Byte[15] = ipv4address->sin_addr.S_un.S_un_b.s_b4;
+				break;
+			}
+		}
+	}
+
+	freeaddrinfo(results);
+
 	if (results == nullptr)
 	{
 		return -1;
 	}
-
-	addr->data.resize(sizeof(sockaddr_in));
-	memcpy(addr->data.data(), results->ai_addr, addr->data.size());
 
 	return 0;
 }
@@ -562,13 +719,27 @@ int WINS_AddrCompare (struct qsockaddr *addr1, struct qsockaddr *addr2)
 
 int WINS_GetSocketPort (struct qsockaddr *addr)
 {
-	return ntohs(((struct sockaddr_in *)addr->data.data())->sin_port);
+	if (addr->data.size() == sizeof(sockaddr_in6))
+	{
+		return ntohs(((struct sockaddr_in6*)addr->data.data())->sin6_port);
+	}
+	else
+	{
+		return ntohs(((struct sockaddr_in*)addr->data.data())->sin_port);
+	}
 }
 
 
 int WINS_SetSocketPort (struct qsockaddr *addr, int port)
 {
-	((struct sockaddr_in *)addr->data.data())->sin_port = htons((unsigned short)port);
+	if (addr->data.size() == sizeof(sockaddr_in6))
+	{
+		((struct sockaddr_in6*)addr->data.data())->sin6_port = htons((unsigned short)port);
+	}
+	else
+	{
+		((struct sockaddr_in*)addr->data.data())->sin_port = htons((unsigned short)port);
+	}
 	return 0;
 }
 
