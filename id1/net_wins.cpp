@@ -44,6 +44,8 @@ qboolean	winsock_lib_initialized;
 int winsock_initialized = 0;
 WSADATA		winsockdata;
 
+int WINS_OpenIPV4Socket(int port);
+
 //=============================================================================
 
 void WINS_GetLocalAddress()
@@ -72,7 +74,7 @@ void WINS_GetLocalAddress()
 int WINS_Init (void)
 {
 	int		i;
-	char	buff[MAXHOSTNAMELEN];
+	char	buff[MAXHOSTNAMELEN + 1];
 	char	*p;
 	int		r;
 	WORD	wVersionRequested;
@@ -86,7 +88,7 @@ int WINS_Init (void)
 	{
 		wVersionRequested = MAKEWORD(2, 2); 
 
-		r = WSAStartup (MAKEWORD(2, 2), &winsockdata);
+		r = WSAStartup (wVersionRequested, &winsockdata);
 
 		if (r)
 		{
@@ -145,7 +147,7 @@ int WINS_Init (void)
 		strcpy(my_tcpip_address, "INADDR_ANY");
 	}
 
-	if ((net_controlsocket = WINS_OpenSocket (0)) == -1)
+	if ((net_controlsocket = WINS_OpenIPV4Socket (0)) == -1)
 	{
 		Con_Printf("WINS_Init: Unable to open control socket\n");
 		if (--winsock_initialized == 0)
@@ -204,11 +206,43 @@ int WINS_OpenSocket (int port)
 	int newsocket;
 	qsockaddr addr;
 	u_long _true = 1;
+	char off = 0;
 
-	if ((newsocket = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+	if ((newsocket = socket (AF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
 		return -1;
 
+	if (setsockopt(newsocket, IPPROTO_IPV6, IPV6_V6ONLY, &off, sizeof(char)) == -1)
+		goto ErrorReturn;
+
 	if (ioctlsocket (newsocket, FIONBIO, &_true) == -1)
+		goto ErrorReturn;
+
+	addr.data.resize(sizeof(sockaddr_in6));
+	auto address = (sockaddr_in6*)addr.data.data();
+	address->sin6_family = AF_INET6;
+	address->sin6_addr = in6addr_any;
+	address->sin6_port = htons((unsigned short)port);
+	if( bind (newsocket, (const sockaddr*)address, (int)addr.data.size()) == 0)
+		return newsocket;
+
+	Sys_Error ("Unable to bind to %s", WINS_AddrToString(&addr));
+ErrorReturn:
+	closesocket (newsocket);
+	return -1;
+}
+
+//=============================================================================
+
+int WINS_OpenIPV4Socket(int port)
+{
+	int newsocket;
+	qsockaddr addr;
+	u_long _true = 1;
+
+	if ((newsocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		return -1;
+
+	if (ioctlsocket(newsocket, FIONBIO, &_true) == -1)
 		goto ErrorReturn;
 
 	addr.data.resize(sizeof(sockaddr_in));
@@ -216,12 +250,12 @@ int WINS_OpenSocket (int port)
 	address->sin_family = AF_INET;
 	address->sin_addr.s_addr = INADDR_ANY;
 	address->sin_port = htons((unsigned short)port);
-	if( bind (newsocket, (const sockaddr*)address, (int)addr.data.size()) == 0)
+	if (bind(newsocket, (const sockaddr*)address, (int)addr.data.size()) == 0)
 		return newsocket;
 
-	Sys_Error ("Unable to bind to %s", WINS_AddrToString(&addr));
+	Sys_Error("Unable to bind to %s", WINS_AddrToString(&addr));
 ErrorReturn:
-	closesocket (newsocket);
+	closesocket(newsocket);
 	return -1;
 }
 
@@ -286,12 +320,18 @@ static int PartialIPAddress (char *in, struct qsockaddr *hostaddr)
 	else
 		port = net_hostport;
 
-	hostaddr->data.resize(sizeof(sockaddr_in));
-	auto address = (sockaddr_in*)hostaddr->data.data();
-	address->sin_family = AF_INET;
-	address->sin_port = htons((short)port);
-	address->sin_addr.s_addr = (myAddr & htonl(mask)) | htonl(addr);
-	
+	auto fulladdr = (myAddr & htonl(mask)) | htonl(addr);
+
+	hostaddr->data.resize(sizeof(sockaddr_in6));
+	auto address = (sockaddr_in6*)hostaddr->data.data();
+	address->sin6_family = AF_INET6;
+	address->sin6_port = htons((short)port);
+	address->sin6_addr = in6addr_v4mappedprefix;
+	address->sin6_addr.u.Byte[12] = fulladdr >> 24;
+	address->sin6_addr.u.Byte[13] = (fulladdr >> 16) & 255;
+	address->sin6_addr.u.Byte[14] = (fulladdr >> 8) & 255;
+	address->sin6_addr.u.Byte[15] = fulladdr & 255;
+
 	return 0;
 }
 //=============================================================================
@@ -333,7 +373,15 @@ int WINS_Read (int socket, std::vector<byte>& buf, struct qsockaddr *addr)
 	}
 	auto len = (int)available;
 	buf.resize(len);
-	auto addrlen = (int)sizeof(sockaddr_in);
+	int addrlen;
+	if (socket == net_controlsocket)
+	{
+		addrlen = (int)sizeof(sockaddr_in);
+	}
+	else
+	{
+		addrlen = (int)sizeof(sockaddr_in6);
+	}
 	addr->data.resize(addrlen);
 	recvfrom(socket, (char*)buf.data(), len, 0, (sockaddr*)addr->data.data(), &addrlen);
 	return len;
@@ -394,12 +442,21 @@ int WINS_Write (int socket, byte *buf, int len, struct qsockaddr *addr)
 
 char *WINS_AddrToString (struct qsockaddr *addr)
 {
-	static char buffer[22];
-	int haddr;
+	static char buffer[128];
 
-	auto addr_in = (sockaddr_in*)addr->data.data();
-	haddr = ntohl(addr_in->sin_addr.s_addr);
-	sprintf(buffer, "%d.%d.%d.%d:%d", (haddr >> 24) & 0xff, (haddr >> 16) & 0xff, (haddr >> 8) & 0xff, haddr & 0xff, ntohs(addr_in->sin_port));
+	if (addr->data.size() == sizeof(sockaddr_in6))
+	{
+		auto address = (sockaddr_in6*)addr->data.data();
+		auto haddr = address->sin6_addr;
+
+		sprintf(buffer, "[%x:%x:%x:%x:%x:%x:%x:%x]:%d", haddr.u.Word[0], haddr.u.Word[1], haddr.u.Word[2], haddr.u.Word[3], haddr.u.Word[4], haddr.u.Word[5], haddr.u.Word[6], haddr.u.Word[7], ntohs(address->sin6_port));
+	}
+	else
+	{
+		auto address = (sockaddr_in*)addr->data.data();
+		auto haddr = ntohl(address->sin_addr.s_addr);
+		sprintf(buffer, "%d.%d.%d.%d:%d", (haddr >> 24) & 0xff, (haddr >> 16) & 0xff, (haddr >> 8) & 0xff, haddr & 0xff, ntohs(address->sin_port));
+	}
 	return buffer;
 }
 
