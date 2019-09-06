@@ -57,7 +57,6 @@ void client_t::Clear()
 	active = false;
 	spawned = false;
 	dropasap = false;
-	privileged = false;
 	sendsignon = false;
 	last_message = 0;
 	netconnection = nullptr;
@@ -314,12 +313,6 @@ void SV_ConnectClient (int clientnum)
 	client->edict = ent;
     client->message.maxsize = (sv_protocol_version == EXPANDED_PROTOCOL_VERSION ? 0 : MAX_MSGLEN);
 	client->message.allowoverflow = true;		// we can catch it
-
-#ifdef IDGODS
-	client->privileged = IsID(&client->netconnection->addr);
-#else	
-	client->privileged = false;				
-#endif
 
 	if (sv.loadgame)
 		memcpy (client->spawn_parms, spawn_parms, sizeof(spawn_parms));

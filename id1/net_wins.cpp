@@ -75,7 +75,7 @@ void WINS_GetLocalAddress()
 		return;
 	}
 
-	addrinfo* result;
+	addrinfo* result = nullptr;
 	for (result = results; result != nullptr; result = result->ai_next)
 	{
 		if (result->ai_family == AF_INET6)
@@ -105,14 +105,14 @@ void WINS_GetLocalAddress()
 		{
 			if (result->ai_family == AF_INET)
 			{
-				auto addr = ntohl(((sockaddr_in*)result->ai_addr)->sin_addr.s_addr);
+				auto address = ((sockaddr_in*)result->ai_addr)->sin_addr;
 				myAddr = in6addr_v4mappedprefix;
-				myAddr.u.Byte[12] = addr >> 24;
-				myAddr.u.Byte[13] = (addr >> 16) & 255;
-				myAddr.u.Byte[14] = (addr >> 8) & 255;
-				myAddr.u.Byte[15] = addr & 255;
+				myAddr.u.Byte[12] = address.S_un.S_un_b.s_b1;
+				myAddr.u.Byte[13] = address.S_un.S_un_b.s_b2;
+				myAddr.u.Byte[14] = address.S_un.S_un_b.s_b3;
+				myAddr.u.Byte[15] = address.S_un.S_un_b.s_b4;
 				myAddr_initialized = true;
-				sprintf(my_tcpip_address, "%d.%d.%d.%d", (addr >> 24) & 0xff, (addr >> 16) & 0xff, (addr >> 8) & 0xff, addr & 0xff);
+				inet_ntop(AF_INET, &address, my_tcpip_address, NET_NAMELEN);
 				break;
 			}
 		}
@@ -183,19 +183,20 @@ int WINS_Init (void)
 		if (i < com_argc-1)
 		{
 			auto err = inet_pton(AF_INET6, com_argv[i+1], &myAddr);
-			if (err < 0)
+			if (err <= 0)
 			{
+				in_addr address { };
 				unsigned long addr = 0;
-				err = inet_pton(AF_INET, com_argv[i+1], &addr);
-				if (err < 0)
+				err = inet_pton(AF_INET, com_argv[i+1], &address);
+				if (err <= 0)
 				{
 					Sys_Error("%s is not a valid IP address", com_argv[i + 1]);
 				}
 				myAddr = in6addr_v4mappedprefix;
-				myAddr.u.Byte[12] = addr >> 24;
-				myAddr.u.Byte[13] = (addr >> 16) & 255;
-				myAddr.u.Byte[14] = (addr >> 8) & 255;
-				myAddr.u.Byte[15] = addr & 255;
+				myAddr.u.Byte[12] = address.S_un.S_un_b.s_b1;
+				myAddr.u.Byte[13] = address.S_un.S_un_b.s_b2;
+				myAddr.u.Byte[14] = address.S_un.S_un_b.s_b3;
+				myAddr.u.Byte[15] = address.S_un.S_un_b.s_b4;
 				myAddr_initialized = true;
 			}
 			else
@@ -621,15 +622,13 @@ int WINS_GetSocketAddr (int socket, struct qsockaddr *addr)
 
 int WINS_GetNameFromAddr (struct qsockaddr *addr, std::string& name)
 {
-	struct hostent *hostentry;
-
-	hostentry = gethostbyaddr ((char *)&((struct sockaddr_in *)addr->data.data())->sin_addr, sizeof(struct in_addr), AF_INET);
-	if (hostentry)
+	char hostname[NI_MAXHOST];
+	auto err = getnameinfo((const sockaddr*)addr->data.data(), addr->data.size(), hostname, NI_MAXHOST, nullptr, 0, 0);
+	if (err == 0)
 	{
-		name = hostentry->h_name;
+		name = hostname;
 		return 0;
 	}
-
 	name = WINS_AddrToString (addr);
 	return 0;
 }
@@ -700,17 +699,45 @@ int WINS_GetAddrFromName(const char *name, struct qsockaddr *addr)
 
 int WINS_AddrCompare (struct qsockaddr *addr1, struct qsockaddr *addr2)
 {
-	auto address1 = (sockaddr_in*)addr1->data.data();
-	auto address2 = (sockaddr_in*)addr2->data.data();
-	
-	if (address1->sin_family != address2->sin_family)
+	auto size1 = addr1->data.size();
+	auto size2 = addr2->data.size();
+
+	if (size1 != size2)
 		return -1;
 
-	if (address1->sin_addr.s_addr != address2->sin_addr.s_addr)
-		return -1;
+	if (size1 == sizeof(sockaddr_in6))
+	{
+		auto address1 = (sockaddr_in6*)addr1->data.data();
+		auto address2 = (sockaddr_in6*)addr2->data.data();
 
-	if (address1->sin_port != address2->sin_port)
-		return 1;
+		if (address1->sin6_family != address2->sin6_family)
+			return -1;
+
+		for (auto i = 0; i < 16; i++)
+		{
+			if (address1->sin6_addr.u.Byte[i] != address2->sin6_addr.u.Byte[i])
+			{
+				return -1;
+			}
+		}
+
+		if (address1->sin6_port != address2->sin6_port)
+			return 1;
+	}
+	else
+	{
+		auto address1 = (sockaddr_in*)addr1->data.data();
+		auto address2 = (sockaddr_in*)addr2->data.data();
+
+		if (address1->sin_family != address2->sin_family)
+			return -1;
+
+		if (address1->sin_addr.s_addr != address2->sin_addr.s_addr)
+			return -1;
+
+		if (address1->sin_port != address2->sin_port)
+			return 1;
+	}
 
 	return 0;
 }
