@@ -153,7 +153,7 @@ void Con_CheckResize (void)
 {
 	int		i, j, width, oldwidth, oldtotallines, numlines, numchars;
 
-	width = (vid.width >> 3) - 2;
+	width = (vid.conwidth >> 3) - 2;
 
 	if (width == con_linewidth)
 		return;
