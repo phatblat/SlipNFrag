@@ -67,6 +67,7 @@ int net_numdrivers = 2;
 
 
 #include "net_wins.h"
+#include "net_sock.h"
 
 net_landriver_t	net_landrivers[MAX_NET_DRIVERS] =
 {
@@ -79,21 +80,21 @@ net_landriver_t	net_landrivers[MAX_NET_DRIVERS] =
 	WINS_Listen,
 	WINS_OpenSocket,
 	WINS_CloseSocket,
-	WINS_Connect,
+	SOCK_Connect,
 	WINS_CheckNewConnections,
 	WINS_Read,
 	WINS_Write,
 	WINS_Broadcast,
-	WINS_AddrToString,
-	WINS_StringToAddr,
+	SOCK_AddrToString,
+	SOCK_StringToAddr,
 	WINS_GetSocketAddr,
-	WINS_GetNameFromAddr,
+	SOCK_GetNameFromAddr,
 	WINS_GetAddrFromName,
-	WINS_AddrCompare,
-	WINS_GetSocketPort,
-	WINS_SetSocketPort,
-	WINS_MaxMessageSize,
-	WINS_MaxUnreliableMessageSize
+	SOCK_AddrCompare,
+	SOCK_GetSocketPort,
+	SOCK_SetSocketPort,
+	SOCK_MaxMessageSize,
+	SOCK_MaxUnreliableMessageSize
 	}
 
 };

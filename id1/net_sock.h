@@ -2,6 +2,8 @@
 
 #ifdef _WIN32
 
+#include <ws2tcpip.h>
+
 #else
 
 #include <netinet/in.h>
@@ -11,8 +13,6 @@
 #endif
 
 int  SOCK_PartialIPAddress (const char *input, in6_addr& local, struct qsockaddr *hostaddr);
-int  SOCK_Read (int socket, std::vector<byte>& buf, struct qsockaddr *addr);
-int  SOCK_ReadIPv4 (int socket, std::vector<byte>& buf, struct qsockaddr *addr);
 int  SOCK_Connect (int socket, struct qsockaddr *addr);
 char *SOCK_AddrToString (struct qsockaddr *addr);
 int  SOCK_StringToAddr (char *string, struct qsockaddr *addr);

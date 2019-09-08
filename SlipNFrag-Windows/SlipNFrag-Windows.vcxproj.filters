@@ -211,6 +211,9 @@
     <ClCompile Include="..\id1\net_wins.cpp">
       <Filter>id1</Filter>
     </ClCompile>
+    <ClCompile Include="..\id1\net_sock.cpp">
+      <Filter>id1</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -345,6 +348,9 @@
       <Filter>id1</Filter>
     </ClInclude>
     <ClInclude Include="..\id1\net_wins.h">
+      <Filter>id1</Filter>
+    </ClInclude>
+    <ClInclude Include="..\id1\net_sock.h">
       <Filter>id1</Filter>
     </ClInclude>
   </ItemGroup>
