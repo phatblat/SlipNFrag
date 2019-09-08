@@ -72,6 +72,7 @@
 		284E087E22C568B3001DF320 /* in_macos.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 284E087C22C568B3001DF320 /* in_macos.cpp */; };
 		285D5B09229F9EE400B6ED09 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28BA2A6E229F31C2001830E9 /* MetalKit.framework */; };
 		2867E02622C79ADF0028B7BC /* PreferencesController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 2867E02522C79ADF0028B7BC /* PreferencesController.mm */; };
+		286DF6C92324813B00B7537E /* net_sock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 286DF6C62323F3AA00B7537E /* net_sock.cpp */; };
 		287A3227229DBC4D00AE6BFA /* snd_null.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 287A3222229DBC4D00AE6BFA /* snd_null.cpp */; };
 		287A3228229DBC4D00AE6BFA /* in_null.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 287A3223229DBC4D00AE6BFA /* in_null.cpp */; };
 		287A3229229DBC4D00AE6BFA /* sys_null.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 287A3224229DBC4D00AE6BFA /* sys_null.cpp */; };
@@ -246,6 +247,8 @@
 		285D5B0E229FA12400B6ED09 /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		2867E02422C79ADF0028B7BC /* PreferencesController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PreferencesController.h; sourceTree = "<group>"; };
 		2867E02522C79ADF0028B7BC /* PreferencesController.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = PreferencesController.mm; sourceTree = "<group>"; };
+		286DF6C62323F3AA00B7537E /* net_sock.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = net_sock.cpp; sourceTree = "<group>"; };
+		286DF6C823247D9800B7537E /* net_sock.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = net_sock.h; sourceTree = "<group>"; };
 		287A320D229DBAA100AE6BFA /* SlipNFrag */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = SlipNFrag; sourceTree = BUILT_PRODUCTS_DIR; };
 		287A3222229DBC4D00AE6BFA /* snd_null.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = snd_null.cpp; sourceTree = "<group>"; };
 		287A3223229DBC4D00AE6BFA /* in_null.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = in_null.cpp; sourceTree = "<group>"; };
@@ -449,6 +452,8 @@
 				283D4BEB229E141E00D68A47 /* net_loop.cpp */,
 				283D4BEA229E140400D68A47 /* net_loop.h */,
 				283D4B8D229DDA0000D68A47 /* net_main.cpp */,
+				286DF6C62323F3AA00B7537E /* net_sock.cpp */,
+				286DF6C823247D9800B7537E /* net_sock.h */,
 				2880A4CC22C5774300AF513D /* net_udp.cpp */,
 				2880A4CB22C5774300AF513D /* net_udp.h */,
 				283D4BE4229E125600D68A47 /* net_vcr.cpp */,
@@ -661,6 +666,7 @@
 				28BA2A7C229F403C001830E9 /* console.cpp in Sources */,
 				28BA2AA9229F403C001830E9 /* sv_phys.cpp in Sources */,
 				28AA1D9C22C0803E00264AD0 /* snd_dma.cpp in Sources */,
+				286DF6C92324813B00B7537E /* net_sock.cpp in Sources */,
 				28BA2AA2229F403C001830E9 /* r_sprite.cpp in Sources */,
 				28BA2A7E229F403C001830E9 /* cvar.cpp in Sources */,
 				28AA1D9722C07E2D00264AD0 /* snd_macos.cpp in Sources */,

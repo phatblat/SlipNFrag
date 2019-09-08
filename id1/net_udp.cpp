@@ -23,8 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <errno.h>
@@ -39,12 +37,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifdef __APPLE__
 #include <unistd.h>
-#include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <net/if.h>
 #else
 extern "C" int gethostname (char *, int);
 #endif
+
+#include "net_udp.h"
+#include "net_sock.h"
 
 extern "C" int close (int);
 
@@ -55,135 +55,99 @@ static int net_controlsocket;
 static int net_broadcastsocket = 0;
 static struct qsockaddr broadcastaddr;
 
-static unsigned long myAddr;
-
-#include "net_udp.h"
+static in6_addr myAddr { };
 
 char*       net_ipaddress = NULL;
 char**      net_ipaddresses = NULL;
 int         net_ipaddressescount = 0;
 int         net_ipaddressessize = 0;
 
+int UDP_OpenIPV4Socket(int port);
+
 //=============================================================================
 
 int UDP_Init (void)
 {
-	struct hostent *local;
 	char	buff[MAXHOSTNAMELEN];
 	struct qsockaddr addr;
-	char *colon;
 	
 	if (COM_CheckParm ("-noudp"))
 		return -1;
 
-	// determine my name & address
-    struct ifaddrs *allInterfaces;
+    // determine my name & address
+    gethostname(buff, MAXHOSTNAMELEN);
     
-    if (getifaddrs(&allInterfaces) == 0)
-    {
-        struct ifaddrs *interface;
-        
-        for (interface = allInterfaces; interface != NULL; interface = interface->ifa_next)
-        {
-            unsigned int flags = interface->ifa_flags;
-            struct sockaddr *addr = interface->ifa_addr;
-            
-            if ((flags & (IFF_UP|IFF_RUNNING|IFF_LOOPBACK)) == (IFF_UP|IFF_RUNNING))
-            {
-                if (addr->sa_family == AF_INET)
-                {
-                    getnameinfo(addr, addr->sa_len, buff, MAXHOSTNAMELEN, NULL, 0, NI_NUMERICHOST);
-                    
-                    if (net_ipaddressescount >= net_ipaddressessize)
-                    {
-                        int newsize = net_ipaddressescount + 4;
-                        char** newipaddresses = new char*[newsize];
-                        
-                        if (net_ipaddresses != NULL)
-                        {
-                            memcpy(newipaddresses, net_ipaddresses, net_ipaddressescount * sizeof(char*));
-                            
-                            delete[] net_ipaddresses;
-                        }
-                        
-                        net_ipaddresses = newipaddresses;
-                        net_ipaddressessize = newsize;
-                    }
-                    
-                    net_ipaddresses[net_ipaddressescount] = buff;
-                    net_ipaddressescount++;
-                }
-            }
-        }
-        
-        freeifaddrs(allInterfaces);
-        
-        if (net_ipaddressescount == 0)
-        {
-            return -1;
-        }
-        
-        if (net_ipaddress == NULL)
-        {
-            Q_strcpy(buff, net_ipaddresses[net_ipaddressescount - 1]);
-            local = gethostbyname(buff);
-            if (local == NULL)
-            {
-                return -1;
-            }
-            myAddr = *(int *)local->h_addr_list[0];
-        }
-        else
-        {
-            qboolean found = false;
-            
-            for (int i = 0; i < net_ipaddressescount; i++)
-            {
-                Q_strcpy(buff, net_ipaddresses[i]);
-                
-                if (strcmp(net_ipaddress, buff) == 0)
-                {
-                    local = gethostbyname(buff);
-                    if (local == NULL)
-                    {
-                        return -1;
-                    }
-                    myAddr = *(int *)local->h_addr_list[0];
-                    
-                    found = true;
-                }
-            }
-            
-            if (!found)
-            {
-                return -1;
-            }
-        }
-    }
-    else
+    addrinfo hints { };
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
+    
+    addrinfo* results = nullptr;
+    auto err = getaddrinfo(buff, "0", &hints, &results);
+    if (err < 0)
     {
         return -1;
     }
     
+    addrinfo* result;
+    for (result = results; result != nullptr; result = result->ai_next)
+    {
+        if (result->ai_family == AF_INET6)
+        {
+            auto is_local = true;
+            for (auto i = 0; i < 16; i++)
+            {
+                if (((sockaddr_in6*)result->ai_addr)->sin6_addr.s6_addr[i] != in6addr_loopback.s6_addr[i])
+                {
+                    is_local = false;
+                    break;
+                }
+            }
+            if (!is_local)
+            {
+                myAddr = ((sockaddr_in6*)result->ai_addr)->sin6_addr;
+                inet_ntop(AF_INET6, &myAddr, my_tcpip_address, NET_NAMELEN);
+                break;
+            }
+        }
+    }
+    
+    if (result == nullptr)
+    {
+        for (result = results; result != nullptr; result = result->ai_next)
+        {
+            if (result->ai_family == AF_INET)
+            {
+                auto address = ((sockaddr_in*)result->ai_addr)->sin_addr;
+                auto addressnumber = htonl(address.s_addr);
+                myAddr.s6_addr[10] = 255;
+                myAddr.s6_addr[11] = 255;
+                myAddr.s6_addr[12] = addressnumber >> 24;
+                myAddr.s6_addr[13] = (addressnumber >> 16) & 255;
+                myAddr.s6_addr[14] = (addressnumber >> 8) & 255;
+                myAddr.s6_addr[15] = addressnumber & 255;
+                inet_ntop(AF_INET, &address, my_tcpip_address, NET_NAMELEN);
+                break;
+            }
+        }
+    }
+    
+    freeaddrinfo(results);
+
 	// if the quake hostname isn't set, set it to the machine name
 	if (Q_strcmp(hostname.string.c_str(), "UNNAMED") == 0)
 	{
-		buff[15] = 0;
 		Cvar_Set ("hostname", buff);
 	}
 
-	if ((net_controlsocket = UDP_OpenSocket (0)) == -1)
+	if ((net_controlsocket = UDP_OpenIPV4Socket (0)) == -1)
 		Sys_Error("UDP_Init: Unable to open control socket\n");
 
-	((struct sockaddr_in *)&broadcastaddr)->sin_family = AF_INET;
-	((struct sockaddr_in *)&broadcastaddr)->sin_addr.s_addr = INADDR_BROADCAST;
-	((struct sockaddr_in *)&broadcastaddr)->sin_port = htons(net_hostport);
-
-	UDP_GetSocketAddr (net_controlsocket, &addr);
-	Q_strcpy(my_tcpip_address,  UDP_AddrToString (&addr));
-	colon = Q_strrchr (my_tcpip_address, ':');
-	if (colon)
-		*colon = 0;
+    broadcastaddr.data.resize(sizeof(sockaddr_in));
+    auto address = (sockaddr_in*)broadcastaddr.data.data();
+    address->sin_family = AF_INET;
+    address->sin_addr.s_addr = INADDR_BROADCAST;
+    address->sin_port = htons((unsigned short)net_hostport);
 
 	Con_Printf("UDP Initialized\n");
 	tcpipAvailable = true;
@@ -224,6 +188,37 @@ void UDP_Listen (qboolean state)
 
 int UDP_OpenSocket (int port)
 {
+    int newsocket;
+    struct sockaddr_in6 address;
+    qboolean _true = true;
+    int off = 0;
+
+    if ((newsocket = socket (PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+        return -1;
+    
+    if (setsockopt(newsocket, IPPROTO_IPV6, IPV6_V6ONLY, (char*)&off, sizeof(off)) == -1)
+        goto ErrorReturn;
+    
+    if (ioctl (newsocket, FIONBIO, (char *)&_true) == -1)
+        goto ErrorReturn;
+    
+    address.sin6_family = AF_INET6;
+    address.sin6_addr = in6addr_any;
+    address.sin6_port = htons((unsigned short)port);
+    if( bind (newsocket, (struct sockaddr*)&address, sizeof(address)) == -1)
+        goto ErrorReturn;
+    
+    return newsocket;
+    
+ErrorReturn:
+    close (newsocket);
+    return -1;
+}
+
+//=============================================================================
+
+int UDP_OpenIPV4Socket (int port)
+{
 	int newsocket;
 	struct sockaddr_in address;
 	qboolean _true = true;
@@ -258,70 +253,6 @@ int UDP_CloseSocket (int socket)
 
 
 //=============================================================================
-/*
-============
-PartialIPAddress
-
-this lets you type only as much of the net address as required, using
-the local network components to fill in the rest
-============
-*/
-static int PartialIPAddress (const char *in, struct qsockaddr *hostaddr)
-{
-	char buff[256];
-	char *b;
-	int addr;
-	int num;
-	int mask;
-	int run;
-	int port;
-	
-	buff[0] = '.';
-	b = buff;
-	strcpy(buff+1, in);
-	if (buff[1] == '.')
-		b++;
-
-	addr = 0;
-	mask=-1;
-	while (*b == '.')
-	{
-		b++;
-		num = 0;
-		run = 0;
-		while (!( *b < '0' || *b > '9'))
-		{
-		  num = num*10 + *b++ - '0';
-		  if (++run > 3)
-		  	return -1;
-		}
-		if ((*b < '0' || *b > '9') && *b != '.' && *b != ':' && *b != 0)
-			return -1;
-		if (num < 0 || num > 255)
-			return -1;
-		mask<<=8;
-		addr = (addr<<8) + num;
-	}
-	
-	if (*b++ == ':')
-		port = Q_atoi(b);
-	else
-		port = net_hostport;
-
-	hostaddr->sa_family = AF_INET;
-	((struct sockaddr_in *)hostaddr)->sin_port = htons((short)port);	
-	((struct sockaddr_in *)hostaddr)->sin_addr.s_addr = (myAddr & htonl(mask)) | htonl(addr);
-	
-	return 0;
-}
-//=============================================================================
-
-int UDP_Connect (int socket, struct qsockaddr *addr)
-{
-	return 0;
-}
-
-//=============================================================================
 
 int UDP_CheckNewConnections (void)
 {
@@ -341,22 +272,34 @@ int UDP_CheckNewConnections (void)
 
 int UDP_Read (int socket, std::vector<byte>& buf, struct qsockaddr *addr)
 {
-	int addrlen = sizeof (struct qsockaddr);
-	int ret, available;
-
-    ret = ioctl(socket, FIONREAD, &available);
-    if (ret >= 0 && available > 0)
+    u_long available = 0;
+    auto err = ioctl(socket, FIONREAD, &available);
+    if (err < 0)
     {
-        buf.resize(available);
-        ret = recvfrom (socket, buf.data(), available, 0, (struct sockaddr *)addr, (socklen_t*)&addrlen);
-        if (ret > 0 && ret < available)
-        {
-            buf.resize(ret);
-        }
+        return err;
     }
-	if (ret == -1 && (errno == EWOULDBLOCK || errno == ECONNREFUSED))
-		return 0;
-	return ret;
+    if (available == 0)
+    {
+        return 0;
+    }
+    auto len = (int)available;
+    buf.resize(len);
+    socklen_t addrlen;
+    if (socket == net_controlsocket)
+    {
+        addrlen = (socklen_t)sizeof(sockaddr_in);
+    }
+    else
+    {
+        addrlen = (socklen_t)sizeof(sockaddr_in6);
+    }
+    addr->data.resize(addrlen);
+    auto read = recvfrom(socket, (char*)buf.data(), len, 0, (sockaddr*)addr->data.data(), &addrlen);
+    if (read > 0 && read < len)
+    {
+        buf.resize(read);
+    }
+    return (int)read;
 }
 
 //=============================================================================
@@ -400,7 +343,7 @@ int UDP_Write (int socket, byte *buf, int len, struct qsockaddr *addr)
 {
 	int ret;
 
-	ret = sendto (socket, buf, len, 0, (struct sockaddr *)addr, sizeof(struct qsockaddr));
+	ret = (int)sendto (socket, buf, (size_t)len, 0, (sockaddr*)addr->data.data(), (socklen_t)addr->data.size());
 	if (ret == -1 && errno == EWOULDBLOCK)
 		return 0;
 	return ret;
@@ -408,123 +351,14 @@ int UDP_Write (int socket, byte *buf, int len, struct qsockaddr *addr)
 
 //=============================================================================
 
-char *UDP_AddrToString (struct qsockaddr *addr)
-{
-	static char buffer[22];
-	int haddr;
-
-	haddr = ntohl(((struct sockaddr_in *)addr)->sin_addr.s_addr);
-	sprintf(buffer, "%d.%d.%d.%d:%d", (haddr >> 24) & 0xff, (haddr >> 16) & 0xff, (haddr >> 8) & 0xff, haddr & 0xff, ntohs(((struct sockaddr_in *)addr)->sin_port));
-	return buffer;
-}
-
-//=============================================================================
-
-int UDP_StringToAddr (char *string, struct qsockaddr *addr)
-{
-	int ha1, ha2, ha3, ha4, hp;
-	int ipaddr;
-
-	sscanf(string, "%d.%d.%d.%d:%d", &ha1, &ha2, &ha3, &ha4, &hp);
-	ipaddr = (ha1 << 24) | (ha2 << 16) | (ha3 << 8) | ha4;
-
-	addr->sa_family = AF_INET;
-	((struct sockaddr_in *)addr)->sin_addr.s_addr = htonl(ipaddr);
-	((struct sockaddr_in *)addr)->sin_port = htons(hp);
-	return 0;
-}
-
-//=============================================================================
-
 int UDP_GetSocketAddr (int socket, struct qsockaddr *addr)
 {
-	int addrlen = sizeof(struct qsockaddr);
-	unsigned int a;
-
-	Q_memset(addr, 0, sizeof(struct qsockaddr));
-	getsockname(socket, (struct sockaddr *)addr, (socklen_t*)&addrlen);
-	a = ((struct sockaddr_in *)addr)->sin_addr.s_addr;
-	if (a == 0 || a == inet_addr("127.0.0.1"))
-		((struct sockaddr_in *)addr)->sin_addr.s_addr = myAddr;
-
-	return 0;
-}
-
-//=============================================================================
-
-int UDP_GetNameFromAddr (struct qsockaddr *addr, std::string& name)
-{
-	struct hostent *hostentry;
-
-	hostentry = gethostbyaddr ((char *)&((struct sockaddr_in *)addr)->sin_addr, sizeof(struct in_addr), AF_INET);
-	if (hostentry)
-	{
-        name = hostentry->h_name;
-		return 0;
-	}
-
-	name = UDP_AddrToString (addr);
-	return 0;
+    return SOCK_GetSocketAddr (socket, net_controlsocket, myAddr, addr);
 }
 
 //=============================================================================
 
 int UDP_GetAddrFromName(const char *name, struct qsockaddr *addr)
 {
-	struct hostent *hostentry;
-
-	if (name[0] >= '0' && name[0] <= '9')
-		return PartialIPAddress (name, addr);
-	
-	hostentry = gethostbyname (name);
-	if (!hostentry)
-		return -1;
-
-	addr->sa_family = AF_INET;
-	((struct sockaddr_in *)addr)->sin_port = htons(net_hostport);	
-	((struct sockaddr_in *)addr)->sin_addr.s_addr = *(int *)hostentry->h_addr_list[0];
-
-	return 0;
-}
-
-//=============================================================================
-
-int UDP_AddrCompare (struct qsockaddr *addr1, struct qsockaddr *addr2)
-{
-	if (addr1->sa_family != addr2->sa_family)
-		return -1;
-
-	if (((struct sockaddr_in *)addr1)->sin_addr.s_addr != ((struct sockaddr_in *)addr2)->sin_addr.s_addr)
-		return -1;
-
-	if (((struct sockaddr_in *)addr1)->sin_port != ((struct sockaddr_in *)addr2)->sin_port)
-		return 1;
-
-	return 0;
-}
-
-//=============================================================================
-
-int UDP_GetSocketPort (struct qsockaddr *addr)
-{
-	return ntohs(((struct sockaddr_in *)addr)->sin_port);
-}
-
-
-int UDP_SetSocketPort (struct qsockaddr *addr, int port)
-{
-	((struct sockaddr_in *)addr)->sin_port = htons(port);
-	return 0;
-}
-
-//=============================================================================
-
-int UDP_MaxMessageSize (struct qsockaddr *sock)
-{
-    return 65507;
-}
-
-int UDP_MaxUnreliableMessageSize (struct qsockaddr *sock)
-{
-    return 65507;
+    return SOCK_GetAddrFromName(name, myAddr, addr);
 }

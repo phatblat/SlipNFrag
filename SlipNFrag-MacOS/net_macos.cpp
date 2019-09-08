@@ -55,6 +55,7 @@ net_driver_t net_drivers[MAX_NET_DRIVERS] =
 int net_numdrivers = 2;
 
 #include "net_udp.h"
+#include "net_sock.h"
 
 net_landriver_t    net_landrivers[MAX_NET_DRIVERS] =
 {
@@ -67,21 +68,21 @@ net_landriver_t    net_landrivers[MAX_NET_DRIVERS] =
         UDP_Listen,
         UDP_OpenSocket,
         UDP_CloseSocket,
-        UDP_Connect,
+        SOCK_Connect,
         UDP_CheckNewConnections,
         UDP_Read,
         UDP_Write,
         UDP_Broadcast,
-        UDP_AddrToString,
-        UDP_StringToAddr,
+        SOCK_AddrToString,
+        SOCK_StringToAddr,
         UDP_GetSocketAddr,
-        UDP_GetNameFromAddr,
+        SOCK_GetNameFromAddr,
         UDP_GetAddrFromName,
-        UDP_AddrCompare,
-        UDP_GetSocketPort,
-        UDP_SetSocketPort,
-        UDP_MaxMessageSize,
-        UDP_MaxUnreliableMessageSize
+        SOCK_AddrCompare,
+        SOCK_GetSocketPort,
+        SOCK_SetSocketPort,
+        SOCK_MaxMessageSize,
+        SOCK_MaxUnreliableMessageSize
     }
 };
 
