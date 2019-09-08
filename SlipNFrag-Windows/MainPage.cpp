@@ -8,6 +8,8 @@
 #include "in_uwp.h"
 #include "snd_uwp.h"
 
+#pragma comment(lib, "User32.lib")
+
 struct __declspec(uuid("5b0d3235-4dba-4d44-865e-8f1d0e4fd04d")) __declspec(novtable) IMemoryBufferByteAccess : ::IUnknown
 {
 	virtual HRESULT __stdcall GetBuffer(uint8_t** value, uint32_t* capacity) = 0;
@@ -606,39 +608,13 @@ namespace winrt::SlipNFrag_Windows::implementation
 							}
 							key_dest_was_game = (key_dest == key_game);
 						}
-						Window::Current().CoreWindow().KeyDown([](IInspectable const&, KeyEventArgs const& e)
+						Window::Current().CoreWindow().KeyDown([this](IInspectable const&, KeyEventArgs const& e)
 							{
-								auto virtualKey = (int)e.VirtualKey();
-								auto mapped = 0;
-								if (virtualKey >= 0 && virtualKey < sizeof(virtualkeymap) / sizeof(int))
-								{
-									mapped = virtualkeymap[virtualKey];
-								}
-								try
-								{
-									Key_Event(mapped, true);
-								}
-								catch (...)
-								{
-									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
-								}
+								HandleKey((int)e.VirtualKey(), true);
 							});
-						Window::Current().CoreWindow().KeyUp([](IInspectable const&, KeyEventArgs const& e)
+						Window::Current().CoreWindow().KeyUp([this](IInspectable const&, KeyEventArgs const& e)
 							{
-								auto virtualKey = (int)e.VirtualKey();
-								auto mapped = 0;
-								if (virtualKey >= 0 && virtualKey < sizeof(virtualkeymap) / sizeof(int))
-								{
-									mapped = virtualkeymap[virtualKey];
-								}
-								try
-								{
-									Key_Event(mapped, false);
-								}
-								catch (...)
-								{
-									// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
-								}
+								HandleKey((int)e.VirtualKey(), false);
 							});
 						if (mouseinitialized)
 						{
@@ -2689,6 +2665,28 @@ namespace winrt::SlipNFrag_Windows::implementation
 			factor = newScreenHeight / 200;
 			newConsoleHeight = 200;
 			newConsoleWidth = newScreenWidth / factor;
+		}
+	}
+
+	void MainPage::HandleKey(int key, bool pressed)
+	{
+		auto mapped = 0;
+		if (key >= 0 && key < sizeof(virtualkeymap) / sizeof(int))
+		{
+			mapped = virtualkeymap[key];
+		}
+		if (mapped == 0)
+		{
+			mapped = MapVirtualKeyA(key, 2); // == MAPVK_VK_TO_CHAR
+		}
+		capslock_down = ((Window::Current().CoreWindow().GetKeyState(VirtualKey::CapitalLock) & CoreVirtualKeyStates::Locked) == CoreVirtualKeyStates::Locked);
+		try
+		{
+			Key_Event(mapped, pressed);
+		}
+		catch (...)
+		{
+			// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
 		}
 	}
 }

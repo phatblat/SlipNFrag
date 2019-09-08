@@ -31,6 +31,7 @@ char	key_lines[32][MAXCMDLINE];
 int		key_linepos;
 int		shift_down=false;
 int		key_lastpress;
+int		capslock_down=false;
 
 int		edit_line=0;
 int		history_line=0;
@@ -712,7 +713,14 @@ void Key_Event (int key, qboolean down)
 	if (!down)
 		return;		// other systems only care about key down events
 
-	if (shift_down)
+	if (capslock_down)
+	{
+		if ((shift_down && (key < 'a' || key > 'z')) || (!shift_down && (key >= 'a') && (key <= 'z')))
+		{
+			key = keyshift[key];
+		}
+	}
+	else if (shift_down)
 	{
 		key = keyshift[key];
 	}

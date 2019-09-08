@@ -139,6 +139,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		void CreateAudioInput();
 		void AddJoystickAxis(winrt::Windows::Foundation::Collections::IPropertySet const& values, winrt::hstring const& stickName, std::string const& axisName, std::vector<std::string>& arguments);
 		void CalculateConsoleDimensions();
+		void HandleKey(int key, bool pressed);
 	};
 }
 
