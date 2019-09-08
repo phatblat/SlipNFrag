@@ -403,6 +403,22 @@ void IN_JoyMove(usercmd_t* cmd)
 						V_StopPitchDrift();
 				}
 			}
+			else
+			{
+				if (fAxisValue > joy_pitchthreshold.value)
+				{
+					cl.viewangles[PITCH] = (fAxisValue - joy_pitchthreshold.value) / (1 - joy_pitchthreshold.value) * 90.0;
+				}
+				else if (fAxisValue < -joy_pitchthreshold.value)
+				{
+					cl.viewangles[PITCH] = (fAxisValue + joy_pitchthreshold.value) / (1 - joy_pitchthreshold.value) * 90.0;
+				}
+				else
+				{
+					cl.viewangles[PITCH] = 0;
+				}
+				V_StopPitchDrift();
+			}
 			break;
 
 		default:
