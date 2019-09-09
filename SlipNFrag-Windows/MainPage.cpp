@@ -552,7 +552,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 						newScreenWidth = (float)swapChainPanel().ActualWidth();
 						newScreenHeight = (float)swapChainPanel().ActualHeight();
 						CalculateConsoleDimensions();
-						CreateDevice();
+						try
+						{
+							CreateDevice();
+						}
+						catch (...)
+						{
+							sys_errormessage = "DirectX 12, Feature Level 11.0 is not currently available in your system.";
+							DisplaySysErrorIfNeeded();
+							return;
+						}
 						std::thread filesThread([this]()
 							{
 								ProcessFiles();
@@ -768,16 +777,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 			{
 				continue;
 			}
-			if (SUCCEEDED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)))
+			if (SUCCEEDED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_10_0, __uuidof(ID3D12Device), nullptr)))
 			{
 				break;
 			}
 		}
-		if (FAILED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3dDevice))))
+		if (FAILED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_10_0, IID_PPV_ARGS(&d3dDevice))))
 		{
 			com_ptr<IDXGIAdapter> warpAdapter;
 			check_hresult(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
-			check_hresult(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3dDevice)));
+			check_hresult(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_10_0, IID_PPV_ARGS(&d3dDevice)));
 		}
 		D3D12_COMMAND_QUEUE_DESC queueDesc { D3D12_COMMAND_LIST_TYPE_DIRECT, 0, D3D12_COMMAND_QUEUE_FLAG_NONE };
 		check_hresult(d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));
@@ -1273,19 +1282,28 @@ namespace winrt::SlipNFrag_Windows::implementation
 		}
 		if (deviceRemoved)
 		{
-			constantBuffer->Unmap(0, nullptr);
-			screen = nullptr;
-			console = nullptr;
-			palette = nullptr;
-			depthStencil = nullptr;
-			CreateDevice();
-#if defined(_DEBUG)
-			com_ptr<IDXGIDebug1> dxgiDebug;
-			if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
+			try
 			{
-				dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
-			}
+				constantBuffer->Unmap(0, nullptr);
+				screen = nullptr;
+				console = nullptr;
+				palette = nullptr;
+				depthStencil = nullptr;
+				CreateDevice();
+#if defined(_DEBUG)
+				com_ptr<IDXGIDebug1> dxgiDebug;
+				if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
+				{
+					dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY | DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+				}
 #endif
+			}
+			catch (...)
+			{
+				sys_errormessage = "DirectX 12, Feature Level 11.0 is not currently available in your system.";
+				DisplaySysErrorIfNeeded();
+				return;
+			}
 		}
 		else
 		{
@@ -1364,274 +1382,277 @@ namespace winrt::SlipNFrag_Windows::implementation
 		}
 		if (joy_initialized && joy_avail && joyAxesInverted.size() > 0)
 		{
-			if (gamepad.get() != nullptr)
+			try
 			{
-				auto reading = gamepad.get().GetCurrentReading();
-				pdwRawValue[JOY_AXIS_X] = (float)reading.LeftThumbstickX * joyAxesInverted[0];
-				pdwRawValue[JOY_AXIS_Y] = (float)-reading.LeftThumbstickY * joyAxesInverted[1];
-				pdwRawValue[JOY_AXIS_Z] = (float)reading.RightThumbstickX * joyAxesInverted[2];
-				pdwRawValue[JOY_AXIS_R] = (float)-reading.RightThumbstickY * joyAxesInverted[3];
-				pdwRawValue[JOY_AXIS_U] = (float)reading.LeftTrigger * joyAxesInverted[4];
-				pdwRawValue[JOY_AXIS_V] = (float)reading.RightTrigger * joyAxesInverted[5];
-				if (previousJoyAxesAsButtonValuesWereRead)
+				if (gamepad.get() != nullptr)
 				{
+					auto reading = gamepad.get().GetCurrentReading();
+					pdwRawValue[JOY_AXIS_X] = (float)reading.LeftThumbstickX * joyAxesInverted[0];
+					pdwRawValue[JOY_AXIS_Y] = (float)-reading.LeftThumbstickY * joyAxesInverted[1];
+					pdwRawValue[JOY_AXIS_Z] = (float)reading.RightThumbstickX * joyAxesInverted[2];
+					pdwRawValue[JOY_AXIS_R] = (float)-reading.RightThumbstickY * joyAxesInverted[3];
+					pdwRawValue[JOY_AXIS_U] = (float)reading.LeftTrigger * joyAxesInverted[4];
+					pdwRawValue[JOY_AXIS_V] = (float)reading.RightTrigger * joyAxesInverted[5];
+					if (previousJoyAxesAsButtonValuesWereRead)
+					{
+						for (auto i = 0; i < joyAxesAsButtons.size(); i++)
+						{
+							auto previous = fabs(previousJoyAxesAsButtonValues[i]);
+							auto current = fabs(pdwRawValue[i]);
+							if (previous < 0.15 && current >= 0.15)
+							{
+								if (joyAxesAsButtons[i].size() > 0)
+								{
+									Cbuf_AddText(joyAxesAsButtons[i].c_str());
+								}
+								else if (joyAxesAsKeys[i] > 0)
+								{
+									Key_Event(joyAxesAsKeys[i], true);
+								}
+							}
+							else if (previous >= 0.15 && current < 0.15)
+							{
+								if (joyAxesAsButtons[i].size() > 0)
+								{
+									Cbuf_AddText(joyAxesAsButtonsOnRelease[i].c_str());
+								}
+								else if (joyAxesAsKeys[i] > 0)
+								{
+									Key_Event(joyAxesAsKeys[i], false);
+								}
+							}
+						}
+					}
 					for (auto i = 0; i < joyAxesAsButtons.size(); i++)
 					{
-						auto previous = fabs(previousJoyAxesAsButtonValues[i]);
-						auto current = fabs(pdwRawValue[i]);
-						if (previous < 0.15 && current >= 0.15)
-						{
-							if (joyAxesAsButtons[i].size() > 0)
-							{
-								Cbuf_AddText(joyAxesAsButtons[i].c_str());
-							}
-							else if (joyAxesAsKeys[i] > 0)
-							{
-								std::lock_guard lock(renderLoopMutex);
-								Key_Event(joyAxesAsKeys[i], true);
-							}
-						}
-						else if (previous >= 0.15 && current < 0.15)
-						{
-							if (joyAxesAsButtons[i].size() > 0)
-							{
-								Cbuf_AddText(joyAxesAsButtonsOnRelease[i].c_str());
-							}
-							else if (joyAxesAsKeys[i] > 0)
-							{
-								std::lock_guard lock(renderLoopMutex);
-								Key_Event(joyAxesAsKeys[i], false);
-							}
-						}
+						previousJoyAxesAsButtonValues[i] = pdwRawValue[i];
 					}
-				}
-				for (auto i = 0; i < joyAxesAsButtons.size(); i++)
-				{
-					previousJoyAxesAsButtonValues[i] = pdwRawValue[i];
-				}
-				previousJoyAxesAsButtonValuesWereRead = true;
-				auto buttons = (unsigned int)reading.Buttons;
-				if (previousGamepadButtonsWereRead)
-				{
-					auto key = 203;
-					unsigned int mask = 1;
-					for (auto i = 0; i < 30; i++)
+					previousJoyAxesAsButtonValuesWereRead = true;
+					auto buttons = (unsigned int)reading.Buttons;
+					if (previousGamepadButtonsWereRead)
 					{
-						if ((buttons & mask) == mask && (previousGamepadButtons & mask) != mask)
+						auto key = 203;
+						unsigned int mask = 1;
+						for (auto i = 0; i < 30; i++)
 						{
-							std::lock_guard lock(renderLoopMutex);
-							if (key_dest == key_game)
+							if ((buttons & mask) == mask && (previousGamepadButtons & mask) != mask)
 							{
-								if (joyButtonsAsKeys[i] >= 0)
+								if (key_dest == key_game)
 								{
-									Key_Event(joyButtonsAsKeys[i], true);
+									if (joyButtonsAsKeys[i] >= 0)
+									{
+										Key_Event(joyButtonsAsKeys[i], true);
+									}
+									else
+									{
+										Key_Event(key, true);
+									}
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::A)
+								{
+									Key_Event(13, true);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::B)
+								{
+									Key_Event(27, true);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadUp)
+								{
+									Key_Event(128, true);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadDown)
+								{
+									Key_Event(129, true);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadLeft)
+								{
+									Key_Event(130, true);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadRight)
+								{
+									Key_Event(131, true);
 								}
 								else
 								{
-									Key_Event(key, true);
+									if (joyButtonsAsKeys[i] >= 0)
+									{
+										Key_Event(joyButtonsAsKeys[i], true);
+									}
+									else
+									{
+										Key_Event(key, true);
+									}
 								}
 							}
-							else if ((GamepadButtons)mask == GamepadButtons::A)
+							else if ((buttons & mask) != mask && (previousGamepadButtons & mask) == mask)
 							{
-								Key_Event(13, true);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::B)
-							{
-								Key_Event(27, true);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadUp)
-							{
-								Key_Event(128, true);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadDown)
-							{
-								Key_Event(129, true);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadLeft)
-							{
-								Key_Event(130, true);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadRight)
-							{
-								Key_Event(131, true);
-							}
-							else
-							{
-								if (joyButtonsAsKeys[i] >= 0)
+								if (key_dest == key_game)
 								{
-									Key_Event(joyButtonsAsKeys[i], true);
+									if (joyButtonsAsKeys[i] >= 0)
+									{
+										Key_Event(joyButtonsAsKeys[i], false);
+									}
+									else
+									{
+										Key_Event(key, false);
+									}
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::A)
+								{
+									Key_Event(13, false);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::B)
+								{
+									Key_Event(27, false);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadUp)
+								{
+									Key_Event(128, false);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadDown)
+								{
+									Key_Event(129, false);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadLeft)
+								{
+									Key_Event(130, false);
+								}
+								else if ((GamepadButtons)mask == GamepadButtons::DPadRight)
+								{
+									Key_Event(131, false);
 								}
 								else
 								{
-									Key_Event(key, true);
+									if (joyButtonsAsKeys[i] >= 0)
+									{
+										Key_Event(joyButtonsAsKeys[i], false);
+									}
+									else
+									{
+										Key_Event(key, false);
+									}
 								}
 							}
+							key++;
+							mask <<= 1;
 						}
-						else if ((buttons & mask) != mask && (previousGamepadButtons & mask) == mask)
-						{
-							std::lock_guard lock(renderLoopMutex);
-							if (key_dest == key_game)
-							{
-								if (joyButtonsAsKeys[i] >= 0)
-								{
-									Key_Event(joyButtonsAsKeys[i], false);
-								}
-								else
-								{
-									Key_Event(key, false);
-								}
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::A)
-							{
-								Key_Event(13, false);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::B)
-							{
-								Key_Event(27, false);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadUp)
-							{
-								Key_Event(128, false);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadDown)
-							{
-								Key_Event(129, false);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadLeft)
-							{
-								Key_Event(130, false);
-							}
-							else if ((GamepadButtons)mask == GamepadButtons::DPadRight)
-							{
-								Key_Event(131, false);
-							}
-							else
-							{
-								if (joyButtonsAsKeys[i] >= 0)
-								{
-									Key_Event(joyButtonsAsKeys[i], false);
-								}
-								else
-								{
-									Key_Event(key, false);
-								}
-							}
-						}
-						key++;
-						mask <<= 1;
 					}
+					previousGamepadButtons = buttons;
+					previousGamepadButtonsWereRead = true;
 				}
-				previousGamepadButtons = buttons;
-				previousGamepadButtonsWereRead = true;
-			}
-			if (joystick.get() != nullptr)
-			{
-				auto buttons = new bool[joystick.get().ButtonCount()];
-				std::vector<GameControllerSwitchPosition> switches(joystick.get().SwitchCount());
-				std::vector<double> axes(joystick.get().AxisCount());
-				joystick.get().GetCurrentReading(array_view(buttons, buttons + joystick.get().ButtonCount()), switches, axes);
-				for (auto i = 0; i < JOY_MAX_AXES; i++)
+				if (joystick.get() != nullptr)
 				{
-					if (i < axes.size())
+					auto buttons = new bool[joystick.get().ButtonCount()];
+					std::vector<GameControllerSwitchPosition> switches(joystick.get().SwitchCount());
+					std::vector<double> axes(joystick.get().AxisCount());
+					joystick.get().GetCurrentReading(array_view(buttons, buttons + joystick.get().ButtonCount()), switches, axes);
+					for (auto i = 0; i < JOY_MAX_AXES; i++)
 					{
-						pdwRawValue[i] = (float)(2 * (axes[i] - 0.5)) * joyAxesInverted[i];
-					}
-					else
-					{
-						pdwRawValue[i] = 0;
-					}
-				}
-				if (previousJoyAxesAsButtonValuesWereRead)
-				{
-					for (auto i = 0; i < joyAxesAsButtons.size(); i++)
-					{
-						auto previous = previousJoyAxesAsButtonValues[i];
-						float current;
 						if (i < axes.size())
 						{
-							current = (float)axes[i];
+							pdwRawValue[i] = (float)(2 * (axes[i] - 0.5)) * joyAxesInverted[i];
 						}
 						else
 						{
-							current = 0;
-						}
-						if (previous < 0.15 && current >= 0.15)
-						{
-							if (joyAxesAsButtons[i].size() > 0)
-							{
-								Cbuf_AddText(joyAxesAsButtons[i].c_str());
-							}
-							else if (joyAxesAsKeys[i] > 0)
-							{
-								std::lock_guard lock(renderLoopMutex);
-								Key_Event(joyAxesAsKeys[i], true);
-							}
-						}
-						else if (previous >= 0.15 && current < 0.15)
-						{
-							if (joyAxesAsButtons[i].size() > 0)
-							{
-								Cbuf_AddText(joyAxesAsButtonsOnRelease[i].c_str());
-							}
-							else if (joyAxesAsKeys[i] > 0)
-							{
-								std::lock_guard lock(renderLoopMutex);
-								Key_Event(joyAxesAsKeys[i], false);
-							}
+							pdwRawValue[i] = 0;
 						}
 					}
-				}
-				for (auto i = 0; i < joyAxesAsButtons.size(); i++)
-				{
-					if (i < axes.size())
+					if (previousJoyAxesAsButtonValuesWereRead)
 					{
-						previousJoyAxesAsButtonValues[i] = (float)axes[i];
-					}
-					else
-					{
-						previousJoyAxesAsButtonValues[i] = 0;
-					}
-				}
-				previousJoyAxesAsButtonValuesWereRead = true;
-				if (previousJoystickButtonsLength == joystick.get().ButtonCount())
-				{
-					auto key = 203;
-					for (auto i = 0; i < 36; i++)
-					{
-						if (i >= joystick.get().ButtonCount())
+						for (auto i = 0; i < joyAxesAsButtons.size(); i++)
 						{
-							break;
-						}
-						if (buttons[i] && !previousJoystickButtons[i])
-						{
-							std::lock_guard lock(renderLoopMutex);
-							if (joyButtonsAsKeys[i] >= 0)
+							auto previous = previousJoyAxesAsButtonValues[i];
+							float current;
+							if (i < axes.size())
 							{
-								Key_Event(joyButtonsAsKeys[i], true);
+								current = (float)axes[i];
 							}
 							else
 							{
-								Key_Event(key, true);
+								current = 0;
+							}
+							if (previous < 0.15 && current >= 0.15)
+							{
+								if (joyAxesAsButtons[i].size() > 0)
+								{
+									Cbuf_AddText(joyAxesAsButtons[i].c_str());
+								}
+								else if (joyAxesAsKeys[i] > 0)
+								{
+									Key_Event(joyAxesAsKeys[i], true);
+								}
+							}
+							else if (previous >= 0.15 && current < 0.15)
+							{
+								if (joyAxesAsButtons[i].size() > 0)
+								{
+									Cbuf_AddText(joyAxesAsButtonsOnRelease[i].c_str());
+								}
+								else if (joyAxesAsKeys[i] > 0)
+								{
+									Key_Event(joyAxesAsKeys[i], false);
+								}
 							}
 						}
-						else if (!buttons[i] && previousJoystickButtons[i])
-						{
-							std::lock_guard lock(renderLoopMutex);
-							if (joyButtonsAsKeys[i] >= 0)
-							{
-								Key_Event(joyButtonsAsKeys[i], false);
-							}
-							else
-							{
-								Key_Event(key, false);
-							}
-						}
-						key++;
 					}
+					for (auto i = 0; i < joyAxesAsButtons.size(); i++)
+					{
+						if (i < axes.size())
+						{
+							previousJoyAxesAsButtonValues[i] = (float)axes[i];
+						}
+						else
+						{
+							previousJoyAxesAsButtonValues[i] = 0;
+						}
+					}
+					previousJoyAxesAsButtonValuesWereRead = true;
+					if (previousJoystickButtonsLength == joystick.get().ButtonCount())
+					{
+						auto key = 203;
+						for (auto i = 0; i < 36; i++)
+						{
+							if (i >= joystick.get().ButtonCount())
+							{
+								break;
+							}
+							if (buttons[i] && !previousJoystickButtons[i])
+							{
+								if (joyButtonsAsKeys[i] >= 0)
+								{
+									Key_Event(joyButtonsAsKeys[i], true);
+								}
+								else
+								{
+									Key_Event(key, true);
+								}
+							}
+							else if (!buttons[i] && previousJoystickButtons[i])
+							{
+								if (joyButtonsAsKeys[i] >= 0)
+								{
+									Key_Event(joyButtonsAsKeys[i], false);
+								}
+								else
+								{
+									Key_Event(key, false);
+								}
+							}
+							key++;
+						}
+					}
+					delete[] previousJoystickButtons;
+					previousJoystickButtons = buttons;
+					previousJoystickButtonsLength = joystick.get().ButtonCount();
 				}
-				delete[] previousJoystickButtons;
-				previousJoystickButtons = buttons;
-				previousJoystickButtonsLength = joystick.get().ButtonCount();
+			}
+			catch (...)
+			{
+				// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
+			}
+			if (DisplaySysErrorIfNeeded() || sys_errorcalled || sys_quitcalled)
+			{
+				return false;
 			}
 		}
 		memset(con_buffer.data(), 255, con_buffer.size());
@@ -2041,6 +2062,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						{
 							toDisplay.push_back((wchar_t)c);
 						}
+						toDisplay += L"\n\nSlip & Frag will now close.";
 						ContentDialog dialog;
 						dialog.Title(box_value(L"Sys_Error"));
 						dialog.Content(box_value(toDisplay));
