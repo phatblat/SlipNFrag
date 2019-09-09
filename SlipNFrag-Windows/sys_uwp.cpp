@@ -13,6 +13,7 @@ char** sys_argv;
 float frame_lapse = 1.0f / 60;
 qboolean isDedicated;
 std::string sys_errormessage;
+qboolean sys_errorcalled;
 qboolean sys_quitcalled;
 int sys_nogamedata;
 std::vector<file_t> sys_files;
@@ -108,8 +109,10 @@ int Sys_FileOpenAppend(const char* path)
 
 void Sys_FileClose(int handle)
 {
-	sys_files[handle].file = nullptr;
+	sys_fileoperationindex = handle;
+	sys_files[handle].stream.Close();
 	sys_files[handle].stream = nullptr;
+	sys_files[handle].file = nullptr;
 }
 
 void Sys_FileSeek(int handle, int position)
@@ -200,6 +203,7 @@ void Sys_Error(const char* error, ...)
 	}
 	Sys_Printf("Sys_Error: %s\n", string.data());
 	sys_errormessage = string.data();
+	sys_errorcalled = true;
 	throw std::runtime_error("Sys_Error called.");
 }
 

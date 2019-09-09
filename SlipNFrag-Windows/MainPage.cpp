@@ -28,6 +28,7 @@ using namespace Windows::Media;
 using namespace Windows::Media::Audio;
 using namespace Windows::Media::MediaProperties;
 using namespace Windows::Media::Render;
+using namespace Windows::Security::Cryptography;
 using namespace Windows::Storage;
 using namespace Windows::Storage::AccessCache;
 using namespace Windows::Storage::FileProperties;
@@ -275,10 +276,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		{
 			sys_errormessage = "FutureAccessList does not contain an entry for basedir_text";
 			sys_nogamedata = 1;
-			swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
-				{
-					DisplaySysErrorIfNeeded();
-				});
+			DisplaySysErrorIfNeeded();
 			return;
 		}
 		auto task = StorageApplicationPermissions::FutureAccessList().GetFolderAsync(L"basedir_text");
@@ -310,7 +308,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						arguments.emplace_back("-hipnotic");
 					}
 				}
-				else if (values.HasKey(L"rogue_radio"))
+				if (values.HasKey(L"rogue_radio"))
 				{
 					auto value = values.Lookup(L"rogue_radio");
 					if (unbox_value<bool>(value))
@@ -318,7 +316,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						arguments.emplace_back("-rogue");
 					}
 				}
-				else if (values.HasKey(L"game_radio"))
+				if (values.HasKey(L"game_radio"))
 				{
 					if (values.HasKey(L"game_text"))
 					{
@@ -618,11 +616,12 @@ namespace winrt::SlipNFrag_Windows::implementation
 							});
 						if (mouseinitialized)
 						{
-							Window::Current().CoreWindow().PointerPressed([](IInspectable const&, PointerEventArgs const& e)
+							Window::Current().CoreWindow().PointerPressed([this](IInspectable const&, PointerEventArgs const& e)
 								{
 									auto properties = e.CurrentPoint().Properties();
 									try
 									{
+										std::lock_guard lock(renderLoopMutex);
 										if (properties.IsLeftButtonPressed())
 										{
 											Key_Event(K_MOUSE1, true);
@@ -641,11 +640,12 @@ namespace winrt::SlipNFrag_Windows::implementation
 										// Do nothing - error messages (and Sys_Quit) will already be handled before getting here
 									}
 								});
-							Window::Current().CoreWindow().PointerReleased([](IInspectable const&, PointerEventArgs const& e)
+							Window::Current().CoreWindow().PointerReleased([this](IInspectable const&, PointerEventArgs const& e)
 								{
 									auto properties = e.CurrentPoint().Properties();
 									try
 									{
+										std::lock_guard lock(renderLoopMutex);
 										if (!properties.IsLeftButtonPressed())
 										{
 											Key_Event(K_MOUSE1, false);
@@ -1305,6 +1305,10 @@ namespace winrt::SlipNFrag_Windows::implementation
 			Application::Current().Exit();
 			return;
 		}
+		if (sys_errorcalled)
+		{
+			return;
+		}
 		renderLoopWorker = ThreadPool::RunAsync([=](IAsyncAction const& action)
 			{
 				RenderLoop(action);
@@ -1358,7 +1362,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 			}
 			key_dest_was_game = (key_dest == key_game);
 		}
-		if (joy_initialized && joy_avail)
+		if (joy_initialized && joy_avail && joyAxesInverted.size() > 0)
 		{
 			if (gamepad.get() != nullptr)
 			{
@@ -1383,6 +1387,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 							}
 							else if (joyAxesAsKeys[i] > 0)
 							{
+								std::lock_guard lock(renderLoopMutex);
 								Key_Event(joyAxesAsKeys[i], true);
 							}
 						}
@@ -1394,6 +1399,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 							}
 							else if (joyAxesAsKeys[i] > 0)
 							{
+								std::lock_guard lock(renderLoopMutex);
 								Key_Event(joyAxesAsKeys[i], false);
 							}
 						}
@@ -1413,6 +1419,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 					{
 						if ((buttons & mask) == mask && (previousGamepadButtons & mask) != mask)
 						{
+							std::lock_guard lock(renderLoopMutex);
 							if (key_dest == key_game)
 							{
 								if (joyButtonsAsKeys[i] >= 0)
@@ -1462,6 +1469,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 						else if ((buttons & mask) != mask && (previousGamepadButtons & mask) == mask)
 						{
+							std::lock_guard lock(renderLoopMutex);
 							if (key_dest == key_game)
 							{
 								if (joyButtonsAsKeys[i] >= 0)
@@ -1555,6 +1563,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 							}
 							else if (joyAxesAsKeys[i] > 0)
 							{
+								std::lock_guard lock(renderLoopMutex);
 								Key_Event(joyAxesAsKeys[i], true);
 							}
 						}
@@ -1566,6 +1575,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 							}
 							else if (joyAxesAsKeys[i] > 0)
 							{
+								std::lock_guard lock(renderLoopMutex);
 								Key_Event(joyAxesAsKeys[i], false);
 							}
 						}
@@ -1594,6 +1604,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 						if (buttons[i] && !previousJoystickButtons[i])
 						{
+							std::lock_guard lock(renderLoopMutex);
 							if (joyButtonsAsKeys[i] >= 0)
 							{
 								Key_Event(joyButtonsAsKeys[i], true);
@@ -1605,6 +1616,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 						}
 						else if (!buttons[i] && previousJoystickButtons[i])
 						{
+							std::lock_guard lock(renderLoopMutex);
 							if (joyButtonsAsKeys[i] >= 0)
 							{
 								Key_Event(joyButtonsAsKeys[i], false);
@@ -1624,7 +1636,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		}
 		memset(con_buffer.data(), 255, con_buffer.size());
 		Sys_Frame(elapsed);
-		if (DisplaySysErrorIfNeeded() || sys_quitcalled)
+		if (DisplaySysErrorIfNeeded() || sys_errorcalled || sys_quitcalled)
 		{
 			return false;
 		}
@@ -1986,52 +1998,58 @@ namespace winrt::SlipNFrag_Windows::implementation
 		{
 			if (sys_nogamedata)
 			{
-				ContentDialog dialog;
-				dialog.Title(box_value(L"Game data not found"));
-				dialog.Content(box_value(L"Go to Preferences and set Game directory (-basedir) to your copy of the game files."));
-				dialog.CloseButtonText(L"Go to Preferences");
-				dialog.PrimaryButtonText(L"Where to buy the game");
-				dialog.SecondaryButtonText(L"Where to get shareware episode");
-				auto task = dialog.ShowAsync();
-				task.Completed([this](IAsyncOperation<ContentDialogResult> const& operation, AsyncStatus const&)
+				swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
 					{
-						auto result = operation.GetResults();
-						if (result == ContentDialogResult::Primary)
-						{
-							Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=buy+quake+1+game"));
-							Application::Current().Exit();
-						}
-						else if (result == ContentDialogResult::Secondary)
-						{
-							Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=download+quake+1+shareware+episode"));
-							Application::Current().Exit();
-						}
-						else
-						{
-							SettingsContentDialog settings;
-							auto task = settings.ShowAsync(ContentDialogPlacement::InPlace);
-							task.Completed([](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const&)
+						ContentDialog dialog;
+						dialog.Title(box_value(L"Game data not found"));
+						dialog.Content(box_value(L"Go to Preferences and set Game directory (-basedir) to your copy of the game files."));
+						dialog.CloseButtonText(L"Go to Preferences");
+						dialog.PrimaryButtonText(L"Where to buy the game");
+						dialog.SecondaryButtonText(L"Where to get shareware episode");
+						auto task = dialog.ShowAsync();
+						task.Completed([this](IAsyncOperation<ContentDialogResult> const& operation, AsyncStatus const&)
+							{
+								auto result = operation.GetResults();
+								if (result == ContentDialogResult::Primary)
 								{
+									Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=buy+quake+1+game"));
 									Application::Current().Exit();
-								});
-						}
+								}
+								else if (result == ContentDialogResult::Secondary)
+								{
+									Launcher::LaunchUriAsync(Uri(L"https://www.google.com/search?q=download+quake+1+shareware+episode"));
+									Application::Current().Exit();
+								}
+								else
+								{
+									SettingsContentDialog settings;
+									auto task = settings.ShowAsync(ContentDialogPlacement::InPlace);
+									task.Completed([](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const&)
+										{
+											Application::Current().Exit();
+										});
+								}
+							});
 					});
 			}
 			else
 			{
-				std::wstring toDisplay;
-				for (auto c : sys_errormessage)
-				{
-					toDisplay.push_back((wchar_t)c);
-				}
-				ContentDialog dialog;
-				dialog.Title(box_value(L"Sys_Error"));
-				dialog.Content(box_value(toDisplay));
-				dialog.CloseButtonText(L"Close");
-				auto task = dialog.ShowAsync();
-				task.Completed([this](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const&)
+				swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [this]()
 					{
-						Application::Current().Exit();
+						std::wstring toDisplay;
+						for (auto c : sys_errormessage)
+						{
+							toDisplay.push_back((wchar_t)c);
+						}
+						ContentDialog dialog;
+						dialog.Title(box_value(L"Sys_Error"));
+						dialog.Content(box_value(toDisplay));
+						dialog.CloseButtonText(L"Close");
+						auto task = dialog.ShowAsync();
+						task.Completed([this](IAsyncOperation<ContentDialogResult> const&, AsyncStatus const&)
+							{
+								Application::Current().Exit();
+							});
 					});
 			}
 			return true;
@@ -2219,7 +2237,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 					}
 					remaining.push_back(c);
 				}
-				auto task = folder.GetFileAsync(remaining);
+				auto task = folder.CreateFileAsync(remaining, CreationCollisionOption::ReplaceExisting);
 				task.Completed([this](IAsyncOperation<StorageFile> const& operation, AsyncStatus const status)
 					{
 						if (status == AsyncStatus::Error)
@@ -2373,8 +2391,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 
 	void MainPage::WriteToFile()
 	{
-		Buffer buffer(sys_fileoperationsize);
-		memcpy(buffer.data(), sys_fileoperationbuffer, sys_fileoperationsize);
+		auto buffer = CryptographicBuffer::CreateFromByteArray({ sys_fileoperationbuffer, sys_fileoperationbuffer + sys_fileoperationsize });
 		fileOperationRunning = true;
 		auto task = sys_files[sys_fileoperationindex].stream.WriteAsync(buffer);
 		task.Completed([this](IAsyncOperationWithProgress<uint32_t, uint32_t> const& operation, AsyncStatus const status)
@@ -2386,8 +2403,19 @@ namespace winrt::SlipNFrag_Windows::implementation
 					fileOperationRunning = false;
 					return;
 				}
-				sys_fileoperation = fo_idle;
-				fileOperationRunning = false;
+				auto task = sys_files[sys_fileoperationindex].stream.FlushAsync();
+				task.Completed([this](IAsyncOperation<bool> const& operation, AsyncStatus const status)
+					{
+						if (status == AsyncStatus::Error)
+						{
+							sys_fileoperationerror = std::to_string(operation.ErrorCode());
+							sys_fileoperation = fo_error;
+							fileOperationRunning = false;
+							return;
+						}
+						sys_fileoperation = fo_idle;
+						fileOperationRunning = false;
+					});
 			});
 	}
 
@@ -2682,6 +2710,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 		capslock_down = ((Window::Current().CoreWindow().GetKeyState(VirtualKey::CapitalLock) & CoreVirtualKeyStates::Locked) == CoreVirtualKeyStates::Locked);
 		try
 		{
+			std::lock_guard lock(renderLoopMutex);
 			Key_Event(mapped, pressed);
 		}
 		catch (...)

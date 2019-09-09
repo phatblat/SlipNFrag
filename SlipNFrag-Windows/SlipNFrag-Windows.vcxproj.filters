@@ -370,6 +370,7 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />
+    <None Include="Package.StoreAssociation.xml" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="MainPage.xaml" />

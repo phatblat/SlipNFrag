@@ -69,14 +69,17 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <PackageCertificateKeyFile>SlipNFrag_Windows_TemporaryKey.pfx</PackageCertificateKeyFile>
-    <PackageCertificateThumbprint>1132EA939A7107B303D4D40ED6CE28778FC96409</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>F68159FF070A310D5A5158FE39DA9E354B6F5F09</PackageCertificateThumbprint>
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <AppxPackageDir>C:\Projects\SlipNFrag\SlipNFrag-Windows\AppPackages\</AppxPackageDir>
-    <AppxBundle>Never</AppxBundle>
-    <AppInstallerUpdateFrequency>1</AppInstallerUpdateFrequency>
+    <AppxBundle>Auto</AppxBundle>
+    <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
     <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
+    <GenerateTestArtifacts>True</GenerateTestArtifacts>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -822,6 +825,9 @@
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
     </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Package.StoreAssociation.xml" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

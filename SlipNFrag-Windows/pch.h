@@ -28,6 +28,7 @@
 #include <winrt/Windows.Media.Audio.h>
 #include <winrt/Windows.Media.MediaProperties.h>
 #include <winrt/Windows.Media.Render.h>
+#include <winrt/Windows.Security.Cryptography.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.Storage.AccessCache.h>
 #include <winrt/Windows.Storage.FileProperties.h>

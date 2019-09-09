@@ -579,7 +579,7 @@ void Host_Loadgame_f (void)
         to_read.push_back(onechar);
         len = Sys_FileRead (f, &onechar, 1);
     }
-    len = std::max((int)to_read.length(), 32767);
+    len = std::min((int)to_read.length(), 32767);
     Q_memcpy(str, to_read.c_str(), len);
     str[len] = 0;
 	for (i=0 ; i<NUM_SPAWN_PARMS ; i++)

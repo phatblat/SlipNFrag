@@ -33,6 +33,7 @@ extern byte* sys_fileoperationbuffer;
 extern int sys_fileoperationsize;
 extern std::string sys_fileoperationerror;
 extern int sys_fileoperationtime;
+extern qboolean sys_errorcalled;
 extern qboolean sys_quitcalled;
 
 void Sys_Init(int argc, char** argv);
