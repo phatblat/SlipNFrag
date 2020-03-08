@@ -37,8 +37,6 @@ static float	basemip[NUM_MIPS-1] = {1.0, 0.5*0.8, 0.25*0.8};
 
 extern int			d_aflatcolor;
 
-void (*d_drawspans) (espan_t *pspan);
-
 
 /*
 ===============
@@ -142,15 +140,6 @@ void D_SetupFrame (void)
 
 	for (i=0 ; i<(NUM_MIPS-1) ; i++)
 		d_scalemip[i] = basemip[i] * d_mipscale.value;
-
-#if	id386
-				if (d_subdiv16.value)
-					d_drawspans = D_DrawSpans16;
-				else
-					d_drawspans = D_DrawSpans8;
-#else
-				d_drawspans = D_DrawSpans8;
-#endif
 
 	d_aflatcolor = 0;
 }
