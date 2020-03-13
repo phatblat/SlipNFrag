@@ -688,12 +688,12 @@ void R_RocketTrail (vec3_t start, vec3_t end, int type)
 
 /*
 ===============
-R_DrawParticles
+R_MoveParticles
 ===============
 */
 extern	cvar_t	sv_gravity;
 
-void R_DrawParticles (void)
+void R_MoveParticles (void)
 {
 	particle_t		*p, *kill;
 	float			grav;
@@ -708,24 +708,7 @@ void R_DrawParticles (void)
         R_IncreaseParticles();
         r_increaseparticles = false;
     }
-#ifdef GLQUAKE
-	vec3_t			up, right;
-	float			scale;
 
-    GL_Bind(particletexture);
-	glEnable (GL_BLEND);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-	glBegin (GL_TRIANGLES);
-
-	VectorScale (vup, 1.5, up);
-	VectorScale (vright, 1.5, right);
-#else
-	D_StartParticles ();
-
-	VectorScale (vright, xscaleshrink, r_pright);
-	VectorScale (vup, yscaleshrink, r_pup);
-	VectorCopy (vpn, r_ppn);
-#endif
 	frametime = cl.time - cl.oldtime;
 	time3 = frametime * 15;
 	time2 = frametime * 10; // 15;
@@ -761,24 +744,6 @@ void R_DrawParticles (void)
 			break;
 		}
 
-#ifdef GLQUAKE
-		// hack a scale up to keep particles from disapearing
-		scale = (p->org[0] - r_origin[0])*vpn[0] + (p->org[1] - r_origin[1])*vpn[1]
-			+ (p->org[2] - r_origin[2])*vpn[2];
-		if (scale < 20)
-			scale = 1;
-		else
-			scale = 1 + scale * 0.004;
-		glColor3ubv ((byte *)&d_8to24table[(int)p->color]);
-		glTexCoord2f (0,0);
-		glVertex3fv (p->org);
-		glTexCoord2f (1,0);
-		glVertex3f (p->org[0] + up[0]*scale, p->org[1] + up[1]*scale, p->org[2] + up[2]*scale);
-		glTexCoord2f (0,1);
-		glVertex3f (p->org[0] + right[0]*scale, p->org[1] + right[1]*scale, p->org[2] + right[2]*scale);
-#else
-		D_DrawParticle (p);
-#endif
 		p->org[0] += p->vel[0]*frametime;
 		p->org[1] += p->vel[1]*frametime;
 		p->org[2] += p->vel[2]*frametime;
@@ -836,13 +801,28 @@ void R_DrawParticles (void)
 			break;
 		}
 	}
+}
 
-#ifdef GLQUAKE
-	glEnd ();
-	glDisable (GL_BLEND);
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-#else
+/*
+===============
+R_DrawParticles
+===============
+*/
+void R_DrawParticles (void)
+{
+	particle_t		*p;
+    
+	D_StartParticles ();
+
+	VectorScale (vright, xscaleshrink, r_pright);
+	VectorScale (vup, yscaleshrink, r_pup);
+	VectorCopy (vpn, r_ppn);
+
+	for (p=active_particles ; p ; p=p->next)
+	{
+		D_DrawParticle (p);
+	}
+
 	D_EndParticles ();
-#endif
 }
 

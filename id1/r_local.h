@@ -244,6 +244,7 @@ qboolean R_AliasCheckBBox (void);
 //=========================================================
 // particle stuff
 
+void R_MoveParticles (void);
 void R_DrawParticles (void);
 void R_InitParticles (void);
 void R_ClearParticles (void);
