@@ -74,6 +74,7 @@ void VID_Init(unsigned char *palette)
     vid.conrowbytes = con_width;
     zbuffer.resize(vid_width * vid_height);
     d_pzbuffer = zbuffer.data();
+    srand(time(nullptr));
     int surfcachesize = D_SurfaceCacheForRes(vid_width, vid_height);
     surfcache.resize(surfcachesize);
     D_InitCaches(surfcache.data(), (int)surfcache.size());
