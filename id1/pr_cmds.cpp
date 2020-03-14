@@ -474,7 +474,7 @@ void PF_random (void)
 {
 	float		num;
 		
-	num = (rand ()&0x7fff) / ((float)0x7fff);
+	num = (Sys_Random ()&0x7fff) / ((float)0x7fff);
 	
 	G_FLOAT(OFS_RETURN) = num;
 }

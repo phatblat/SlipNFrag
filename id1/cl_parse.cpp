@@ -436,7 +436,7 @@ if (bits&(1<<i))
 		if (model)
 		{
 			if (model->synctype == ST_RAND)
-				ent->syncbase = (float)(rand()&0x7fff) / 0x7fff;
+				ent->syncbase = (float)(Sys_Random()&0x7fff) / 0x7fff;
 			else
 				ent->syncbase = 0.0;
 		}
@@ -586,7 +586,7 @@ void CL_ParseExpandedUpdate (int bits)
         if (model)
         {
             if (model->synctype == ST_RAND)
-                ent->syncbase = (float)(rand()&0x7fff) / 0x7fff;
+                ent->syncbase = (float)(Sys_Random()&0x7fff) / 0x7fff;
             else
                 ent->syncbase = 0.0;
         }

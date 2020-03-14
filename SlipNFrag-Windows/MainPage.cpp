@@ -777,16 +777,16 @@ namespace winrt::SlipNFrag_Windows::implementation
 			{
 				continue;
 			}
-			if (SUCCEEDED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_10_0, __uuidof(ID3D12Device), nullptr)))
+			if (SUCCEEDED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)))
 			{
 				break;
 			}
 		}
-		if (FAILED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_10_0, IID_PPV_ARGS(&d3dDevice))))
+		if (FAILED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3dDevice))))
 		{
 			com_ptr<IDXGIAdapter> warpAdapter;
 			check_hresult(dxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&warpAdapter)));
-			check_hresult(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_10_0, IID_PPV_ARGS(&d3dDevice)));
+			check_hresult(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&d3dDevice)));
 		}
 		D3D12_COMMAND_QUEUE_DESC queueDesc { D3D12_COMMAND_LIST_TYPE_DIRECT, 0, D3D12_COMMAND_QUEUE_FLAG_NONE };
 		check_hresult(d3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&commandQueue)));

@@ -672,7 +672,7 @@ void _Host_Frame (float time)
 	{
     
 // keep the random time dependent
-	rand ();
+	Sys_Random ();
 	
 // decide the simulation time
 	if (!Host_FilterTime (time))

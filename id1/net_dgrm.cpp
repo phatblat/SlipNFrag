@@ -341,7 +341,7 @@ int	Datagram_GetMessage (qsocket_t *sock)
 	{	
 		length = sfunc.Read (sock->socket, packetBuffer, &readaddr);
 
-//	if ((rand() & 255) > 220)
+//	if ((Sys_Random() & 255) > 220)
 //		continue;
 
 		if (length == 0)

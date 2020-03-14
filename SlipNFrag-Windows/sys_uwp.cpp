@@ -3,6 +3,7 @@
 #include "sys_uwp.h"
 #include "errno.h"
 #include <sys/stat.h>
+#include <random>
 
 using namespace winrt;
 using namespace Windows::Storage;
@@ -261,6 +262,13 @@ void Sys_HighFPPrecision()
 
 void Sys_LowFPPrecision()
 {
+}
+
+int Sys_Random()
+{
+	static std::default_random_engine engine{ };
+	static std::uniform_int_distribution distribution(0, 32767);
+	return distribution(engine);
 }
 
 void Sys_Init(int argc, char** argv)
