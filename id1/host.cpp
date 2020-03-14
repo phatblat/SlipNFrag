@@ -733,6 +733,9 @@ void _Host_Frame (float time)
 	if (host_speeds.value)
 		time2 = Sys_FloatTime ();
 		
+// update particles
+    R_MoveParticles ();
+
 // update audio
 	if (cls.signon == SIGNONS)
 	{

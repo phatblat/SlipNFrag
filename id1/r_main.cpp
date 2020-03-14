@@ -1001,7 +1001,6 @@ SetVisibilityByPassages ();
 	}
 
 	R_DrawParticles ();
-	R_MoveParticles ();
 
 	if (r_dspeeds.value)
 		dp_time2 = Sys_FloatTime ();
