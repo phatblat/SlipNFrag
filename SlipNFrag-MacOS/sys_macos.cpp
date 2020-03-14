@@ -189,6 +189,11 @@ void Sys_LowFPPrecision()
 {
 }
 
+int Sys_Random()
+{
+    return rand();
+}
+
 void Sys_Init(int argc, char** argv)
 {
     static quakeparms_t parms;
