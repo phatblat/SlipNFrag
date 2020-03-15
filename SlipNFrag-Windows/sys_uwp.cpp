@@ -266,7 +266,7 @@ void Sys_LowFPPrecision()
 
 int Sys_Random()
 {
-	static std::default_random_engine engine{ };
+	static std::default_random_engine engine { };
 	static std::uniform_int_distribution distribution(0, 32767);
 	return distribution(engine);
 }
@@ -284,5 +284,10 @@ void Sys_Init(int argc, char** argv)
 
 void Sys_Frame(float frame_lapse)
 {
-	Host_Frame(frame_lapse);
+	auto updated = Host_FrameUpdate(frame_lapse);
+	if (updated)
+	{
+		Host_FrameRender();
+	}
+	Host_FrameFinish(updated);
 }
