@@ -656,42 +656,54 @@ void Host_ServerFrame (void)
 
 /*
 ==================
-Host_Frame
+Host_Frame****
 
 Runs all active servers
 ==================
 */
-void _Host_Frame (float time)
-{
-	static double		time1 = 0;
-	static double		time2 = 0;
-	static double		time3 = 0;
-	int			pass1, pass2, pass3;
 
+void _Host_FrameReset()
+{
+    r_ledgesurfstackindex = -1;
+    r_increaseledges = false;
+    r_increaselsurfs = false;
+    sv_bump_protocol_version = false;
+    sv_request_protocol_version_upgrade = false;
+    sv_static_entity_count = 0;
+    increasebverts = false;
+    increasebedges = false;
+    basespan_stack_index = -1;
+    increase_basespan = 0;
+    warp_stack_index = -1;
+}
+
+double _host_frame_time1 = 0;
+
+qboolean _Host_FrameUpdate (float time)
+{
 	try
 	{
-    
 // keep the random time dependent
-	Sys_Random ();
+        Sys_Random ();
 	
 // decide the simulation time
-	if (!Host_FilterTime (time))
-		return;			// don't run too fast, or packets will flood out
+        if (!Host_FilterTime (time))
+            return false;			// don't run too fast, or packets will flood out
 		
 // get new key events
-	Sys_SendKeyEvents ();
+        Sys_SendKeyEvents ();
 
 // allow mice or other external controllers to add commands
-	IN_Commands ();
+        IN_Commands ();
 
 // process console commands
-	Cbuf_Execute ();
+        Cbuf_Execute ();
 
-	NET_Poll();
+        NET_Poll();
 
 // if running the server locally, make intentions now
-	if (sv.active)
-		CL_SendCmd ();
+        if (sv.active)
+            CL_SendCmd ();
 	
 //-------------------
 //
@@ -700,10 +712,10 @@ void _Host_Frame (float time)
 //-------------------
 
 // check for commands typed to the host
-	Host_GetConsoleCommands ();
+        Host_GetConsoleCommands ();
 	
-	if (sv.active)
-		Host_ServerFrame ();
+        if (sv.active)
+            Host_ServerFrame ();
 
 //-------------------
 //
@@ -713,103 +725,126 @@ void _Host_Frame (float time)
 
 // if running the server remotely, send intentions now after
 // the incoming messages have been read
-	if (!sv.active)
-		CL_SendCmd ();
+        if (!sv.active)
+            CL_SendCmd ();
 
-	host_time += host_frametime;
+        host_time += host_frametime;
 
 // fetch results from server
-	if (cls.state == ca_connected)
-	{
-		CL_ReadFromServer ();
-	}
+        if (cls.state == ca_connected)
+        {
+            CL_ReadFromServer ();
+        }
 
 // update video
-	if (host_speeds.value)
-		time1 = Sys_FloatTime ();
-		
-	SCR_UpdateScreen ();
+        if (host_speeds.value)
+            _host_frame_time1 = Sys_FloatTime ();
+        
+        return true;
+    }
+    catch (...)
+    {
+        _Host_FrameReset ();
+        return false;
+    }
+}
 
-	if (host_speeds.value)
-		time2 = Sys_FloatTime ();
+void _Host_FrameRender (void)
+{
+	SCR_UpdateScreen ();
+}
+
+void _Host_FrameFinish (void)
+{
+    static double        time2 = 0;
+    static double        time3 = 0;
+    int            pass1, pass2, pass3;
+    
+    try
+    {
+        if (host_speeds.value)
+            time2 = Sys_FloatTime ();
 		
 // update particles
-    R_MoveParticles ();
+        R_MoveParticles ();
 
 // update audio
-	if (cls.signon == SIGNONS)
-	{
-		S_Update (r_origin, vpn, vright, vup);
-		CL_DecayLights ();
-	}
-	else
-		S_Update (vec3_origin, vec3_origin, vec3_origin, vec3_origin);
+        if (cls.signon == SIGNONS)
+        {
+            S_Update (r_origin, vpn, vright, vup);
+            CL_DecayLights ();
+        }
+        else
+            S_Update (vec3_origin, vec3_origin, vec3_origin, vec3_origin);
 	
-	CDAudio_Update();
+        CDAudio_Update();
 
-	if (host_speeds.value)
-	{
-		pass1 = (time1 - time3)*1000;
-		time3 = Sys_FloatTime ();
-		pass2 = (time2 - time1)*1000;
-		pass3 = (time3 - time2)*1000;
-		Con_Printf ("%3i tot %3i server %3i gfx %3i snd\n",
-					pass1+pass2+pass3, pass1, pass2, pass3);
-	}
+        if (host_speeds.value)
+        {
+            pass1 = (_host_frame_time1 - time3)*1000;
+            time3 = Sys_FloatTime ();
+            pass2 = (time2 - _host_frame_time1)*1000;
+            pass3 = (time3 - time2)*1000;
+            Con_Printf ("%3i tot %3i server %3i gfx %3i snd\n",
+                        pass1+pass2+pass3, pass1, pass2, pass3);
+        }
 	
-	host_framecount++;
-
+        host_framecount++;
 	}
 	catch (...)
 	{
-		r_ledgesurfstackindex = -1;
-		r_increaseledges = false;
-		r_increaselsurfs = false;
-		sv_bump_protocol_version = false;
-		sv_request_protocol_version_upgrade = false;
-		sv_static_entity_count = 0;
-		increasebverts = false;
-		increasebedges = false;
-		basespan_stack_index = -1;
-		increase_basespan = 0;
-		warp_stack_index = -1;
+        _Host_FrameReset();
 	}
 }
 
-void Host_Frame (float time)
+double host_frame_time1;
+
+bool Host_FrameUpdate (float time)
 {
-	double	time1, time2;
+    if (serverprofile.value)
+    {
+        host_frame_time1 = Sys_FloatTime ();
+    }
+    return _Host_FrameUpdate (time);
+}
+
+void Host_FrameRender (void)
+{
+    _Host_FrameRender ();
+}
+
+void Host_FrameFinish (qboolean updated)
+{
+	double	time2;
 	static double	timetotal;
 	static int		timecount;
 	int		i, c, m;
 
-	if (!serverprofile.value)
+    if (updated)
+        _Host_FrameFinish ();
+    
+	if (serverprofile.value)
 	{
-		_Host_Frame (time);
-		return;
-	}
+        time2 = Sys_FloatTime ();
 	
-	time1 = Sys_FloatTime ();
-	_Host_Frame (time);
-	time2 = Sys_FloatTime ();	
-	
-	timetotal += time2 - time1;
-	timecount++;
-	
-	if (timecount < 1000)
-		return;
+        timetotal += time2 - host_frame_time1;
+        timecount++;
+        
+        if (timecount < 1000)
+            return;
 
-	m = timetotal*1000/timecount;
-	timecount = 0;
-	timetotal = 0;
-	c = 0;
-	for (i=0 ; i<svs.maxclients ; i++)
-	{
-		if (svs.clients[i].active)
-			c++;
-	}
+        m = timetotal*1000/timecount;
+        timecount = 0;
+        timetotal = 0;
+        c = 0;
+        for (i=0 ; i<svs.maxclients ; i++)
+        {
+            if (svs.clients[i].active)
+                c++;
+        }
 
-	Con_Printf ("serverprofile: %2i clients %2i msec\n",  c,  m);
+        Con_Printf ("serverprofile: %2i clients %2i msec\n",  c,  m);
+    }
 }
 
 //============================================================================

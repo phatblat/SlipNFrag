@@ -246,7 +246,12 @@ int main (int argc, char **argv)
 	Host_Init (&parms);
 	while (1)
 	{
-		Host_Frame (0.1);
+        auto updated = Host_FrameUpdate (0.1);
+        if (updated)
+        {
+            Host_FrameRender ();
+        }
+        Host_FrameFinish (updated);
     }
     return EXIT_SUCCESS;
 }

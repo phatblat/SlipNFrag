@@ -207,5 +207,10 @@ void Sys_Init(int argc, char** argv)
 
 void Sys_Frame(float frame_lapse)
 {
-    Host_Frame(frame_lapse);
+    auto updated = Host_FrameUpdate(frame_lapse);
+    if (updated)
+    {
+        Host_FrameRender();
+    }
+    Host_FrameFinish(updated);
 }
