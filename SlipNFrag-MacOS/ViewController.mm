@@ -77,12 +77,12 @@
 -(void)viewWillAppear
 {
     [super viewWillAppear];
-    trackingArea = [[NSTrackingArea alloc] initWithRect:mtkView.frame options:NSTrackingCursorUpdate | NSTrackingActiveAlways owner:mtkView userInfo:nil];
+    trackingArea = [[NSTrackingArea alloc] initWithRect:mtkView.frame options:NSTrackingCursorUpdate | NSTrackingMouseMoved | NSTrackingActiveAlways owner:self userInfo:nil];
     [mtkView addTrackingArea:trackingArea];
     [NSNotificationCenter.defaultCenter addObserverForName:NSViewFrameDidChangeNotification object:mtkView queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification * _Nonnull note)
     {
         [self->mtkView removeTrackingArea:self->trackingArea];
-        self->trackingArea = [[NSTrackingArea alloc] initWithRect:self->mtkView.frame options:NSTrackingCursorUpdate | NSTrackingActiveAlways owner:self->mtkView userInfo:nil];
+        self->trackingArea = [[NSTrackingArea alloc] initWithRect:self->mtkView.frame options:NSTrackingCursorUpdate | NSTrackingMouseMoved | NSTrackingActiveAlways owner:self userInfo:nil];
         [self->mtkView addTrackingArea:self->trackingArea];
     }];
 }
@@ -96,6 +96,65 @@
 -(void)cursorUpdate:(NSEvent *)event
 {
     [blankCursor set];
+}
+
+-(void)mouseMoved:(NSEvent *)event
+{
+    BOOL handled = NO;
+    if (mouseinitialized)
+    {
+        CGPoint point = [self->mtkView convertPoint:event.locationInWindow fromView:nil];
+        if ([self->mtkView mouse:point inRect:self->mtkView.bounds])
+        {
+            mx += event.deltaX;
+            my += event.deltaY;
+            handled = YES;
+        }
+    }
+    if (!handled)
+    {
+        [super mouseMoved:event];
+    }
+}
+
+-(void)mouseDown:(NSEvent *)event
+{
+    if (event.type == NSEventTypeLeftMouseDown)
+    {
+        Key_Event(200, YES);
+    }
+    else if (event.type == NSEventTypeRightMouseDown)
+    {
+        Key_Event(202, YES);
+    }
+    else if (event.type == NSEventTypeOtherMouseDown)
+    {
+        Key_Event(201, YES);
+    }
+    else
+    {
+        [super mouseDown:event];
+    }
+}
+
+-(void)mouseUp:(NSEvent *)event
+{
+    if (event.type == NSEventTypeLeftMouseUp)
+    {
+        Key_Event(200, NO);
+    }
+    else if (event.type == NSEventTypeRightMouseUp)
+    {
+        Key_Event(202, NO);
+    }
+    else if (event.type == NSEventTypeOtherMouseUp)
+    {
+        Key_Event(201, NO);
+    }
+    else
+    {
+        [super mouseUp:event];
+    }
 }
 
 -(void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size
@@ -361,45 +420,6 @@
          self->previousModifierFlags = event.modifierFlags;
          return nil;
      }];
-    if (mouseinitialized)
-    {
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskMouseMoved handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-         {
-             mx += event.deltaX;
-             my += event.deltaY;
-             return event;
-         }];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-         {
-             Key_Event(200, YES);
-             return event;
-         }];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-         {
-             Key_Event(200, NO);
-             return event;
-         }];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskRightMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-         {
-             Key_Event(201, YES);
-             return event;
-         }];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskRightMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-         {
-             Key_Event(201, NO);
-             return event;
-         }];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskOtherMouseDown handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-         {
-             Key_Event(202, YES);
-             return event;
-         }];
-        [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskOtherMouseUp handler:^NSEvent * _Nullable(NSEvent * _Nonnull event)
-         {
-             Key_Event(202, NO);
-             return event;
-         }];
-    }
     if (joy_initialized)
     {
         for (GCController* controller in [GCController controllers])
