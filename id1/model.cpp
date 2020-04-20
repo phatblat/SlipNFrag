@@ -148,13 +148,17 @@ Mod_DecompressVis
 */
 byte *Mod_DecompressVis (byte *in, model_t *model)
 {
-    static std::vector<byte> decompressed;
+    static std::vector<byte> decompressed(MAX_MAP_LEAFS/8);
 	int		c;
 	byte	*out;
 	int		row;
 
 	row = (model->numleafs+7)>>3;	
-    decompressed.resize(row);
+    auto size = (model->numleafs+31)>>3;
+    if (size > decompressed.size())
+    {
+        decompressed.resize(size);
+    }
     out = decompressed.data();
 
 	if (!in)
