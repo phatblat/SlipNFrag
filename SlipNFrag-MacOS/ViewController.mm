@@ -447,12 +447,12 @@
 {
     auto factor = (double)vid_width / 320;
     double new_conwidth = 320;
-    auto new_conheight = (double)vid_height / factor;
+    auto new_conheight = ceil((double)vid_height / factor);
     if (new_conheight < 200)
     {
         factor = (double)vid_height / 200;
         new_conheight = 200;
-        new_conwidth = (double)vid_width / factor;
+        new_conwidth = (double)(((int)ceil((double)vid_width / factor) + 3) & ~3);
     }
     con_width = (int)new_conwidth;
     con_height = (int)new_conheight;
