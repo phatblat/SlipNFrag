@@ -105,7 +105,15 @@ edict_t *ED_Alloc (void)
 	sv.num_edicts++;
     if (sv.num_edicts * pr_edict_size >= sv.edicts.size())
     {
-        for (j = 0, k = 0; j < sv.num_edicts; j++, k += pr_edict_size)
+		auto sv_playerindex = 0;
+		for (j = 0, c = svs.clients.data(); j < svs.maxclients; j++, c++)
+		{
+			if (sv_player == c->edict)
+			{
+				sv_playerindex = j + 1;
+			}
+		}
+		for (j = 0, k = 0; j < sv.num_edicts; j++, k += pr_edict_size)
         {
             e = (edict_t*)(sv.edicts.data() + k);
             SV_UnlinkEdict(e);
@@ -121,6 +129,10 @@ edict_t *ED_Alloc (void)
         {
             c->edict = EDICT_NUM(j + 1);
         }
+		if (sv_playerindex > 0)
+		{
+			sv_player = EDICT_NUM(sv_playerindex);
+		}
     }
     
     e = EDICT_NUM(i);

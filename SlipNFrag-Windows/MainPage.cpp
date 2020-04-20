@@ -2592,11 +2592,14 @@ namespace winrt::SlipNFrag_Windows::implementation
 						byte* data;
 						unsigned int capacity;
 						byteAccess->GetBuffer(&data, &capacity);
-						memcpy(data, shm->buffer.data() + (snd_current_sample_pos << 1), capacity);
-						snd_current_sample_pos += (samples << 1);
-						if (snd_current_sample_pos >= shm->samples)
+						if (shm != nullptr)
 						{
-							snd_current_sample_pos = 0;
+							memcpy(data, shm->buffer.data() + (snd_current_sample_pos << 1), capacity);
+							snd_current_sample_pos += (samples << 1);
+							if (snd_current_sample_pos >= shm->samples)
+							{
+								snd_current_sample_pos = 0;
+							}
 						}
 					}
 					audioInput.AddFrame(frame);

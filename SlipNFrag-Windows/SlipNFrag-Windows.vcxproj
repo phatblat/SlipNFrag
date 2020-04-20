@@ -72,7 +72,7 @@
     <PackageCertificateThumbprint>F68159FF070A310D5A5158FE39DA9E354B6F5F09</PackageCertificateThumbprint>
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
-    <AppxPackageDir>C:\Projects\SlipNFrag\SlipNFrag-Windows\AppPackages\</AppxPackageDir>
+    <AppxPackageDir>C:\Projects\Releases\</AppxPackageDir>
     <AppxBundle>Auto</AppxBundle>
     <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
     <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
@@ -80,6 +80,7 @@
     <AppxBundlePlatforms>x64</AppxBundlePlatforms>
     <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
