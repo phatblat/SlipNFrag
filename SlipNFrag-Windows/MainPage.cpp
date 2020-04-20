@@ -2712,12 +2712,12 @@ namespace winrt::SlipNFrag_Windows::implementation
 	{
 		auto factor = newScreenWidth / 320;
 		newConsoleWidth = 320;
-		newConsoleHeight = newScreenHeight / factor;
+		newConsoleHeight = ceil(newScreenHeight / factor);
 		if (newConsoleHeight < 200)
 		{
 			factor = newScreenHeight / 200;
 			newConsoleHeight = 200;
-			newConsoleWidth = newScreenWidth / factor;
+			newConsoleWidth = (float)(((int)ceil(newScreenWidth / factor) + 3) & ~3);
 		}
 	}
 
