@@ -538,22 +538,25 @@ void PF_ambientsound (void)
     if (soundnum >= MAX_SOUNDS)
     {
         sv_bump_protocol_version = true;
+    }
+    if (sv_bump_protocol_version || sv_protocol_version == EXPANDED_PROTOCOL_VERSION)
+    {
         MSG_WriteByte(&sv.signon, svc_expandedspawnstaticsound);
     }
     else
     {
-	MSG_WriteByte (&sv.signon,svc_spawnstaticsound);
+        MSG_WriteByte (&sv.signon,svc_spawnstaticsound);
     }
 	for (i=0 ; i<3 ; i++)
 		MSG_WriteCoord(&sv.signon, pos[i]);
 
-    if (soundnum >= MAX_SOUNDS)
+    if (sv_bump_protocol_version || sv_protocol_version == EXPANDED_PROTOCOL_VERSION)
     {
         MSG_WriteLongAsString (&sv.signon, soundnum);
     }
     else
     {
-	MSG_WriteByte (&sv.signon, soundnum);
+        MSG_WriteByte (&sv.signon, soundnum);
     }
     
 	MSG_WriteByte (&sv.signon, vol*255);
@@ -1473,14 +1476,16 @@ void PF_makestatic (void)
     if (index >= MAX_MODELS)
     {
         sv_bump_protocol_version = true;
+    }
+    if (sv_bump_protocol_version || sv_protocol_version == EXPANDED_PROTOCOL_VERSION)
+    {
         MSG_WriteByte(&sv.signon, svc_expandedspawnstatic);
         MSG_WriteLongAsString (&sv.signon, index);
     }
     else
     {
         MSG_WriteByte (&sv.signon,svc_spawnstatic);
-
-	MSG_WriteByte (&sv.signon, index);
+        MSG_WriteByte (&sv.signon, index);
     }
     sv_static_entity_count++;
 

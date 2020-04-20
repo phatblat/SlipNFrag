@@ -201,14 +201,33 @@ void SV_StartSound (edict_t *entity, int channel, const char *sample, int volume
 		field_mask |= SND_ATTENUATION;
 
 // directed messages go only to the entity the are targeted on
-	MSG_WriteByte (&sv.datagram, svc_sound);
+    if (channel > 65535 || sound_num > 255)
+    {
+        sv_bump_protocol_version = true;
+    }
+    if (sv_bump_protocol_version || sv_protocol_version == EXPANDED_PROTOCOL_VERSION)
+    {
+        MSG_WriteByte (&sv.datagram, svc_expandedsound);
+    }
+    else
+    {
+        MSG_WriteByte (&sv.datagram, svc_sound);
+    }
 	MSG_WriteByte (&sv.datagram, field_mask);
 	if (field_mask & SND_VOLUME)
 		MSG_WriteByte (&sv.datagram, volume);
 	if (field_mask & SND_ATTENUATION)
 		MSG_WriteByte (&sv.datagram, attenuation*64);
-	MSG_WriteShort (&sv.datagram, channel);
-	MSG_WriteByte (&sv.datagram, sound_num);
+    if (sv_bump_protocol_version || sv_protocol_version == EXPANDED_PROTOCOL_VERSION)
+    {
+        MSG_WriteLongAsString (&sv.datagram, channel);
+        MSG_WriteLongAsString (&sv.datagram, sound_num);
+    }
+    else
+    {
+        MSG_WriteShort (&sv.datagram, channel);
+        MSG_WriteByte (&sv.datagram, sound_num);
+    }
 	for (i=0 ; i<3 ; i++)
 		MSG_WriteCoord (&sv.datagram, entity->v.origin[i]+0.5*(entity->v.mins[i]+entity->v.maxs[i]));
 }           
@@ -1090,20 +1109,14 @@ void SV_CreateBaseline (void)
             MSG_WriteLongAsString (&sv.signon,entnum);
             
             MSG_WriteLongAsString (&sv.signon, svent->baseline.modelindex);
-            MSG_WriteByte (&sv.signon, svent->baseline.frame);
-            MSG_WriteByte (&sv.signon, svent->baseline.colormap);
-            MSG_WriteByte (&sv.signon, svent->baseline.skin);
-            for (i=0 ; i<3 ; i++)
-            {
-                MSG_WriteCoord(&sv.signon, svent->baseline.origin[i]);
-                MSG_WriteAngle(&sv.signon, svent->baseline.angles[i]);
-            }
-            continue;
         }
-		MSG_WriteByte (&sv.signon,svc_spawnbaseline);
-		MSG_WriteShort (&sv.signon,entnum);
+        else
+        {
+            MSG_WriteByte (&sv.signon,svc_spawnbaseline);
+            MSG_WriteShort (&sv.signon,entnum);
 
-		MSG_WriteByte (&sv.signon, svent->baseline.modelindex);
+            MSG_WriteByte (&sv.signon, svent->baseline.modelindex);
+        }
 		MSG_WriteByte (&sv.signon, svent->baseline.frame);
 		MSG_WriteByte (&sv.signon, svent->baseline.colormap);
 		MSG_WriteByte (&sv.signon, svent->baseline.skin);
@@ -1346,7 +1359,10 @@ void SV_SpawnServer (char *server)
 // send serverinfo to all connected clients
 	for (i=0,host_client = svs.clients.data() ; i<svs.maxclients ; i++, host_client++)
 		if (host_client->active)
+        {
+            host_client->message.maxsize = (sv_protocol_version == EXPANDED_PROTOCOL_VERSION ? 0 : MAX_MSGLEN);
 			SV_SendServerinfo (host_client);
+        }
 	
 	Con_DPrintf ("Server spawned.\n");
 }

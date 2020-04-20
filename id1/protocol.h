@@ -131,6 +131,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define svc_cutscene		34
 
+#define svc_expandedsound (64 + 6)
 #define svc_expandedclientdata (64 + 15)
 #define svc_expandedspawnstatic (64 + 20)
 #define svc_expandedspawnbaseline (64 + 22)

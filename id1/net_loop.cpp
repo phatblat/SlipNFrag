@@ -133,12 +133,12 @@ int Loop_GetMessage (qsocket_t *sock)
 		return 0;
 
 	ret = sock->receiveMessage[0];
-	length = sock->receiveMessage[1] + (sock->receiveMessage[2] << 8);
+	length = sock->receiveMessage[1] + (sock->receiveMessage[2] << 8) + (sock->receiveMessage[3] << 16) + (sock->receiveMessage[4] << 24);
 	// alignment byte skipped here
 	SZ_Clear (&net_message);
-	SZ_Write (&net_message, &sock->receiveMessage[4], length);
+	SZ_Write (&net_message, &sock->receiveMessage[8], length);
 
-	length = IntAlign(length + 4);
+	length = IntAlign(length + 8);
     sock->receiveMessage.erase(sock->receiveMessage.begin(), sock->receiveMessage.begin() + length);
 
 	if (sock->driverdata && ret == 1)
@@ -158,7 +158,7 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 
 	bufferLength = ((qsocket_t *)sock->driverdata)->receiveMessage.size();
 
-	((qsocket_t *)sock->driverdata)->receiveMessage.resize(IntAlign(bufferLength + data->data.size() + 4));
+	((qsocket_t *)sock->driverdata)->receiveMessage.resize(IntAlign(bufferLength + data->data.size() + 8));
 
 	buffer = ((qsocket_t *)sock->driverdata)->receiveMessage.data() + bufferLength;
 
@@ -167,10 +167,12 @@ int Loop_SendMessage (qsocket_t *sock, sizebuf_t *data)
 
 	// length
 	*buffer++ = data->data.size() & 0xff;
-	*buffer++ = data->data.size() >> 8;
+	*buffer++ = (data->data.size() >> 8) & 0xff;
+    *buffer++ = (data->data.size() >> 16) & 0xff;
+    *buffer++ = (data->data.size() >> 24) & 0xff;
 
 	// align
-	buffer++;
+	buffer += 3;
 
 	// message
 	Q_memcpy(buffer, data->data.data(), data->data.size());
@@ -190,7 +192,7 @@ int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 
 	bufferLength = ((qsocket_t *)sock->driverdata)->receiveMessage.size();
 
-    ((qsocket_t *)sock->driverdata)->receiveMessage.resize(IntAlign(bufferLength + data->data.size() + 4));
+    ((qsocket_t *)sock->driverdata)->receiveMessage.resize(IntAlign(bufferLength + data->data.size() + 8));
 
     buffer = ((qsocket_t *)sock->driverdata)->receiveMessage.data() + bufferLength;
 
@@ -198,11 +200,13 @@ int Loop_SendUnreliableMessage (qsocket_t *sock, sizebuf_t *data)
 	*buffer++ = 2;
 
 	// length
-	*buffer++ = data->data.size() & 0xff;
-	*buffer++ = data->data.size() >> 8;
+    *buffer++ = data->data.size() & 0xff;
+    *buffer++ = (data->data.size() >> 8) & 0xff;
+    *buffer++ = (data->data.size() >> 16) & 0xff;
+    *buffer++ = (data->data.size() >> 24) & 0xff;
 
 	// align
-	buffer++;
+    buffer += 3;
 
 	// message
 	Q_memcpy(buffer, data->data.data(), data->data.size());

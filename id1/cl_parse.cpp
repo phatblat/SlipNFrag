@@ -73,7 +73,7 @@ const char *svc_strings[] =
     "UNKNOWN",
     "UNKNOWN",
     "UNKNOWN",
-    "UNKNOWN",
+    "svc_expandedsound",
     "UNKNOWN",
     "UNKNOWN",
     "UNKNOWN",
@@ -184,14 +184,54 @@ void CL_ParseStartSoundPacket(void)
 	ent = channel >> 3;
 	channel &= 7;
 
-	if (ent > MAX_EDICTS)
-		Host_Error ("CL_ParseStartSoundPacket: ent = %i", ent);
-	
 	for (i=0 ; i<3 ; i++)
 		pos[i] = MSG_ReadCoord ();
  
     S_StartSound (ent, channel, cl.sound_precache[sound_num], pos, volume/255.0, attenuation);
 }       
+
+
+/*
+==================
+CL_ParseStartSoundPacket
+==================
+*/
+void CL_ParseExpandedStartSoundPacket(void)
+{
+    vec3_t  pos;
+    int     channel, ent;
+    int     sound_num;
+    int     volume;
+    int     field_mask;
+    float   attenuation;
+    int     i;
+               
+    field_mask = MSG_ReadByte();
+
+    if (field_mask & SND_VOLUME)
+        volume = MSG_ReadByte ();
+    else
+        volume = DEFAULT_SOUND_PACKET_VOLUME;
+    
+    if (field_mask & SND_ATTENUATION)
+        attenuation = MSG_ReadByte () / 64.0;
+    else
+        attenuation = DEFAULT_SOUND_PACKET_ATTENUATION;
+    
+    channel = MSG_ReadLongFromString ();
+    sound_num = MSG_ReadLongFromString ();
+
+    ent = channel >> 3;
+    channel &= 7;
+
+    if (ent > sv.edicts.size() / pr_edict_size)
+        Host_Error ("CL_ParseStartSoundPacket: ent = %i", ent);
+    
+    for (i=0 ; i<3 ; i++)
+        pos[i] = MSG_ReadCoord ();
+ 
+    S_StartSound (ent, channel, cl.sound_precache[sound_num], pos, volume/255.0, attenuation);
+}
 
 /*
 ==================
@@ -1207,6 +1247,10 @@ void CL_ParseServerMessage (void)
 			CL_ParseStartSoundPacket();
 			break;
 			
+        case svc_expandedsound:
+            CL_ParseExpandedStartSoundPacket();
+            break;
+            
 		case svc_stopsound:
 			i = MSG_ReadShort();
 			S_StopSound(i>>3, i&7);

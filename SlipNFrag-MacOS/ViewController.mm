@@ -101,7 +101,7 @@
 -(void)mouseMoved:(NSEvent *)event
 {
     BOOL handled = NO;
-    if (mouseinitialized)
+    if (mouseinitialized && key_dest == key_game)
     {
         CGPoint point = [self->mtkView convertPoint:event.locationInWindow fromView:nil];
         if ([self->mtkView mouse:point inRect:self->mtkView.bounds])
