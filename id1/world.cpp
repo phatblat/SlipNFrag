@@ -286,8 +286,13 @@ void SV_TouchLinks ( edict_t *ent, areanode_t *node )
 // touch linked edicts
 	for (l = node->trigger_edicts.next ; l != &node->trigger_edicts ; l = next)
 	{
+        if (l == nullptr)
+        {
+            Sys_Error ("SV_TouchLinks: NULL trigger edict");
+        }
 		next = l->next;
-		touch = EDICT_FROM_AREA(l);
+        auto base_ptr = (size_t)&(((edict_t*)0)->area);
+        touch = ((edict_t*)((byte *)l - (int)base_ptr));
 		if (touch == ent)
 			continue;
 		if (!touch->v.touch || touch->v.solid != SOLID_TRIGGER)
@@ -750,6 +755,10 @@ void SV_ClipToLinks ( areanode_t *node, moveclip_t *clip )
 // touch linked edicts
 	for (l = node->solid_edicts.next ; l != &node->solid_edicts ; l = next)
 	{
+        if (l == nullptr)
+        {
+            Sys_Error ("SV_ClipToLinks: NULL solid edict");
+        }
 		next = l->next;
 		auto base_ptr = (size_t)&(((edict_t*)0)->area);
         touch = ((edict_t*)((byte *)l - (int)base_ptr));
