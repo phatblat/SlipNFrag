@@ -209,6 +209,10 @@
         console = [mtkView.device newTextureWithDescriptor:consoleDescriptor];
         firstFrame = NO;
     }
+    if (r_cache_thrash)
+    {
+        VID_ReallocSurfCache();
+    }
     memset(con_buffer.data(), 255, con_buffer.size());
     Sys_Frame(frame_lapse);
     if ([self displaySysErrorIfNeeded])

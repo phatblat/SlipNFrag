@@ -19,3 +19,5 @@ extern int con_height;
 extern unsigned d_8to24table[256];
 
 void VID_Resize();
+
+void VID_ReallocSurfCache();
