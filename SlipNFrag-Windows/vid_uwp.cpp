@@ -15,6 +15,7 @@ int con_rowbytes;
 std::vector<short> zbuffer;
 std::vector<byte> surfcache;
 qboolean vid_palettechanged;
+int surfcache_extrasize;
 
 unsigned short d_8to16table[256];
 unsigned d_8to24table[256];
@@ -74,6 +75,7 @@ void VID_Init(unsigned char* palette)
 	int surfcachesize = D_SurfaceCacheForRes(vid_width, vid_height);
 	surfcache.resize(surfcachesize);
 	D_InitCaches(surfcache.data(), (int)surfcache.size());
+	surfcache_extrasize = 0;
 }
 
 void VID_Resize()
@@ -99,6 +101,16 @@ void VID_Resize()
 	R_ResizeTurb();
 	R_ResizeEdges();
 	vid.recalc_refdef = 1;
+	surfcache_extrasize = 0;
+}
+
+void VID_ReallocSurfCache()
+{
+	int surfcachesize = D_SurfaceCacheForRes(vid_width, vid_height);
+	surfcache_extrasize += surfcachesize;
+	surfcache.resize(surfcachesize + surfcache_extrasize);
+	Draw_ResizeScanTables();
+	D_InitCaches(surfcache.data(), (int)surfcache.size());
 }
 
 void VID_Shutdown(void)

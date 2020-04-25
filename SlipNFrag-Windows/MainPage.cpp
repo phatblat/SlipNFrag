@@ -1362,6 +1362,10 @@ namespace winrt::SlipNFrag_Windows::implementation
 			VID_Resize();
 			firstResize = false;
 		}
+		if (r_cache_thrash)
+		{
+			VID_ReallocSurfCache();
+		}
 		if (mouseinitialized)
 		{
 			if (key_dest_was_game && key_dest != key_game)

@@ -14,3 +14,5 @@ extern unsigned d_8to24table[256];
 extern qboolean vid_palettechanged;
 
 void VID_Resize();
+
+void VID_ReallocSurfCache();
