@@ -393,6 +393,142 @@ byte	*mod_base;
 
 /*
 =================
+Mod_AveragePixels
+=================
+*/
+byte Mod_AveragePixels (std::vector<byte>& pixdata, int& d_red, int& d_green, int& d_blue)
+{
+    int        r,g,b;
+    int        i;
+    int        vis;
+    int        pix;
+    int        dr, dg, db;
+    int        bestdistortion, distortion;
+    int        bestcolor;
+    byte    *pal;
+    int        fullbright;
+    int        e;
+    
+    vis = 0;
+    r = g = b = 0;
+    fullbright = 0;
+    for (i=0 ; i<pixdata.size() ; i++)
+    {
+        pix = pixdata[i];
+        if (pix == 255)
+            fullbright = 2;
+        else if (pix >= 240)
+        {
+            return pix;
+        }
+        else
+        {
+            if (fullbright)
+                continue;
+        }
+        
+        r += host_basepal[pix*3];
+        g += host_basepal[pix*3+1];
+        b += host_basepal[pix*3+2];
+        vis++;
+    }
+    
+    if (fullbright == 2)
+        return 255;
+        
+    r /= vis;
+    g /= vis;
+    b /= vis;
+    
+    if (!fullbright)
+    {
+        r += d_red;
+        g += d_green;
+        b += d_blue;
+    }
+    
+//
+// find the best color
+//
+    bestdistortion = r*r + g*g + b*b;
+    bestcolor = 0;
+    if (fullbright)
+    {
+        i = 240;
+        e = 255;
+    }
+    else
+    {
+        i = 0;
+        e = 240;
+    }
+    
+    for ( ; i< e ; i++)
+    {
+        pix = i;    //pixdata[i];
+
+        pal = host_basepal + pix*3;
+
+        dr = r - (int)pal[0];
+        dg = g - (int)pal[1];
+        db = b - (int)pal[2];
+
+        distortion = dr*dr + dg*dg + db*db;
+        if (distortion < bestdistortion)
+        {
+            if (!distortion)
+            {
+                d_red = d_green = d_blue = 0;    // no distortion yet
+                return pix;        // perfect match
+            }
+
+            bestdistortion = distortion;
+            bestcolor = pix;
+        }
+    }
+
+    if (!fullbright)
+    {    // error diffusion
+        pal = host_basepal + bestcolor*3;
+        d_red = r - (int)pal[0];
+        d_green = g - (int)pal[1];
+        d_blue = b - (int)pal[2];
+    }
+
+    return bestcolor;
+}
+
+/*
+=================
+Mod_GenerateMipmaps
+=================
+*/
+void Mod_GenerateMipmaps (byte* data, int w, int h)
+{
+    auto d_red = 0, d_green = 0, d_blue = 0;    // no distortion yet
+    auto source = data;
+    auto lump_p = data + w * h;
+    for (auto miplevel = 1 ; miplevel<MIPLEVELS ; miplevel++)
+    {
+        auto mipstep = 1<<miplevel;
+        for (auto y=0 ; y<h ; y+=mipstep)
+        {
+            for (auto x = 0 ; x<w ; x+= mipstep)
+            {
+                std::vector<byte> pixdata;
+                for (auto yy=0 ; yy<mipstep ; yy++)
+                    for (auto xx=0 ; xx<mipstep ; xx++)
+                    {
+                        pixdata.push_back(source[ (y+yy)*w + x + xx ]);
+                    }
+                *lump_p++ = Mod_AveragePixels (pixdata, d_red, d_green, d_blue);
+            }
+        }
+    }
+}
+
+/*
+=================
 Mod_LoadTextures
 =================
 */
@@ -444,28 +580,14 @@ void Mod_LoadTextures (lump_t *l)
 		// the pixels immediately follow the structures
         if (tx->name[0] == '{')
         {
-            // Fix for textures with an invalid value for the transparent palette entry,
-            // for mip levels beyond level 0:
-            auto first_mip = tx->offsets[1];
-            auto tx_pixels = (byte*)(tx+1);
-            auto mt_pixels = (byte*)(mt+1);
-            memcpy ( tx_pixels, mt_pixels, first_mip);
-            for (j = first_mip; j < pixels; j++)
-            {
-                auto p = mt_pixels[j];
-                if (p == 0xf0)
-                {
-                    p = 0xff;
-                }
-                tx_pixels[j] = p;
-            }
+            memcpy ( tx+1, mt+1, mt->width*mt->height);
+            Mod_GenerateMipmaps ((byte*)(tx+1), mt->width, mt->height);
         }
         else
         {
             memcpy ( tx+1, mt+1, pixels);
         }
-		
-		if (!Q_strncmp(mt->name,"sky",3))	
+		if (!Q_strncmp(mt->name,"sky",3))
 			R_InitSky (tx);
 	}
 
