@@ -231,6 +231,11 @@ void Sys_LowFPPrecision (void)
 {
 }
 
+int Sys_Random()
+{
+	return rand();
+}
+
 //=============================================================================
 
 int main (int argc, char **argv)

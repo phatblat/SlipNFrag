@@ -1170,17 +1170,31 @@ void Mod_LoadNodes (lump_t *l)
 		p = LittleLong(in->planenum);
 		out->plane = loadmodel->planes + p;
 
-		out->firstsurface = LittleShort (in->firstface);
-		out->numsurfaces = LittleShort (in->numfaces);
+		out->firstsurface = (unsigned short)LittleShort (in->firstface);
+		out->numsurfaces = (unsigned short)LittleShort (in->numfaces);
 		
-		for (j=0 ; j<2 ; j++)
-		{
-			p = LittleShort (in->children[j]);
-			if (p >= 0)
-				out->children[j] = loadmodel->nodes + p;
-			else
-				out->children[j] = (mnode_t *)(loadmodel->leafs + (-1 - p));
-		}
+        if (count > 32767)
+        {
+            for (j=0 ; j<2 ; j++)
+            {
+                p = (unsigned short)LittleShort (in->children[j]);
+                if (p < count)
+                    out->children[j] = loadmodel->nodes + p;
+                else
+                    out->children[j] = (mnode_t *)(loadmodel->leafs + 65535 - p);
+            }
+        }
+        else
+        {
+            for (j=0 ; j<2 ; j++)
+            {
+                p = LittleShort (in->children[j]);
+                if (p >= 0)
+                    out->children[j] = loadmodel->nodes + p;
+                else
+                    out->children[j] = (mnode_t *)(loadmodel->leafs + (-1 - p));
+            }
+        }
 	}
 	
 	Mod_SetParent (loadmodel->nodes, NULL);	// sets nodes and leafs
@@ -1267,8 +1281,8 @@ void Mod_LoadLeafs (lump_t *l)
 		out->contents = p;
 
 		out->firstmarksurface = loadmodel->marksurfaces +
-			LittleShort(in->firstmarksurface);
-		out->nummarksurfaces = LittleShort(in->nummarksurfaces);
+			(unsigned short)LittleShort(in->firstmarksurface);
+		out->nummarksurfaces = (unsigned short)LittleShort(in->nummarksurfaces);
 		
 		p = LittleLong(in->visofs);
 		if (p == -1)
@@ -1376,12 +1390,32 @@ void Mod_LoadClipnodes (lump_t *l)
 	hull->clip_maxs[1] = 32;
 	hull->clip_maxs[2] = 64;
 
-	for (i=0 ; i<count ; i++, out++, in++)
-	{
-		out->planenum = LittleLong(in->planenum);
-		out->children[0] = LittleShort(in->children[0]);
-		out->children[1] = LittleShort(in->children[1]);
-	}
+    if (count > 32767)
+    {
+        for (i=0 ; i<count ; i++, out++, in++)
+        {
+            out->planenum = LittleLong(in->planenum);
+            out->children[0] = (unsigned short)LittleShort(in->children[0]);
+            if (out->children[0] >= count)
+            {
+                out->children[0] -= 65536;
+            }
+            out->children[1] = (unsigned short)LittleShort(in->children[1]);
+            if (out->children[1] >= count)
+            {
+                out->children[1] -= 65536;
+            }
+        }
+    }
+    else
+    {
+        for (i=0 ; i<count ; i++, out++, in++)
+        {
+            out->planenum = LittleLong(in->planenum);
+            out->children[0] = LittleShort(in->children[0]);
+            out->children[1] = LittleShort(in->children[1]);
+        }
+    }
 }
 
 /*
@@ -1501,7 +1535,7 @@ void Mod_LoadMarksurfaces (lump_t *l)
 
 	for ( i=0 ; i<count ; i++)
 	{
-		j = LittleShort(in[i]);
+		j = (unsigned short)LittleShort(in[i]);
 		if (j >= loadmodel->numsurfaces)
 			Sys_Error ("Mod_ParseMarksurfaces: bad surface number");
 		out[i] = loadmodel->surfaces + j;
