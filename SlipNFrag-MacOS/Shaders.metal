@@ -22,10 +22,10 @@ struct VertexOut
     float2 texCoords;
 };
 
-vertex VertexOut vertexMain(VertexIn inVertex [[stage_in]], constant float4x4* modelViewProjectionMatrix [[buffer(1)]])
+vertex VertexOut vertexMain(VertexIn inVertex [[stage_in]])
 {
     VertexOut outVertex;
-    outVertex.position = inVertex.position * (*modelViewProjectionMatrix);
+    outVertex.position = inVertex.position;
     outVertex.texCoords = inVertex.texCoords;
     return outVertex;
 }

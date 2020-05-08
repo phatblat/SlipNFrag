@@ -26,7 +26,6 @@
     id<MTLCommandQueue> commandQueue;
     MTKView* mtkView;
     id<MTLRenderPipelineState> pipelineState;
-    id<MTLBuffer> modelViewProjectionMatrixBuffer;
     id<MTLTexture> screen;
     id<MTLTexture> console;
     id<MTLTexture> palette;
@@ -189,23 +188,17 @@
         vid_height = (int)height;
         [self calculateConsoleDimensions];
         VID_Resize();
-        float matrix[16];
-        bzero(matrix, sizeof(matrix));
-        matrix[0] = 1;
-        matrix[5] = 1;
-        matrix[10] = -1;
-        matrix[15] = 1;
-        float* matrixData = (float*)modelViewProjectionMatrixBuffer.contents;
-        memcpy(matrixData, matrix, sizeof(matrix));
         MTLTextureDescriptor* screenDescriptor = [MTLTextureDescriptor new];
         screenDescriptor.pixelFormat = MTLPixelFormatR8Unorm;
         screenDescriptor.width = vid_width;
         screenDescriptor.height = vid_height;
+        screenDescriptor.storageMode = MTLStorageModeManaged;
         screen = [mtkView.device newTextureWithDescriptor:screenDescriptor];
         MTLTextureDescriptor* consoleDescriptor = [MTLTextureDescriptor new];
         consoleDescriptor.pixelFormat = MTLPixelFormatR8Unorm;
         consoleDescriptor.width = con_width;
         consoleDescriptor.height = con_height;
+        screenDescriptor.storageMode = MTLStorageModeManaged;
         console = [mtkView.device newTextureWithDescriptor:consoleDescriptor];
         firstFrame = NO;
     }
@@ -234,7 +227,6 @@
         id<MTLRenderCommandEncoder> commandEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         [commandEncoder setRenderPipelineState:pipelineState];
         [commandEncoder setVertexBuffer:screenPlane offset:0 atIndex:0];
-        [commandEncoder setVertexBuffer:modelViewProjectionMatrixBuffer offset:0 atIndex:1];
         [commandEncoder setFragmentTexture:screen atIndex:0];
         [commandEncoder setFragmentTexture:console atIndex:1];
         [commandEncoder setFragmentTexture:palette atIndex:2];
@@ -290,10 +282,10 @@
         NSLog(@"%@", error);
         [NSApplication.sharedApplication terminate:self];
     }
-    modelViewProjectionMatrixBuffer = [device newBufferWithLength:16 * sizeof(float) options:0];
     MTLTextureDescriptor* paletteDescriptor = [MTLTextureDescriptor new];
     paletteDescriptor.textureType = MTLTextureType1D;
     paletteDescriptor.width = 256;
+    paletteDescriptor.storageMode = MTLStorageModeManaged;
     palette = [device newTextureWithDescriptor:paletteDescriptor];
     MTLSamplerDescriptor* screenSamplerDescriptor = [MTLSamplerDescriptor new];
     screenSamplerState = [device newSamplerStateWithDescriptor:screenSamplerDescriptor];
@@ -301,15 +293,7 @@
     consoleSamplerState = [device newSamplerStateWithDescriptor:consoleSamplerDescriptor];
     MTLSamplerDescriptor* paletteSamplerDescriptor = [MTLSamplerDescriptor new];
     paletteSamplerState = [device newSamplerStateWithDescriptor:paletteSamplerDescriptor];
-    float screenPlaneVertices[] = {
-        -1, 1, -1, 1,
-        0, 0,
-        1, 1, -1, 1,
-        1, 0,
-        -1, -1, -1, 1,
-        0, 1,
-        1, -1, -1, 1,
-        1, 1};
+    float screenPlaneVertices[] = { -1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, -1, -1, 0, 1, 0, 1, 1, -1, 0, 1, 1, 1 };
     screenPlane = [device newBufferWithBytes:screenPlaneVertices length:sizeof(screenPlaneVertices) options:0];
     vid_width = (int)self.view.frame.size.width;
     vid_height = (int)self.view.frame.size.height;
