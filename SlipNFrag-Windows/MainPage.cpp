@@ -1659,7 +1659,6 @@ namespace winrt::SlipNFrag_Windows::implementation
 				return false;
 			}
 		}
-		memset(con_buffer.data(), 255, con_buffer.size());
 		Sys_Frame(elapsed);
 		if (DisplaySysErrorIfNeeded() || sys_errorcalled || sys_quitcalled)
 		{
