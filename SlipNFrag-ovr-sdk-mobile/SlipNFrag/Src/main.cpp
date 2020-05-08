@@ -88,6 +88,15 @@ struct AppState
 	bool FirstFrame;
 	double PreviousTime;
 	double CurrentTime;
+	GLuint Framebuffer;
+	GLuint Program;
+	GLuint VertexShader;
+	GLuint FragmentShader;
+	GLint InputPositionAttrib;
+	GLint InputTexCoordsAttrib;
+	GLuint ScreenTexId;
+	GLuint ConsoleTexId;
+	GLuint PaletteTexId;
 };
 
 static void appHandleCommands(struct android_app *app, int32_t cmd)
@@ -346,9 +355,80 @@ void android_main(struct android_app *app)
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, appState.CylinderWidth, appState.CylinderHeight, GL_RGBA, GL_UNSIGNED_BYTE, appState.CylinderTexData.data());
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-			GLfloat borderColor[] = {0.0f, 0.0f, 0.0f, 0.0f};
+			GLfloat borderColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
 			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 			glBindTexture(GL_TEXTURE_2D, 0);
+			glGenFramebuffers(1, &appState.Framebuffer);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, appState.Framebuffer);
+			glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, appState.CylinderTexId, 0);
+			auto status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+			if (status != GL_FRAMEBUFFER_COMPLETE)
+			{
+				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: Incomplete frame buffer object: %i", status);
+				exit(0);
+			}
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+			auto vertexShaderFile = AAssetManager_open(app->activity->assetManager, "VertexShader.vert", AASSET_MODE_BUFFER);
+			GLint vertexShaderFileLength = AAsset_getLength(vertexShaderFile);
+			std::vector<GLchar> vertexShaderSource(vertexShaderFileLength);
+			GLchar* vertexShaderSourcePtr = vertexShaderSource.data();
+			AAsset_read(vertexShaderFile, vertexShaderSourcePtr, vertexShaderFileLength);
+			auto pixelShaderFile = AAssetManager_open(app->activity->assetManager, "PixelShader.frag", AASSET_MODE_BUFFER);
+			GLint pixelShaderFileLength = AAsset_getLength(pixelShaderFile);
+			std::vector<GLchar> pixelShaderSource(pixelShaderFileLength);
+			GLchar* pixelShaderSourcePtr = pixelShaderSource.data();
+			AAsset_read(pixelShaderFile, pixelShaderSourcePtr, pixelShaderFileLength);
+			appState.VertexShader = glCreateShader(GL_VERTEX_SHADER);
+			glShaderSource(appState.VertexShader, 1, &vertexShaderSourcePtr, &vertexShaderFileLength);
+			glCompileShader(appState.VertexShader);
+			GLint result;
+			glGetShaderiv(appState.VertexShader, GL_COMPILE_STATUS, &result);
+			if (result == GL_FALSE)
+			{
+				GLint infoLogLength;
+				glGetShaderiv(appState.VertexShader, GL_INFO_LOG_LENGTH, &infoLogLength);
+				std::vector<GLchar> infoLog(infoLogLength);
+				glGetShaderInfoLog(appState.VertexShader, infoLogLength, nullptr, infoLog.data());
+				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: glCompileShader() for vertex shader failed: %s", infoLog.data());
+				exit(0);
+			}
+			appState.FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(appState.FragmentShader, 1, &pixelShaderSourcePtr, &pixelShaderFileLength);
+			glCompileShader(appState.FragmentShader);
+			glGetShaderiv(appState.FragmentShader, GL_COMPILE_STATUS, &result);
+			if (result == GL_FALSE)
+			{
+				GLint infoLogLength;
+				glGetShaderiv(appState.FragmentShader, GL_INFO_LOG_LENGTH, &infoLogLength);
+				std::vector<GLchar> infoLog(infoLogLength);
+				glGetShaderInfoLog(appState.FragmentShader, infoLogLength, nullptr, infoLog.data());
+				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: glCompileShader() for pixel shader failed: %s", infoLog.data());
+				exit(0);
+			}
+			appState.Program = glCreateProgram();
+			glAttachShader(appState.Program, appState.VertexShader);
+			glAttachShader(appState.Program, appState.FragmentShader);
+			glLinkProgram(appState.Program);
+			glGetProgramiv(appState.Program, GL_LINK_STATUS, &result);
+			if (result == GL_FALSE)
+			{
+				GLint infoLogLength;
+				glGetProgramiv(appState.Program, GL_INFO_LOG_LENGTH, &infoLogLength);
+				std::vector<GLchar> infoLog(infoLogLength);
+				glGetProgramInfoLog(appState.Program, infoLogLength, nullptr, infoLog.data());
+				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: glLinkShader() failed: %s", infoLog.data());
+				exit(0);
+			}
+			appState.InputPositionAttrib = glGetAttribLocation(appState.Program, "inputPosition");
+			appState.InputTexCoordsAttrib = glGetAttribLocation(appState.Program, "inputTexCoords");
+			glUseProgram(appState.Program);
+			auto consoleUniform = glGetUniformLocation(appState.Program, "console");
+			glUniform1i(consoleUniform, 0);
+			auto screenUniform = glGetUniformLocation(appState.Program, "screen");
+			glUniform1i(screenUniform, 1);
+			auto paletteUniform = glGetUniformLocation(appState.Program, "palette");
+			glUniform1i(paletteUniform, 2);
+			glUseProgram(0);
 			appState.FirstFrame = true;
 			appState.CreatedScene = true;
 		}
@@ -381,35 +461,77 @@ void android_main(struct android_app *app)
 		{
 			vid_width = appState.CylinderWidth;
 			vid_height = appState.CylinderHeight;
-			con_width = vid_width;
-			con_height = vid_height;
+			auto factor = (double)vid_width / 320;
+			double new_conwidth = 320;
+			auto new_conheight = ceil((double)vid_height / factor);
+			if (new_conheight < 200)
+			{
+				factor = (double)vid_height / 200;
+				new_conheight = 200;
+				new_conwidth = (double)(((int)ceil((double)vid_width / factor) + 3) & ~3);
+			}
+			con_width = (int)new_conwidth;
+			con_height = (int)new_conheight;
 			VID_Resize();
+			glGenTextures(1, &appState.ScreenTexId);
+			glBindTexture(GL_TEXTURE_2D, appState.ScreenTexId);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, vid_width, vid_height);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			GLfloat borderColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glGenTextures(1, &appState.ConsoleTexId);
+			glBindTexture(GL_TEXTURE_2D, appState.ConsoleTexId);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, con_width, con_height);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glGenTextures(1, &appState.PaletteTexId);
+			glBindTexture(GL_TEXTURE_2D, appState.PaletteTexId);
+			glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 256, 1);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glBindTexture(GL_TEXTURE_2D, 0);
 			appState.FirstFrame = false;
 		}
 		if (r_cache_thrash)
 		{
 			VID_ReallocSurfCache();
 		}
-		memset(con_buffer.data(), 255, con_buffer.size());
+		//memset(con_buffer.data(), 255, con_buffer.size());
 		Sys_Frame(frame_lapse);
 		if (sys_errormessage.length() > 0)
 		{
 			exit(0);
 		}
-		auto index = 0;
-		for (auto y = 0; y < vid_height; y++)
-		{
-			for (auto x = 0; x < vid_width; x++)
-			{
-				auto con_pixel = con_buffer[index];
-				auto vid_pixel = vid_buffer[index];
-				appState.CylinderTexData[index] = d_8to24table[con_pixel < 255 ? con_pixel : vid_pixel];
-				index++;
-			}
-		}
-		glBindTexture(GL_TEXTURE_2D, appState.CylinderTexId);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, appState.CylinderWidth, appState.CylinderHeight, GL_RGBA, GL_UNSIGNED_BYTE, appState.CylinderTexData.data());
-		glBindTexture(GL_TEXTURE_2D, 0);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, appState.Framebuffer);
+		glUseProgram(appState.Program);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, appState.ConsoleTexId);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, con_width, con_height, GL_RED, GL_UNSIGNED_BYTE, con_buffer.data());
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, appState.ScreenTexId);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vid_width, vid_height, GL_RED, GL_UNSIGNED_BYTE, vid_buffer.data());
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, appState.PaletteTexId);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, d_8to24table);
+		glViewport(0, 0, vid_width, vid_height);
+		GLfloat vertices[] { -1, -1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, 1, 1, 0, 1 };
+		GLfloat texCoords[] { 0, 0, 1, 0, 0, 1, 1, 1 };
+		glVertexAttribPointer(appState.InputPositionAttrib, 4, GL_FLOAT, GL_FALSE, 0, vertices);
+		glVertexAttribPointer(appState.InputTexCoordsAttrib, 2, GL_FLOAT, GL_FALSE, 0, texCoords);
+		glEnableVertexAttribArray(appState.InputPositionAttrib);
+		glEnableVertexAttribArray(appState.InputTexCoordsAttrib);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		glUseProgram(0);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 		auto screenLayer = vrapi_DefaultLayerCylinder2();
 		const float fadeLevel = 1.0f;
 		screenLayer.Header.ColorScale.x = screenLayer.Header.ColorScale.y = screenLayer.Header.ColorScale.z =

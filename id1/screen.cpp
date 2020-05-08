@@ -450,6 +450,8 @@ SCR_SetUpToDrawConsole
 */
 void SCR_SetUpToDrawConsole (void)
 {
+	memset(vid.conbuffer, 255, vid.conrowbytes * vid.conheight);
+
 	Con_CheckResize ();
 	
 	if (scr_drawloading)
