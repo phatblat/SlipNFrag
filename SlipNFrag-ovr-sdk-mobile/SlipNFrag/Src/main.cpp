@@ -12,6 +12,8 @@
 #include <EGL/eglext.h>
 #include <unistd.h>
 #include "vid_ovr.h"
+#include "VrApi_Input.h"
+#include "in_ovr.h"
 
 #ifndef GL_CLAMP_TO_BORDER
 #define GL_CLAMP_TO_BORDER 0x812D
@@ -163,11 +165,13 @@ void android_main(struct android_app *app)
 	appState.CpuLevel = 2;
 	appState.GpuLevel = 2;
 	appState.Java = java;
-	sys_argc = 3;
+	sys_argc = 5;
 	sys_argv = new char *[sys_argc];
 	sys_argv[0] = (char *) "SlipNFrag";
 	sys_argv[1] = (char *) "-basedir";
 	sys_argv[2] = (char *) "/sdcard/android/data/com.heribertodelgado.slipnfrag/files";
+	sys_argv[3] = (char *) "+map";
+	sys_argv[4] = (char *) "start";
 	Sys_Init(sys_argc, sys_argv);
 	if (sys_errormessage.length() > 0)
 	{
@@ -325,6 +329,45 @@ void android_main(struct android_app *app)
 					break;
 			}
 		}
+		if (joy_initialized)
+		{
+			joy_avail = false;
+			for (auto i = 0; ; i++)
+			{
+				ovrInputCapabilityHeader cap;
+				ovrResult result = vrapi_EnumerateInputDevices(appState.Ovr, i, &cap);
+				if (result < 0)
+				{
+					break;
+				}
+				if (cap.Type == ovrControllerType_TrackedRemote)
+				{
+					ovrInputStateTrackedRemote trackedRemoteState;
+					trackedRemoteState.Header.ControllerType = ovrControllerType_TrackedRemote;
+					result = vrapi_GetCurrentInputState(appState.Ovr, cap.DeviceID, &trackedRemoteState.Header);
+					if (result == ovrSuccess)
+					{
+						result = vrapi_GetInputDeviceCapabilities(appState.Ovr, &cap);
+						if (result == ovrSuccess)
+						{
+							auto tr_cap = (ovrInputTrackedRemoteCapabilities*)&cap;
+							if ((tr_cap->ControllerCapabilities & ovrControllerCaps_LeftHand) != 0)
+							{
+								pdwRawValue[JOY_AXIS_X] = -trackedRemoteState.Joystick.x;
+								pdwRawValue[JOY_AXIS_Y] = -trackedRemoteState.Joystick.y;
+								joy_avail = true;
+							}
+							else if ((tr_cap->ControllerCapabilities & ovrControllerCaps_RightHand) != 0)
+							{
+								pdwRawValue[JOY_AXIS_Z] = trackedRemoteState.Joystick.x;
+								pdwRawValue[JOY_AXIS_R] = trackedRemoteState.Joystick.y;
+								joy_avail = true;
+							}
+						}
+					}
+				}
+			}
+		}
 		if (appState.Ovr == NULL)
 		{
 			continue;
@@ -476,26 +519,22 @@ void android_main(struct android_app *app)
 			glGenTextures(1, &appState.ScreenTexId);
 			glBindTexture(GL_TEXTURE_2D, appState.ScreenTexId);
 			glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, vid_width, vid_height);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-			GLfloat borderColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 			glGenTextures(1, &appState.ConsoleTexId);
 			glBindTexture(GL_TEXTURE_2D, appState.ConsoleTexId);
 			glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, con_width, con_height);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 			glGenTextures(1, &appState.PaletteTexId);
 			glBindTexture(GL_TEXTURE_2D, appState.PaletteTexId);
 			glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 256, 1);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-			glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 			glBindTexture(GL_TEXTURE_2D, 0);
@@ -505,7 +544,6 @@ void android_main(struct android_app *app)
 		{
 			VID_ReallocSurfCache();
 		}
-		//memset(con_buffer.data(), 255, con_buffer.size());
 		Sys_Frame(frame_lapse);
 		if (sys_errormessage.length() > 0)
 		{

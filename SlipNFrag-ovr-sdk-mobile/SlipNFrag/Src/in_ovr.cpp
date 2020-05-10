@@ -1,13 +1,5 @@
-//
-//  in_macos.cpp
-//  SlipNFrag-MacOS
-//
-//  Created by Heriberto Delgado on 6/27/19.
-//  Copyright © 2019 Heriberto Delgado. All rights reserved.
-//
-
 #include "quakedef.h"
-#include "in_macos.h"
+#include "in_ovr.h"
 
 float   mouse_x, mouse_y;
 float   old_mouse_x, old_mouse_y;
@@ -33,13 +25,13 @@ float pdwRawValue[JOY_MAX_AXES];
 // each time.  this avoids any problems with getting back to a default usage
 // or when changing from one controller to another.  this way at least something
 // works.
-cvar_t    in_joystick = { "joystick","0", true };
+cvar_t    in_joystick = { "joystick","1", true };
 cvar_t    joy_name = { "joyname", "joystick" };
-cvar_t    joy_advanced = { "joyadvanced", "0" };
-cvar_t    joy_advaxisx = { "joyadvaxisx", "0" };
-cvar_t    joy_advaxisy = { "joyadvaxisy", "0" };
-cvar_t    joy_advaxisz = { "joyadvaxisz", "0" };
-cvar_t    joy_advaxisr = { "joyadvaxisr", "0" };
+cvar_t    joy_advanced = { "joyadvanced", "1" };
+cvar_t    joy_advaxisx = { "joyadvaxisx", "3" }; // AxisSide
+cvar_t    joy_advaxisy = { "joyadvaxisy", "1" }; // AxisForward
+cvar_t    joy_advaxisz = { "joyadvaxisz", "4" }; // AxisTurn
+cvar_t    joy_advaxisr = { "joyadvaxisr", "2" }; // AxisLook
 cvar_t    joy_advaxisu = { "joyadvaxisu", "0" };
 cvar_t    joy_advaxisv = { "joyadvaxisv", "0" };
 cvar_t    joy_forwardthreshold = { "joyforwardthreshold", "0.15" };
@@ -199,11 +191,6 @@ void IN_Commands (void)
 
 void IN_MouseMove (usercmd_t *cmd)
 {
-	if (!mouseinitialized)
-	{
-		return;
-	}
-
     if (m_filter.value)
     {
         mouse_x = (mx + old_mouse_x) * 0.5;
