@@ -1,19 +1,15 @@
-#include <EGL/egl.h>
-#include "VrApi.h"
-#include <vector>
-#include <GLES3/gl3.h>
-#include <android_native_app_glue.h>
-#include <android/log.h>
-#include "sys_ovr.h"
-#include "VrApi_SystemUtils.h"
+#include "AppState.h"
 #include <android/window.h>
 #include <sys/prctl.h>
 #include "VrApi_Helpers.h"
+#include <android/log.h>
+#include "sys_ovr.h"
 #include <EGL/eglext.h>
 #include <unistd.h>
 #include "vid_ovr.h"
-#include "VrApi_Input.h"
 #include "in_ovr.h"
+#include "VrApi_Input.h"
+#include "stb_image.h"
 
 #ifndef GL_CLAMP_TO_BORDER
 #define GL_CLAMP_TO_BORDER 0x812D
@@ -26,8 +22,9 @@
 static const int CPU_LEVEL = 2;
 static const int GPU_LEVEL = 3;
 
-static const char *EglErrorString(const EGLint error)
+static const char* eglErrorString()
 {
+	auto error = eglGetError();
 	switch (error)
 	{
 		case EGL_SUCCESS:
@@ -60,89 +57,68 @@ static const char *EglErrorString(const EGLint error)
 			return "EGL_BAD_NATIVE_WINDOW";
 		case EGL_CONTEXT_LOST:
 			return "EGL_CONTEXT_LOST";
-		default:
-			return "unknown";
 	}
+	return "";
 }
 
-struct AppState
+double getTime()
 {
-	ovrJava Java;
-	ANativeWindow *NativeWindow;
-	bool Resumed;
-	ovrMobile *Ovr;
-	uint64_t FrameIndex;
-	double DisplayTime;
-	int SwapInterval;
-	int CpuLevel;
-	int GpuLevel;
-	uint32_t ThreadId;
-	EGLDisplay Display;
-	EGLConfig Config;
-	EGLSurface TinySurface;
-	EGLContext Context;
-	bool CreatedScene;
-	ovrTextureSwapChain *CylinderSwapChain;
-	int CylinderWidth;
-	int CylinderHeight;
-	std::vector<uint32_t> CylinderTexData;
-	GLuint CylinderTexId;
-	bool FirstFrame;
-	double PreviousTime;
-	double CurrentTime;
-	GLuint Framebuffer;
-	GLuint Program;
-	GLuint VertexShader;
-	GLuint FragmentShader;
-	GLint InputPositionAttrib;
-	GLint InputTexCoordsAttrib;
-	GLuint ScreenTexId;
-	GLuint ConsoleTexId;
-	GLuint PaletteTexId;
-};
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
+}
 
 static void appHandleCommands(struct android_app *app, int32_t cmd)
 {
 	auto appState = (AppState *)app->userData;
-
+	double delta;
 	switch (cmd)
 	{
-		case APP_CMD_START:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: onStart()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: APP_CMD_START");
+		case APP_CMD_PAUSE:
+			appState->Resumed = false;
+			appState->PausedTime = getTime();
 			break;
 		case APP_CMD_RESUME:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: onResume()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: APP_CMD_RESUME");
 			appState->Resumed = true;
-			break;
-		case APP_CMD_PAUSE:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: onPause()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: APP_CMD_PAUSE");
-			appState->Resumed = false;
-			break;
-		case APP_CMD_STOP:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: onStop()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: APP_CMD_STOP");
-			break;
-		case APP_CMD_DESTROY:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: onDestroy()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: APP_CMD_DESTROY");
-			appState->NativeWindow = NULL;
+			delta = getTime() - appState->PausedTime;
+			if (appState->PreviousTime > 0)
+			{
+				appState->PreviousTime += delta;
+			}
+			if (appState->CurrentTime > 0)
+			{
+				appState->CurrentTime += delta;
+			}
 			break;
 		case APP_CMD_INIT_WINDOW:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: surfaceCreated()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: APP_CMD_INIT_WINDOW");
 			appState->NativeWindow = app->window;
 			break;
 		case APP_CMD_TERM_WINDOW:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: surfaceDestroyed()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: APP_CMD_TERM_WINDOW");
 			appState->NativeWindow = NULL;
 			break;
-		default:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "android_main: unknown command sent");
+		case APP_CMD_DESTROY:
+			exit(0);
 	}
+}
+
+bool leftButtonIsDown(AppState& appState, uint32_t button)
+{
+	return ((appState.LeftButtons & button) != 0 && (appState.PreviousLeftButtons & button) == 0);
+}
+
+bool leftButtonIsUp(AppState& appState, uint32_t button)
+{
+	return ((appState.LeftButtons & button) == 0 && (appState.PreviousLeftButtons & button) != 0);
+}
+
+bool rightButtonIsDown(AppState& appState, uint32_t button)
+{
+	return ((appState.RightButtons & button) != 0 && (appState.PreviousRightButtons & button) == 0);
+}
+
+bool rightButtonIsUp(AppState& appState, uint32_t button)
+{
+	return ((appState.RightButtons & button) == 0 && (appState.PreviousRightButtons & button) != 0);
 }
 
 void android_main(struct android_app *app)
@@ -165,22 +141,9 @@ void android_main(struct android_app *app)
 	appState.CpuLevel = 2;
 	appState.GpuLevel = 2;
 	appState.Java = java;
-	sys_argc = 5;
-	sys_argv = new char *[sys_argc];
-	sys_argv[0] = (char *) "SlipNFrag";
-	sys_argv[1] = (char *) "-basedir";
-	sys_argv[2] = (char *) "/sdcard/android/data/com.heribertodelgado.slipnfrag/files";
-	sys_argv[3] = (char *) "+map";
-	sys_argv[4] = (char *) "start";
-	Sys_Init(sys_argc, sys_argv);
-	if (sys_errormessage.length() > 0)
-	{
-		if (sys_nogamedata)
-		{
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Game data not found. Upload the game data files to your headset and try again.");
-		}
-		exit(0);
-	}
+	appState.PausedTime = -1;
+	appState.PreviousTime = -1;
+	appState.CurrentTime = -1;
 	appState.Display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 	eglInitialize(appState.Display, nullptr, nullptr);
 	const auto MAX_CONFIGS = 1024;
@@ -188,7 +151,7 @@ void android_main(struct android_app *app)
 	EGLint numConfigs = 0;
 	if (eglGetConfigs(appState.Display, configs.data(), MAX_CONFIGS, &numConfigs) == EGL_FALSE)
 	{
-		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglGetConfigs() failed: %s", EglErrorString(eglGetError()));
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglGetConfigs() failed: %s", eglErrorString());
 		exit(0);
 	}
 	const EGLint configAttributes[] = {EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 0, EGL_STENCIL_SIZE, 0, EGL_SAMPLES, 0, EGL_NONE};
@@ -222,27 +185,27 @@ void android_main(struct android_app *app)
 	}
 	if (appState.Config == 0)
 	{
-		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglChooseConfig() failed: %s", EglErrorString(eglGetError()));
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglChooseConfig() failed: %s", eglErrorString());
 		exit(0);
 	}
 	EGLint contextAttributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
 	appState.Context = eglCreateContext(appState.Display, appState.Config, EGL_NO_CONTEXT, contextAttributes);
 	if (appState.Context == EGL_NO_CONTEXT)
 	{
-		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglCreateContext() failed: %s", EglErrorString(eglGetError()));
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglCreateContext() failed: %s", eglErrorString());
 		exit(0);
 	}
 	const EGLint surfaceAttributes[] = {EGL_WIDTH, 16, EGL_HEIGHT, 16, EGL_NONE};
 	appState.TinySurface = eglCreatePbufferSurface(appState.Display, appState.Config, surfaceAttributes);
 	if (appState.TinySurface == EGL_NO_SURFACE)
 	{
-		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglCreatePbufferSurface() failed: %s", EglErrorString(eglGetError()));
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglCreatePbufferSurface() failed: %s", eglErrorString());
 		eglDestroyContext(appState.Display, appState.Context);
 		exit(0);
 	}
 	if (eglMakeCurrent(appState.Display, appState.TinySurface, appState.TinySurface, appState.Context) == EGL_FALSE)
 	{
-		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglMakeCurrent() failed: %s", EglErrorString(eglGetError()));
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglMakeCurrent() failed: %s", eglErrorString());
 		eglDestroySurface(appState.Display, appState.TinySurface);
 		eglDestroyContext(appState.Display, appState.Context);
 		exit(0);
@@ -298,75 +261,212 @@ void android_main(struct android_app *app)
 				}
 			}
 		}
-		ovrEventDataBuffer eventDataBuffer{};
-		for (;;)
+		auto leftRemoteFound = false;
+		auto rightRemoteFound = false;
+		appState.LeftButtons = 0;
+		appState.RightButtons = 0;
+		appState.LeftJoystick.x = 0;
+		appState.LeftJoystick.y = 0;
+		appState.RightJoystick.x = 0;
+		appState.RightJoystick.y = 0;
+		for (auto i = 0; ; i++)
 		{
-			auto eventHeader = (ovrEventHeader *) (&eventDataBuffer);
-			ovrResult res = vrapi_PollEvent(eventHeader);
-			if (res != ovrSuccess)
+			ovrInputCapabilityHeader cap;
+			ovrResult result = vrapi_EnumerateInputDevices(appState.Ovr, i, &cap);
+			if (result < 0)
 			{
 				break;
 			}
-			switch (eventHeader->EventType)
+			if (cap.Type == ovrControllerType_TrackedRemote)
 			{
-				case VRAPI_EVENT_DATA_LOST:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_DATA_LOST");
-					break;
-				case VRAPI_EVENT_VISIBILITY_GAINED:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_VISIBILITY_GAINED");
-					break;
-				case VRAPI_EVENT_VISIBILITY_LOST:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_VISIBILITY_LOST");
-					break;
-				case VRAPI_EVENT_FOCUS_GAINED:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_FOCUS_GAINED");
-					break;
-				case VRAPI_EVENT_FOCUS_LOST:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_FOCUS_LOST");
-					break;
-				default:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Unknown event");
-					break;
-			}
-		}
-		if (joy_initialized)
-		{
-			joy_avail = false;
-			for (auto i = 0; ; i++)
-			{
-				ovrInputCapabilityHeader cap;
-				ovrResult result = vrapi_EnumerateInputDevices(appState.Ovr, i, &cap);
-				if (result < 0)
+				ovrInputStateTrackedRemote trackedRemoteState;
+				trackedRemoteState.Header.ControllerType = ovrControllerType_TrackedRemote;
+				result = vrapi_GetCurrentInputState(appState.Ovr, cap.DeviceID, &trackedRemoteState.Header);
+				if (result == ovrSuccess)
 				{
-					break;
-				}
-				if (cap.Type == ovrControllerType_TrackedRemote)
-				{
-					ovrInputStateTrackedRemote trackedRemoteState;
-					trackedRemoteState.Header.ControllerType = ovrControllerType_TrackedRemote;
-					result = vrapi_GetCurrentInputState(appState.Ovr, cap.DeviceID, &trackedRemoteState.Header);
+					result = vrapi_GetInputDeviceCapabilities(appState.Ovr, &cap);
 					if (result == ovrSuccess)
 					{
-						result = vrapi_GetInputDeviceCapabilities(appState.Ovr, &cap);
-						if (result == ovrSuccess)
+						auto trCap = (ovrInputTrackedRemoteCapabilities*) &cap;
+						if ((trCap->ControllerCapabilities & ovrControllerCaps_LeftHand) != 0)
 						{
-							auto tr_cap = (ovrInputTrackedRemoteCapabilities*)&cap;
-							if ((tr_cap->ControllerCapabilities & ovrControllerCaps_LeftHand) != 0)
-							{
-								pdwRawValue[JOY_AXIS_X] = -trackedRemoteState.Joystick.x;
-								pdwRawValue[JOY_AXIS_Y] = -trackedRemoteState.Joystick.y;
-								joy_avail = true;
-							}
-							else if ((tr_cap->ControllerCapabilities & ovrControllerCaps_RightHand) != 0)
-							{
-								pdwRawValue[JOY_AXIS_Z] = trackedRemoteState.Joystick.x;
-								pdwRawValue[JOY_AXIS_R] = trackedRemoteState.Joystick.y;
-								joy_avail = true;
-							}
+							leftRemoteFound = true;
+							appState.LeftButtons = trackedRemoteState.Buttons;
+							appState.LeftJoystick = trackedRemoteState.Joystick;
+						}
+						else if ((trCap->ControllerCapabilities & ovrControllerCaps_RightHand) != 0)
+						{
+							rightRemoteFound = true;
+							appState.RightButtons = trackedRemoteState.Buttons;
+							appState.RightJoystick = trackedRemoteState.Joystick;
 						}
 					}
 				}
 			}
+		}
+		if (leftRemoteFound && rightRemoteFound)
+		{
+			if (appState.Mode == AppStartupMode)
+			{
+				if (appState.StartupButtonsPressed)
+				{
+					if ((appState.LeftButtons & ovrButton_X) == 0 && (appState.RightButtons & ovrButton_A) == 0)
+					{
+						appState.Mode = AppCylinderMode;
+						appState.StartupButtonsPressed = false;
+					}
+				}
+				else if ((appState.LeftButtons & ovrButton_X) != 0 && (appState.RightButtons & ovrButton_A) != 0)
+				{
+					appState.StartupButtonsPressed = true;
+				}
+			}
+			else if (appState.Mode == AppCylinderMode)
+			{
+				if (host_initialized)
+				{
+					if (leftButtonIsDown(appState, ovrButton_Enter))
+					{
+						Key_Event(K_ESCAPE, true);
+					}
+					if (leftButtonIsUp(appState, ovrButton_Enter))
+					{
+						Key_Event(K_ESCAPE, false);
+					}
+					if (key_dest == key_game)
+					{
+						if (joy_initialized)
+						{
+							joy_avail = true;
+							pdwRawValue[JOY_AXIS_X] = -appState.LeftJoystick.x;
+							pdwRawValue[JOY_AXIS_Y] = -appState.LeftJoystick.y;
+							pdwRawValue[JOY_AXIS_Z] = appState.RightJoystick.x;
+							pdwRawValue[JOY_AXIS_R] = appState.RightJoystick.y;
+						}
+						if (leftButtonIsDown(appState, ovrButton_Trigger) || rightButtonIsDown(appState, ovrButton_Trigger))
+						{
+							Cmd_ExecuteString("+attack", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_Trigger) || rightButtonIsUp(appState, ovrButton_Trigger))
+						{
+							Cmd_ExecuteString("-attack", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_GripTrigger))
+						{
+							Cmd_ExecuteString("+speed", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_GripTrigger))
+						{
+							Cmd_ExecuteString("-speed", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_Joystick))
+						{
+							Cmd_ExecuteString("impulse 10", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_B))
+						{
+							Cmd_ExecuteString("+jump", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_B))
+						{
+							Cmd_ExecuteString("-jump", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_X) || rightButtonIsDown(appState, ovrButton_A))
+						{
+							Cmd_ExecuteString("+movedown", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_X) || rightButtonIsUp(appState, ovrButton_A))
+						{
+							Cmd_ExecuteString("-movedown", src_command);
+						}
+						if (rightButtonIsDown(appState, ovrButton_Joystick))
+						{
+							Cmd_ExecuteString("+mlook", src_command);
+						}
+						if (rightButtonIsUp(appState, ovrButton_Joystick))
+						{
+							Cmd_ExecuteString("-mlook", src_command);
+						}
+					}
+					else
+					{
+						if ((appState.LeftJoystick.y > 0.5 && appState.PreviousLeftJoystick.y <= 0.5) || (appState.RightJoystick.y > 0.5 && appState.PreviousRightJoystick.y <= 0.5))
+						{
+							Key_Event(K_UPARROW, true);
+						}
+						if ((appState.LeftJoystick.y <= 0.5 && appState.PreviousLeftJoystick.y > 0.5) || (appState.RightJoystick.y <= 0.5 && appState.PreviousRightJoystick.y > 0.5))
+						{
+							Key_Event(K_UPARROW, false);
+						}
+						if ((appState.LeftJoystick.y < -0.5 && appState.PreviousLeftJoystick.y >= -0.5) || (appState.RightJoystick.y < -0.5 && appState.PreviousRightJoystick.y >= -0.5))
+						{
+							Key_Event(K_DOWNARROW, true);
+						}
+						if ((appState.LeftJoystick.y >= -0.5 && appState.PreviousLeftJoystick.y < -0.5) || (appState.RightJoystick.y >= -0.5 && appState.PreviousRightJoystick.y < -0.5))
+						{
+							Key_Event(K_DOWNARROW, false);
+						}
+						if ((appState.LeftJoystick.x > 0.5 && appState.PreviousLeftJoystick.x <= 0.5) || (appState.RightJoystick.x > 0.5 && appState.PreviousRightJoystick.x <= 0.5))
+						{
+							Key_Event(K_RIGHTARROW, true);
+						}
+						if ((appState.LeftJoystick.x <= 0.5 && appState.PreviousLeftJoystick.x > 0.5) || (appState.RightJoystick.x <= 0.5 && appState.PreviousRightJoystick.x > 0.5))
+						{
+							Key_Event(K_RIGHTARROW, false);
+						}
+						if ((appState.LeftJoystick.x < -0.5 && appState.PreviousLeftJoystick.x >= -0.5) || (appState.RightJoystick.x < -0.5 && appState.PreviousRightJoystick.x >= -0.5))
+						{
+							Key_Event(K_LEFTARROW, true);
+						}
+						if ((appState.LeftJoystick.x >= -0.5 && appState.PreviousLeftJoystick.x < -0.5) || (appState.RightJoystick.x >= -0.5 && appState.PreviousRightJoystick.x < -0.5))
+						{
+							Key_Event(K_LEFTARROW, false);
+						}
+						if (leftButtonIsDown(appState, ovrButton_Trigger) || leftButtonIsDown(appState, ovrButton_X) || rightButtonIsDown(appState, ovrButton_Trigger) || rightButtonIsDown(appState, ovrButton_A))
+						{
+							Key_Event(K_ENTER, true);
+						}
+						if (leftButtonIsUp(appState, ovrButton_Trigger) || leftButtonIsUp(appState, ovrButton_X) || rightButtonIsUp(appState, ovrButton_Trigger) || rightButtonIsUp(appState, ovrButton_A))
+						{
+							Key_Event(K_ENTER, false);
+						}
+						if (leftButtonIsDown(appState, ovrButton_GripTrigger) || leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_B))
+						{
+							Key_Event(K_ESCAPE, true);
+						}
+						if (leftButtonIsUp(appState, ovrButton_GripTrigger) || leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_B))
+						{
+							Key_Event(K_ESCAPE, false);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			joy_avail = false;
+		}
+		if (leftRemoteFound)
+		{
+			appState.PreviousLeftButtons = appState.LeftButtons;
+			appState.PreviousLeftJoystick = appState.LeftJoystick;
+		}
+		else
+		{
+			appState.PreviousLeftButtons = 0;
+			appState.PreviousLeftJoystick.x = 0;
+			appState.PreviousLeftJoystick.y = 0;
+		}
+		if (rightRemoteFound)
+		{
+			appState.PreviousRightButtons = appState.RightButtons;
+			appState.PreviousRightJoystick = appState.RightJoystick;
+		}
+		else
+		{
+			appState.PreviousRightButtons = 0;
+			appState.PreviousRightJoystick.x = 0;
+			appState.PreviousRightJoystick.y = 0;
 		}
 		if (appState.Ovr == NULL)
 		{
@@ -393,6 +493,61 @@ void android_main(struct android_app *app)
 			appState.CylinderHeight = 400;
 			appState.CylinderSwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, GL_RGBA8, appState.CylinderWidth, appState.CylinderHeight, 1, 1);
 			appState.CylinderTexData.resize(appState.CylinderWidth * appState.CylinderHeight);
+			auto playImageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
+			auto playImageFileLength = AAsset_getLength(playImageFile);
+			std::vector<stbi_uc> playImageSource(playImageFileLength);
+			AAsset_read(playImageFile, playImageSource.data(), playImageFileLength);
+			int playImageWidth;
+			int playImageHeight;
+			int playImageComponents;
+			auto playImage = stbi_load_from_memory(playImageSource.data(), playImageFileLength, &playImageWidth, &playImageHeight, &playImageComponents, 4);
+			auto texIndex = ((appState.CylinderHeight - playImageHeight) * appState.CylinderWidth + appState.CylinderWidth - playImageWidth) / 2;
+			auto playIndex = 0;
+			for (auto y = 0; y < playImageHeight; y++)
+			{
+				for (auto x = 0; x < playImageWidth; x++)
+				{
+					auto r = playImage[playIndex];
+					playIndex++;
+					auto g = playImage[playIndex];
+					playIndex++;
+					auto b = playImage[playIndex];
+					playIndex++;
+					auto a = playImage[playIndex];
+					playIndex++;
+					auto factor = (double)a / 255;
+					r = (unsigned char)((double)r * factor);
+					g = (unsigned char)((double)g * factor);
+					b = (unsigned char)((double)b * factor);
+					appState.CylinderTexData[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+					texIndex++;
+				}
+				texIndex += appState.CylinderWidth - playImageWidth;
+			}
+			stbi_image_free(playImage);
+			for (auto b = 0; b < 5; b++)
+			{
+				auto i = (unsigned char)(192.0 * sin(M_PI / (double)(b - 1)));
+				auto color = ((uint32_t)255 << 24) | ((uint32_t)i << 16) | ((uint32_t)i << 8) | i;
+				auto texTopIndex = b * appState.CylinderWidth + b;
+				auto texBottomIndex = (appState.CylinderHeight - 1 - b) * appState.CylinderWidth + b;
+				for (auto x = 0; x < appState.CylinderWidth - b - b; x++)
+				{
+					appState.CylinderTexData[texTopIndex] = color;
+					texTopIndex++;
+					appState.CylinderTexData[texBottomIndex] = color;
+					texBottomIndex++;
+				}
+				auto texLeftIndex = (b + 1) * appState.CylinderWidth + b;
+				auto texRightIndex = (b + 1) * appState.CylinderWidth + appState.CylinderWidth - 1 - b;
+				for (auto y = 0; y < appState.CylinderHeight - b - 1 - b - 1; y++)
+				{
+					appState.CylinderTexData[texLeftIndex] = color;
+					texLeftIndex += appState.CylinderWidth;
+					appState.CylinderTexData[texRightIndex] = color;
+					texRightIndex += appState.CylinderWidth;
+				}
+			}
 			appState.CylinderTexId = vrapi_GetTextureSwapChainHandle(appState.CylinderSwapChain, 0);
 			glBindTexture(GL_TEXTURE_2D, appState.CylinderTexId);
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, appState.CylinderWidth, appState.CylinderHeight, GL_RGBA, GL_UNSIGNED_BYTE, appState.CylinderTexData.data());
@@ -475,101 +630,142 @@ void android_main(struct android_app *app)
 			appState.FirstFrame = true;
 			appState.CreatedScene = true;
 		}
+		if (appState.PreviousMode != appState.Mode)
+		{
+			if (appState.PreviousMode == AppStartupMode)
+			{
+				sys_argc = 5;
+				sys_argv = new char *[sys_argc];
+				sys_argv[0] = (char *) "SlipNFrag";
+				sys_argv[1] = (char *) "-basedir";
+				sys_argv[2] = (char *) "/sdcard/android/data/com.heribertodelgado.slipnfrag/files";
+				sys_argv[3] = (char *) "+map";
+				sys_argv[4] = (char *) "start";
+				Sys_Init(sys_argc, sys_argv);
+				if (sys_errormessage.length() > 0)
+				{
+					if (sys_nogamedata)
+					{
+						__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Game data not found. Upload the game data files to your headset and try again.");
+					}
+					exit(0);
+				}
+				appState.PreviousLeftButtons = 0;
+				appState.PreviousRightButtons = 0;
+			}
+			if (appState.Mode == AppCylinderMode)
+			{
+				Cvar_SetValue("joystick", 1);
+				Cvar_SetValue("joyadvanced", 1);
+				Cvar_SetValue("joyadvaxisx", AxisSide);
+				Cvar_SetValue("joyadvaxisy", AxisForward);
+				Cvar_SetValue("joyadvaxisz", AxisTurn);
+				Cvar_SetValue("joyadvaxisr", AxisLook);
+				Joy_AdvancedUpdate_f();
+			}
+			appState.PreviousMode = appState.Mode;
+		}
 		appState.FrameIndex++;
 		const auto predictedDisplayTime = vrapi_GetPredictedDisplayTime(appState.Ovr, appState.FrameIndex);
 		const auto tracking = vrapi_GetPredictedTracking2(appState.Ovr, predictedDisplayTime);
 		appState.DisplayTime = predictedDisplayTime;
 		ovrTracking2 updatedTracking = tracking;
-		if (appState.PreviousTime < 0)
+		if (host_initialized)
 		{
-			struct timespec now;
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			appState.PreviousTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
-		}
-		else if (appState.CurrentTime < 0)
-		{
-			struct timespec now;
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			appState.CurrentTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
-		}
-		else
-		{
-			appState.PreviousTime = appState.CurrentTime;
-			struct timespec now;
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			appState.CurrentTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
-			frame_lapse = (float) (appState.CurrentTime - appState.PreviousTime);
-		}
-		if (appState.FirstFrame)
-		{
-			vid_width = appState.CylinderWidth;
-			vid_height = appState.CylinderHeight;
-			auto factor = (double)vid_width / 320;
-			double new_conwidth = 320;
-			auto new_conheight = ceil((double)vid_height / factor);
-			if (new_conheight < 200)
+			if (appState.PreviousTime < 0)
 			{
-				factor = (double)vid_height / 200;
-				new_conheight = 200;
-				new_conwidth = (double)(((int)ceil((double)vid_width / factor) + 3) & ~3);
+				struct timespec now;
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				appState.PreviousTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
 			}
-			con_width = (int)new_conwidth;
-			con_height = (int)new_conheight;
-			VID_Resize();
-			glGenTextures(1, &appState.ScreenTexId);
-			glBindTexture(GL_TEXTURE_2D, appState.ScreenTexId);
-			glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, vid_width, vid_height);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glGenTextures(1, &appState.ConsoleTexId);
-			glBindTexture(GL_TEXTURE_2D, appState.ConsoleTexId);
-			glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, con_width, con_height);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glGenTextures(1, &appState.PaletteTexId);
-			glBindTexture(GL_TEXTURE_2D, appState.PaletteTexId);
-			glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 256, 1);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glBindTexture(GL_TEXTURE_2D, 0);
-			appState.FirstFrame = false;
+			else if (appState.CurrentTime < 0)
+			{
+				struct timespec now;
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				appState.CurrentTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
+			}
+			else
+			{
+				appState.PreviousTime = appState.CurrentTime;
+				struct timespec now;
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				appState.CurrentTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
+				frame_lapse = (float) (appState.CurrentTime - appState.PreviousTime);
+			}
+			if (appState.FirstFrame)
+			{
+				vid_width = appState.CylinderWidth;
+				vid_height = appState.CylinderHeight;
+				auto factor = (double) vid_width / 320;
+				double new_conwidth = 320;
+				auto new_conheight = ceil((double) vid_height / factor);
+				if (new_conheight < 200)
+				{
+					factor = (double) vid_height / 200;
+					new_conheight = 200;
+					new_conwidth = (double) (((int) ceil((double) vid_width / factor) + 3) & ~3);
+				}
+				con_width = (int) new_conwidth;
+				con_height = (int) new_conheight;
+				VID_Resize();
+				glGenTextures(1, &appState.ScreenTexId);
+				glBindTexture(GL_TEXTURE_2D, appState.ScreenTexId);
+				glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, vid_width, vid_height);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+				glGenTextures(1, &appState.ConsoleTexId);
+				glBindTexture(GL_TEXTURE_2D, appState.ConsoleTexId);
+				glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, con_width, con_height);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+				glGenTextures(1, &appState.PaletteTexId);
+				glBindTexture(GL_TEXTURE_2D, appState.PaletteTexId);
+				glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 256, 1);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+				glBindTexture(GL_TEXTURE_2D, 0);
+				appState.FirstFrame = false;
+			}
+			if (r_cache_thrash)
+			{
+				VID_ReallocSurfCache();
+			}
+			Sys_Frame(frame_lapse);
+			if (sys_errormessage.length() > 0)
+			{
+				exit(0);
+			}
+			if (appState.Mode == AppCylinderMode)
+			{
+				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, appState.Framebuffer);
+				glUseProgram(appState.Program);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, appState.ConsoleTexId);
+				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, con_width, con_height, GL_RED, GL_UNSIGNED_BYTE, con_buffer.data());
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, appState.ScreenTexId);
+				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vid_width, vid_height, GL_RED, GL_UNSIGNED_BYTE, vid_buffer.data());
+				glActiveTexture(GL_TEXTURE2);
+				glBindTexture(GL_TEXTURE_2D, appState.PaletteTexId);
+				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, d_8to24table);
+				glViewport(0, 0, vid_width, vid_height);
+				GLfloat vertices[] { -1, -1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, 1, 1, 0, 1 };
+				GLfloat texCoords[] { 0, 0, 1, 0, 0, 1, 1, 1 };
+				glVertexAttribPointer(appState.InputPositionAttrib, 4, GL_FLOAT, GL_FALSE, 0, vertices);
+				glVertexAttribPointer(appState.InputTexCoordsAttrib, 2, GL_FLOAT, GL_FALSE, 0, texCoords);
+				glEnableVertexAttribArray(appState.InputPositionAttrib);
+				glEnableVertexAttribArray(appState.InputTexCoordsAttrib);
+				glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+				glUseProgram(0);
+				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+			}
 		}
-		if (r_cache_thrash)
-		{
-			VID_ReallocSurfCache();
-		}
-		Sys_Frame(frame_lapse);
-		if (sys_errormessage.length() > 0)
-		{
-			exit(0);
-		}
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, appState.Framebuffer);
-		glUseProgram(appState.Program);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, appState.ConsoleTexId);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, con_width, con_height, GL_RED, GL_UNSIGNED_BYTE, con_buffer.data());
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, appState.ScreenTexId);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vid_width, vid_height, GL_RED, GL_UNSIGNED_BYTE, vid_buffer.data());
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, appState.PaletteTexId);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, d_8to24table);
-		glViewport(0, 0, vid_width, vid_height);
-		GLfloat vertices[] { -1, -1, 0, 1, 1, -1, 0, 1, -1, 1, 0, 1, 1, 1, 0, 1 };
-		GLfloat texCoords[] { 0, 0, 1, 0, 0, 1, 1, 1 };
-		glVertexAttribPointer(appState.InputPositionAttrib, 4, GL_FLOAT, GL_FALSE, 0, vertices);
-		glVertexAttribPointer(appState.InputTexCoordsAttrib, 2, GL_FLOAT, GL_FALSE, 0, texCoords);
-		glEnableVertexAttribArray(appState.InputPositionAttrib);
-		glEnableVertexAttribArray(appState.InputTexCoordsAttrib);
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-		glUseProgram(0);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 		auto screenLayer = vrapi_DefaultLayerCylinder2();
 		const float fadeLevel = 1.0f;
 		screenLayer.Header.ColorScale.x = screenLayer.Header.ColorScale.y = screenLayer.Header.ColorScale.z =
@@ -619,28 +815,28 @@ void android_main(struct android_app *app)
 	{
 		if (eglMakeCurrent(appState.Display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT) == EGL_FALSE)
 		{
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglMakeCurrent() failed: %s", EglErrorString(eglGetError()));
+			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglMakeCurrent() failed: %s", eglGetError());
 		}
 	}
 	if (appState.Context != EGL_NO_CONTEXT)
 	{
 		if (eglDestroyContext(appState.Display, appState.Context) == EGL_FALSE)
 		{
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglDestroyContext() failed: %s", EglErrorString(eglGetError()));
+			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglDestroyContext() failed: %s", eglGetError());
 		}
 	}
 	if (appState.TinySurface != EGL_NO_SURFACE)
 	{
 		if (eglDestroySurface(appState.Display, appState.TinySurface) == EGL_FALSE)
 		{
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglDestroySurface() failed: %s", EglErrorString(eglGetError()));
+			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglDestroySurface() failed: %s", eglGetError());
 		}
 	}
 	if (appState.Display != 0)
 	{
 		if (eglTerminate(appState.Display) == EGL_FALSE)
 		{
-			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglTerminate() failed: %s", EglErrorString(eglGetError()));
+			__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: eglTerminate() failed: %s", eglGetError());
 		}
 	}
 	vrapi_Shutdown();

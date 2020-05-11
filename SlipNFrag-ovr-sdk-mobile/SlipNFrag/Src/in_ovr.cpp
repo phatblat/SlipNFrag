@@ -25,13 +25,13 @@ float pdwRawValue[JOY_MAX_AXES];
 // each time.  this avoids any problems with getting back to a default usage
 // or when changing from one controller to another.  this way at least something
 // works.
-cvar_t    in_joystick = { "joystick","1", true };
+cvar_t    in_joystick = { "joystick","0", true };
 cvar_t    joy_name = { "joyname", "joystick" };
-cvar_t    joy_advanced = { "joyadvanced", "1" };
-cvar_t    joy_advaxisx = { "joyadvaxisx", "3" }; // AxisSide
-cvar_t    joy_advaxisy = { "joyadvaxisy", "1" }; // AxisForward
-cvar_t    joy_advaxisz = { "joyadvaxisz", "4" }; // AxisTurn
-cvar_t    joy_advaxisr = { "joyadvaxisr", "2" }; // AxisLook
+cvar_t    joy_advanced = { "joyadvanced", "0" };
+cvar_t    joy_advaxisx = { "joyadvaxisx", "0" };
+cvar_t    joy_advaxisy = { "joyadvaxisy", "0" };
+cvar_t    joy_advaxisz = { "joyadvaxisz", "0" };
+cvar_t    joy_advaxisr = { "joyadvaxisr", "0" };
 cvar_t    joy_advaxisu = { "joyadvaxisu", "0" };
 cvar_t    joy_advaxisv = { "joyadvaxisv", "0" };
 cvar_t    joy_forwardthreshold = { "joyforwardthreshold", "0.15" };
