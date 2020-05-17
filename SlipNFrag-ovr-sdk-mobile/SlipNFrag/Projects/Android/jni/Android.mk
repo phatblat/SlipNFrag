@@ -23,7 +23,7 @@ LOCAL_SRC_FILES			:=  $(LOCAL_PATH)/../../../../../SlipNFrag/cd_null.cpp \
 LOCAL_SRC_FILES         += $(ID1_FILES)
 LOCAL_C_INCLUDES        :=	$(LOCAL_PATH)/../../../../../id1 \
 							$(LOCAL_PATH)/../../../../3rdParty/stb/src
-LOCAL_LDLIBS			:= -llog -landroid -lGLESv3 -lEGL -lz
+LOCAL_LDLIBS			:= -llog -landroid
 
 LOCAL_LDFLAGS			:= -u ANativeActivity_onCreate
 
