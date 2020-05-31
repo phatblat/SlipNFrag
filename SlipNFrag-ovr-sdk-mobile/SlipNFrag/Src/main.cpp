@@ -14,13 +14,16 @@
 #include <unistd.h>
 #include "VrApi_Input.h"
 #include "VrApi_SystemUtils.h"
+#include "vid_ovr.h"
+#include "in_ovr.h"
+#include "stb_image.h"
 
 #define DEBUG 1
 #define _DEBUG 1
 
 #define OFFSETOF_MEMBER(type, member) (size_t) & ((type*)0)->member
 #define SIZEOF_MEMBER(type, member) sizeof(((type*)0)->member)
-#define VK(func) VkCheckErrors(func, #func);
+#define VK(func) checkErrors(func, #func);
 #define VC(func) func;
 #define MAX_PROGRAM_PARMS 16
 #define MAX_VERTEX_ATTRIBUTES 16
@@ -113,34 +116,12 @@ enum TextureUsage
 	TEXTURE_USAGE_FRAG_DENSITY = 1 << 8,
 };
 
-enum SurfaceColorFormat
-{
-	SURFACE_COLOR_FORMAT_R5G6B5,
-	SURFACE_COLOR_FORMAT_B5G6R5,
-	SURFACE_COLOR_FORMAT_R8G8B8A8,
-	SURFACE_COLOR_FORMAT_B8G8R8A8,
-	SURFACE_COLOR_FORMAT_MAX
-};
-
 enum SurfaceDepthFormat
 {
 	SURFACE_DEPTH_FORMAT_NONE,
 	SURFACE_DEPTH_FORMAT_D16,
 	SURFACE_DEPTH_FORMAT_D24,
 	SURFACE_DEPTH_FORMAT_MAX
-};
-
-enum CommandBufferType
-{
-	COMMAND_BUFFER_TYPE_PRIMARY,
-	COMMAND_BUFFER_TYPE_SECONDARY,
-	COMMAND_BUFFER_TYPE_SECONDARY_CONTINUE_RENDER_PASS
-};
-
-enum BufferUnmapType
-{
-	BUFFER_UNMAP_TYPE_USE_ALLOCATED, // use the newly allocated (host visible) buffer
-	BUFFER_UNMAP_TYPE_COPY_BACK // copy back to the original buffer
 };
 
 struct Instance
@@ -264,6 +245,7 @@ struct Device
 	PFN_vkCmdBindVertexBuffers vkCmdBindVertexBuffers;
 	PFN_vkCmdDrawIndexed vkCmdDrawIndexed;
 	PFN_vkCmdCopyBuffer vkCmdCopyBuffer;
+	PFN_vkCmdCopyBufferToImage vkCmdCopyBufferToImage;
 	PFN_vkCmdResolveImage vkCmdResolveImage;
 	PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
 	PFN_vkCmdPushConstants vkCmdPushConstants;
@@ -402,7 +384,6 @@ struct DepthBuffer
 struct RenderPass
 {
 	VkSubpassContents type;
-	SurfaceColorFormat colorFormat;
 	SurfaceDepthFormat depthFormat;
 	bool useFragmentDensity;
 	VkSampleCountFlagBits sampleCount;
@@ -529,7 +510,6 @@ struct GraphicsCommand
 
 struct CommandBuffer
 {
-	CommandBufferType type;
 	int numBuffers;
 	int currentBuffer;
 	std::vector<VkCommandBuffer> cmdBuffers;
@@ -616,89 +596,90 @@ static const VkQueueFlags requiredQueueFlags = VK_QUEUE_GRAPHICS_BIT;
 
 static const int queueCount = 1;
 
-static VkBufferUsageFlags getBufferUsage(const BufferType type)
-{
-	return (
-			(type == BUFFER_TYPE_VERTEX)
-			? VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
-			: ((type == BUFFER_TYPE_INDEX)
-			   ? VK_BUFFER_USAGE_INDEX_BUFFER_BIT
-			   : ((type == BUFFER_TYPE_UNIFORM) ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT : 0)));
-}
-
-static const char *VkErrorString(VkResult result)
-{
-	switch (result)
-	{
-		case VK_SUCCESS:
-			return "VK_SUCCESS";
-		case VK_NOT_READY:
-			return "VK_NOT_READY";
-		case VK_TIMEOUT:
-			return "VK_TIMEOUT";
-		case VK_EVENT_SET:
-			return "VK_EVENT_SET";
-		case VK_EVENT_RESET:
-			return "VK_EVENT_RESET";
-		case VK_INCOMPLETE:
-			return "VK_INCOMPLETE";
-		case VK_ERROR_OUT_OF_HOST_MEMORY:
-			return "VK_ERROR_OUT_OF_HOST_MEMORY";
-		case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-			return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
-		case VK_ERROR_INITIALIZATION_FAILED:
-			return "VK_ERROR_INITIALIZATION_FAILED";
-		case VK_ERROR_DEVICE_LOST:
-			return "VK_ERROR_DEVICE_LOST";
-		case VK_ERROR_MEMORY_MAP_FAILED:
-			return "VK_ERROR_MEMORY_MAP_FAILED";
-		case VK_ERROR_LAYER_NOT_PRESENT:
-			return "VK_ERROR_LAYER_NOT_PRESENT";
-		case VK_ERROR_EXTENSION_NOT_PRESENT:
-			return "VK_ERROR_EXTENSION_NOT_PRESENT";
-		case VK_ERROR_FEATURE_NOT_PRESENT:
-			return "VK_ERROR_FEATURE_NOT_PRESENT";
-		case VK_ERROR_INCOMPATIBLE_DRIVER:
-			return "VK_ERROR_INCOMPATIBLE_DRIVER";
-		case VK_ERROR_TOO_MANY_OBJECTS:
-			return "VK_ERROR_TOO_MANY_OBJECTS";
-		case VK_ERROR_FORMAT_NOT_SUPPORTED:
-			return "VK_ERROR_FORMAT_NOT_SUPPORTED";
-		case VK_ERROR_SURFACE_LOST_KHR:
-			return "VK_ERROR_SURFACE_LOST_KHR";
-		case VK_SUBOPTIMAL_KHR:
-			return "VK_SUBOPTIMAL_KHR";
-		case VK_ERROR_OUT_OF_DATE_KHR:
-			return "VK_ERROR_OUT_OF_DATE_KHR";
-		case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
-			return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
-		case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-			return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
-		case VK_ERROR_VALIDATION_FAILED_EXT:
-			return "VK_ERROR_VALIDATION_FAILED_EXT";
-		default:
-		{
-			if (result == VK_ERROR_INVALID_SHADER_NV)
-			{
-				return "VK_ERROR_INVALID_SHADER_NV";
-			}
-			return "unknown";
-		}
-	}
-}
-
-static void VkCheckErrors(VkResult result, const char *function)
+static void checkErrors(VkResult result, const char *function)
 {
 	if (result != VK_SUCCESS)
 	{
-		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Vulkan error: %s: %s\n", function, VkErrorString(result));
+		const char* errorString;
+		switch (result)
+		{
+			case VK_NOT_READY:
+				errorString = "VK_NOT_READY";
+				break;
+			case VK_TIMEOUT:
+				errorString = "VK_TIMEOUT";
+				break;
+			case VK_EVENT_SET:
+				errorString = "VK_EVENT_SET";
+				break;
+			case VK_EVENT_RESET:
+				errorString = "VK_EVENT_RESET";
+				break;
+			case VK_INCOMPLETE:
+				errorString = "VK_INCOMPLETE";
+				break;
+			case VK_ERROR_OUT_OF_HOST_MEMORY:
+				errorString = "VK_ERROR_OUT_OF_HOST_MEMORY";
+				break;
+			case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+				errorString = "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+				break;
+			case VK_ERROR_INITIALIZATION_FAILED:
+				errorString = "VK_ERROR_INITIALIZATION_FAILED";
+				break;
+			case VK_ERROR_DEVICE_LOST:
+				errorString = "VK_ERROR_DEVICE_LOST";
+				break;
+			case VK_ERROR_MEMORY_MAP_FAILED:
+				errorString = "VK_ERROR_MEMORY_MAP_FAILED";
+				break;
+			case VK_ERROR_LAYER_NOT_PRESENT:
+				errorString = "VK_ERROR_LAYER_NOT_PRESENT";
+				break;
+			case VK_ERROR_EXTENSION_NOT_PRESENT:
+				errorString = "VK_ERROR_EXTENSION_NOT_PRESENT";
+				break;
+			case VK_ERROR_FEATURE_NOT_PRESENT:
+				errorString = "VK_ERROR_FEATURE_NOT_PRESENT";
+				break;
+			case VK_ERROR_INCOMPATIBLE_DRIVER:
+				errorString = "VK_ERROR_INCOMPATIBLE_DRIVER";
+				break;
+			case VK_ERROR_TOO_MANY_OBJECTS:
+				errorString = "VK_ERROR_TOO_MANY_OBJECTS";
+				break;
+			case VK_ERROR_FORMAT_NOT_SUPPORTED:
+				errorString = "VK_ERROR_FORMAT_NOT_SUPPORTED";
+				break;
+			case VK_ERROR_SURFACE_LOST_KHR:
+				errorString = "VK_ERROR_SURFACE_LOST_KHR";
+				break;
+			case VK_SUBOPTIMAL_KHR:
+				errorString = "VK_SUBOPTIMAL_KHR";
+				break;
+			case VK_ERROR_OUT_OF_DATE_KHR:
+				errorString = "VK_ERROR_OUT_OF_DATE_KHR";
+				break;
+			case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
+				errorString = "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
+				break;
+			case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
+				errorString = "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+				break;
+			case VK_ERROR_VALIDATION_FAILED_EXT:
+				errorString = "VK_ERROR_VALIDATION_FAILED_EXT";
+				break;
+			case VK_ERROR_INVALID_SHADER_NV:
+				errorString = "VK_ERROR_INVALID_SHADER_NV";
+				break;
+			default:
+				errorString = "unknown";
+		}
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Vulkan error: %s: %s\n", function, errorString);
 	}
 }
 
-static uint32_t VkGetMemoryTypeIndex(
-		Device *device,
-		const uint32_t typeBits,
-		const VkMemoryPropertyFlags requiredProperties)
+static uint32_t getMemoryTypeIndex(Device *device, const uint32_t typeBits, const VkMemoryPropertyFlags requiredProperties)
 {
 	// Search memory types to find the index with the requested properties.
 	for (uint32_t type = 0; type < device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
@@ -791,13 +772,29 @@ bool createBuffer(Context *context, Buffer *buffer, const BufferType type, const
 	buffer->size = dataSize;
 	buffer->owner = true;
 
-	VkBufferCreateInfo bufferCreateInfo;
+	VkBufferCreateInfo bufferCreateInfo { };
 	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferCreateInfo.pNext = NULL;
-	bufferCreateInfo.flags = 0;
 	bufferCreateInfo.size = dataSize;
-	bufferCreateInfo.usage = getBufferUsage(type) |
-							 (hostVisible ? VK_BUFFER_USAGE_TRANSFER_SRC_BIT : VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	switch (type)
+	{
+		case BUFFER_TYPE_VERTEX:
+			bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+			break;
+		case BUFFER_TYPE_INDEX:
+			bufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+			break;
+		case BUFFER_TYPE_UNIFORM:
+			bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			break;
+	}
+	if (hostVisible)
+	{
+		bufferCreateInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	}
+	else
+	{
+		bufferCreateInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	}
 	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	bufferCreateInfo.queueFamilyIndexCount = 0;
 	bufferCreateInfo.pQueueFamilyIndices = NULL;
@@ -815,8 +812,7 @@ bool createBuffer(Context *context, Buffer *buffer, const BufferType type, const
 	memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	memoryAllocateInfo.pNext = NULL;
 	memoryAllocateInfo.allocationSize = memoryRequirements.size;
-	memoryAllocateInfo.memoryTypeIndex =
-			VkGetMemoryTypeIndex(context->device, memoryRequirements.memoryTypeBits, buffer->flags);
+	memoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(context->device, memoryRequirements.memoryTypeBits, buffer->flags);
 
 	VK(context->device->vkAllocateMemory(
 			context->device->device, &memoryAllocateInfo, nullptr, &buffer->memory));
@@ -866,10 +862,7 @@ bool createBuffer(Context *context, Buffer *buffer, const BufferType type, const
 			stagingMemoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 			stagingMemoryAllocateInfo.pNext = NULL;
 			stagingMemoryAllocateInfo.allocationSize = stagingMemoryRequirements.size;
-			stagingMemoryAllocateInfo.memoryTypeIndex = VkGetMemoryTypeIndex(
-					context->device,
-					stagingMemoryRequirements.memoryTypeBits,
-					VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+			stagingMemoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(context->device, stagingMemoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
 			VkDeviceMemory srcMemory;
 			VK(context->device->vkAllocateMemory(
@@ -1405,17 +1398,27 @@ struct Renderer
 	RenderPass RenderPassSingleView;
 	CommandBuffer EyeCommandBuffer[VRAPI_FRAME_LAYER_EYE_MAX];
 	Framebuffer Framebuffer[VRAPI_FRAME_LAYER_EYE_MAX];
-
 	ovrMatrix4f ViewMatrix[VRAPI_FRAME_LAYER_EYE_MAX];
 	ovrMatrix4f ProjectionMatrix[VRAPI_FRAME_LAYER_EYE_MAX];
 	int NumEyes;
+};
+
+enum AppMode
+{
+	AppStartupMode,
+	AppCylinderMode,
+	AppProjectionMode
 };
 
 struct AppState
 {
 	ovrJava Java;
 	ANativeWindow *NativeWindow;
+	AppMode Mode;
+	AppMode PreviousMode;
+	bool StartupButtonsPressed;
 	bool Resumed;
+	double PausedTime;
 	Device Device;
 	Context Context;
 	ovrMobile *Ovr;
@@ -1428,8 +1431,25 @@ struct AppState
 	int GpuLevel;
 	int MainThreadTid;
 	int RenderThreadTid;
-	bool BackButtonDownLastFrame;
 	Renderer Renderer;
+	ovrTextureSwapChain* CylinderSwapChain;
+	int CylinderWidth;
+	int CylinderHeight;
+	std::vector<uint32_t> CylinderTexData;
+	VkImage CylinderTexImage;
+	Buffer CylinderTexBuffer;
+	VkCommandBuffer CylinderCommandBuffer;
+	bool FirstFrame;
+	double PreviousTime;
+	double CurrentTime;
+	uint32_t PreviousLeftButtons;
+	uint32_t PreviousRightButtons;
+	uint32_t LeftButtons;
+	uint32_t RightButtons;
+	ovrVector2f PreviousLeftJoystick;
+	ovrVector2f PreviousRightJoystick;
+	ovrVector2f LeftJoystick;
+	ovrVector2f RightJoystick;
 };
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallback(VkDebugReportFlagsEXT msgFlags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject, size_t location, int32_t msgCode, const char *pLayerPrefix, const char *pMsg, void *pUserData)
@@ -1459,45 +1479,64 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallback(VkDebugReportFlagsEXT msgFlag
 	return VK_FALSE;
 }
 
-static void appHandleCmd(struct android_app *app, int32_t cmd)
+double getTime()
 {
-	auto appState = (AppState *) app->userData;
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
+}
+
+static void appHandleCommands(struct android_app *app, int32_t cmd)
+{
+	auto appState = (AppState *)app->userData;
+	double delta;
 	switch (cmd)
 	{
-		case APP_CMD_START:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "onStart()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "    APP_CMD_START");
+		case APP_CMD_PAUSE:
+			appState->Resumed = false;
+			appState->PausedTime = getTime();
 			break;
 		case APP_CMD_RESUME:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "onResume()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "    APP_CMD_RESUME");
 			appState->Resumed = true;
-			break;
-		case APP_CMD_PAUSE:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "onPause()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "    APP_CMD_PAUSE");
-			appState->Resumed = false;
-			break;
-		case APP_CMD_STOP:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "onStop()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "    APP_CMD_STOP");
-			break;
-		case APP_CMD_DESTROY:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "onDestroy()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "    APP_CMD_DESTROY");
-			appState->NativeWindow = NULL;
+			delta = getTime() - appState->PausedTime;
+			if (appState->PreviousTime > 0)
+			{
+				appState->PreviousTime += delta;
+			}
+			if (appState->CurrentTime > 0)
+			{
+				appState->CurrentTime += delta;
+			}
 			break;
 		case APP_CMD_INIT_WINDOW:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "surfaceCreated()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "    APP_CMD_INIT_WINDOW");
 			appState->NativeWindow = app->window;
 			break;
 		case APP_CMD_TERM_WINDOW:
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "surfaceDestroyed()");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "    APP_CMD_TERM_WINDOW");
 			appState->NativeWindow = NULL;
 			break;
+		case APP_CMD_DESTROY:
+			exit(0);
 	}
+}
+
+bool leftButtonIsDown(AppState& appState, uint32_t button)
+{
+	return ((appState.LeftButtons & button) != 0 && (appState.PreviousLeftButtons & button) == 0);
+}
+
+bool leftButtonIsUp(AppState& appState, uint32_t button)
+{
+	return ((appState.LeftButtons & button) == 0 && (appState.PreviousLeftButtons & button) != 0);
+}
+
+bool rightButtonIsDown(AppState& appState, uint32_t button)
+{
+	return ((appState.RightButtons & button) != 0 && (appState.PreviousRightButtons & button) == 0);
+}
+
+bool rightButtonIsUp(AppState& appState, uint32_t button)
+{
+	return ((appState.RightButtons & button) == 0 && (appState.PreviousRightButtons & button) != 0);
 }
 
 void android_main(struct android_app *app)
@@ -1534,6 +1573,9 @@ void android_main(struct android_app *app)
 	}
 	appState.Renderer.NumEyes = VRAPI_FRAME_LAYER_EYE_MAX;
 	appState.Java = java;
+	appState.PausedTime = -1;
+	appState.PreviousTime = -1;
+	appState.CurrentTime = -1;
 	uint32_t instanceExtensionNamesSize;
 	if (vrapi_GetInstanceExtensionsVulkan(nullptr, &instanceExtensionNamesSize))
 	{
@@ -2440,6 +2482,13 @@ void android_main(struct android_app *app)
 		vrapi_Shutdown();
 		exit(0);
 	}
+	appState.Device.vkCmdCopyBufferToImage = (PFN_vkCmdCopyBufferToImage) (appState.Device.instance->vkGetDeviceProcAddr(appState.Device.device, "vkCmdCopyBufferToImage"));
+	if (appState.Device.vkCmdCopyBufferToImage == nullptr)
+	{
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): vkGetDeviceProcAddr() could not find vkCmdCopyBufferToImage.");
+		vrapi_Shutdown();
+		exit(0);
+	}
 	appState.Device.vkCmdResolveImage = (PFN_vkCmdResolveImage) (appState.Device.instance->vkGetDeviceProcAddr(appState.Device.device, "vkCmdResolveImage"));
 	if (appState.Device.vkCmdResolveImage == nullptr)
 	{
@@ -2555,7 +2604,6 @@ void android_main(struct android_app *app)
 	}
 	appState.Renderer.RenderPassSingleView.type = VK_SUBPASS_CONTENTS_INLINE;
 	appState.Renderer.RenderPassSingleView.useFragmentDensity = useFragmentDensity;
-	appState.Renderer.RenderPassSingleView.colorFormat = SURFACE_COLOR_FORMAT_R8G8B8A8;
 	appState.Renderer.RenderPassSingleView.depthFormat = SURFACE_DEPTH_FORMAT_D24;
 	appState.Renderer.RenderPassSingleView.sampleCount = SAMPLE_COUNT;
 	appState.Renderer.RenderPassSingleView.internalColorFormat = VK_FORMAT_R8G8B8A8_UNORM;
@@ -2673,27 +2721,28 @@ void android_main(struct android_app *app)
 			vrapi_Shutdown();
 			exit(0);
 		}
-		appState.Renderer.Framebuffer[i].Width = eyeTextureWidth;
-		appState.Renderer.Framebuffer[i].Height = eyeTextureHeight;
-		appState.Renderer.Framebuffer[i].SampleCount = appState.Renderer.RenderPassSingleView.sampleCount;
-		appState.Renderer.Framebuffer[i].ColorTextureSwapChain = colorSwapChains[i].SwapChain;
-		appState.Renderer.Framebuffer[i].TextureSwapChainLength = colorSwapChains[i].SwapChainLength;
-		appState.Renderer.Framebuffer[i].Framebuffer.colorTextures.resize(appState.Renderer.Framebuffer[i].TextureSwapChainLength);
+		auto& framebuffer = appState.Renderer.Framebuffer[i];
+		framebuffer.Width = eyeTextureWidth;
+		framebuffer.Height = eyeTextureHeight;
+		framebuffer.SampleCount = appState.Renderer.RenderPassSingleView.sampleCount;
+		framebuffer.ColorTextureSwapChain = colorSwapChains[i].SwapChain;
+		framebuffer.TextureSwapChainLength = colorSwapChains[i].SwapChainLength;
+		framebuffer.Framebuffer.colorTextures.resize(framebuffer.TextureSwapChainLength);
 		if (colorSwapChains[i].FragmentDensityTextures.size() > 0)
 		{
-			appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures.resize(appState.Renderer.Framebuffer[i].TextureSwapChainLength);
+			framebuffer.Framebuffer.fragmentDensityTextures.resize(framebuffer.TextureSwapChainLength);
 		}
-		appState.Renderer.Framebuffer[i].Framebuffer.framebuffers.resize(appState.Renderer.Framebuffer[i].TextureSwapChainLength);
-		appState.Renderer.Framebuffer[i].Framebuffer.renderPass = &appState.Renderer.RenderPassSingleView;
-		appState.Renderer.Framebuffer[i].Framebuffer.width = eyeTextureWidth;
-		appState.Renderer.Framebuffer[i].Framebuffer.height = eyeTextureHeight;
-		appState.Renderer.Framebuffer[i].Framebuffer.numLayers = isMultiview ? 2 : 1;
-		appState.Renderer.Framebuffer[i].Framebuffer.numBuffers = appState.Renderer.Framebuffer[i].TextureSwapChainLength;
-		appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer = 0;
-		appState.Renderer.Framebuffer[i].Framebuffer.currentLayer = 0;
-		for (auto j = 0; j < appState.Renderer.Framebuffer[i].TextureSwapChainLength; j++)
+		framebuffer.Framebuffer.framebuffers.resize(framebuffer.TextureSwapChainLength);
+		framebuffer.Framebuffer.renderPass = &appState.Renderer.RenderPassSingleView;
+		framebuffer.Framebuffer.width = eyeTextureWidth;
+		framebuffer.Framebuffer.height = eyeTextureHeight;
+		framebuffer.Framebuffer.numLayers = isMultiview ? 2 : 1;
+		framebuffer.Framebuffer.numBuffers = framebuffer.TextureSwapChainLength;
+		framebuffer.Framebuffer.currentBuffer = 0;
+		framebuffer.Framebuffer.currentLayer = 0;
+		for (auto j = 0; j < framebuffer.TextureSwapChainLength; j++)
 		{
-			auto texture = &appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[j];
+			auto texture = &framebuffer.Framebuffer.colorTextures[j];
 			texture->width = eyeTextureWidth;
 			texture->height = eyeTextureHeight;
 			texture->depth = 1;
@@ -2744,25 +2793,25 @@ void android_main(struct android_app *app)
 			imageViewCreateInfo.subresourceRange.layerCount = texture->layerCount;
 			VK(appState.Context.device->vkCreateImageView(appState.Context.device->device, &imageViewCreateInfo, nullptr, &texture->view));
 			updateTextureSampler(&appState.Context, texture);
-			if (appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures.size() > 0)
+			if (framebuffer.Framebuffer.fragmentDensityTextures.size() > 0)
 			{
-				auto textureFragmentDensity = &appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures[j];
-				textureFragmentDensity->width = colorSwapChains[i].FragmentDensityTextureSizes[j].width;
-				textureFragmentDensity->height = colorSwapChains[i].FragmentDensityTextureSizes[j].height;
-				textureFragmentDensity->depth = 1;
-				textureFragmentDensity->layerCount = isMultiview ? 2 : 1;
-				textureFragmentDensity->mipCount = 1;
-				textureFragmentDensity->sampleCount = VK_SAMPLE_COUNT_1_BIT;
-				textureFragmentDensity->usage = TEXTURE_USAGE_FRAG_DENSITY;
-				textureFragmentDensity->wrapMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-				textureFragmentDensity->filter = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-				textureFragmentDensity->maxAnisotropy = 1.0f;
-				textureFragmentDensity->format = VK_FORMAT_R8G8_UNORM;
-				textureFragmentDensity->imageLayout = VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
-				textureFragmentDensity->image = colorSwapChains[i].FragmentDensityTextures[j];
-				textureFragmentDensity->memory = VK_NULL_HANDLE;
-				textureFragmentDensity->sampler = VK_NULL_HANDLE;
-				textureFragmentDensity->view = VK_NULL_HANDLE;
+				auto& textureFragmentDensity = framebuffer.Framebuffer.fragmentDensityTextures[j];
+				textureFragmentDensity.width = colorSwapChains[i].FragmentDensityTextureSizes[j].width;
+				textureFragmentDensity.height = colorSwapChains[i].FragmentDensityTextureSizes[j].height;
+				textureFragmentDensity.depth = 1;
+				textureFragmentDensity.layerCount = isMultiview ? 2 : 1;
+				textureFragmentDensity.mipCount = 1;
+				textureFragmentDensity.sampleCount = VK_SAMPLE_COUNT_1_BIT;
+				textureFragmentDensity.usage = TEXTURE_USAGE_FRAG_DENSITY;
+				textureFragmentDensity.wrapMode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+				textureFragmentDensity.filter = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+				textureFragmentDensity.maxAnisotropy = 1.0f;
+				textureFragmentDensity.format = VK_FORMAT_R8G8_UNORM;
+				textureFragmentDensity.imageLayout = VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
+				textureFragmentDensity.image = colorSwapChains[i].FragmentDensityTextures[j];
+				textureFragmentDensity.memory = VK_NULL_HANDLE;
+				textureFragmentDensity.sampler = VK_NULL_HANDLE;
+				textureFragmentDensity.view = VK_NULL_HANDLE;
 				{
 					beginSetupCommandBuffer(&appState.Context);
 					VkImageMemoryBarrier imageMemoryBarrier { };
@@ -2775,7 +2824,7 @@ void android_main(struct android_app *app)
 					imageMemoryBarrier.image = colorSwapChains[i].FragmentDensityTextures[i];
 					imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					imageMemoryBarrier.subresourceRange.levelCount = 1;
-					imageMemoryBarrier.subresourceRange.layerCount = textureFragmentDensity->layerCount;
+					imageMemoryBarrier.subresourceRange.layerCount = textureFragmentDensity.layerCount;
 					const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 					const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 					const VkDependencyFlags flags = 0;
@@ -2784,7 +2833,7 @@ void android_main(struct android_app *app)
 				}
 				VkImageViewCreateInfo imageViewCreateInfoFragmentDensity { };
 				imageViewCreateInfoFragmentDensity.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-				imageViewCreateInfoFragmentDensity.image = textureFragmentDensity->image;
+				imageViewCreateInfoFragmentDensity.image = textureFragmentDensity.image;
 				imageViewCreateInfoFragmentDensity.viewType = isMultiview ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
 				imageViewCreateInfoFragmentDensity.format = VK_FORMAT_R8G8_UNORM;
 				imageViewCreateInfoFragmentDensity.components.r = VK_COMPONENT_SWIZZLE_R;
@@ -2793,17 +2842,17 @@ void android_main(struct android_app *app)
 				imageViewCreateInfoFragmentDensity.components.a = VK_COMPONENT_SWIZZLE_A;
 				imageViewCreateInfoFragmentDensity.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				imageViewCreateInfoFragmentDensity.subresourceRange.levelCount = 1;
-				imageViewCreateInfoFragmentDensity.subresourceRange.layerCount = textureFragmentDensity->layerCount;
-				VK(appState.Context.device->vkCreateImageView(appState.Context.device->device, &imageViewCreateInfoFragmentDensity, nullptr, &textureFragmentDensity->view));
-				updateTextureSampler(&appState.Context, textureFragmentDensity);
+				imageViewCreateInfoFragmentDensity.subresourceRange.layerCount = textureFragmentDensity.layerCount;
+				VK(appState.Context.device->vkCreateImageView(appState.Context.device->device, &imageViewCreateInfoFragmentDensity, nullptr, &textureFragmentDensity.view));
+				updateTextureSampler(&appState.Context, &textureFragmentDensity);
 			}
 		}
 		if (appState.Renderer.RenderPassSingleView.sampleCount > VK_SAMPLE_COUNT_1_BIT)
 		{
 			const int depth = 0;
 			const int faceCount = 1;
-			const int width = appState.Renderer.Framebuffer[i].Width;
-			const int height = appState.Renderer.Framebuffer[i].Height;
+			const int width = framebuffer.Width;
+			const int height = framebuffer.Height;
 			const int maxDimension = width > height ? (width > depth ? width : depth) : (height > depth ? height : depth);
 			const int maxMipLevels = (1 + integerLog2(maxDimension));
 			const int layerCount = (isMultiview ? 2 : 1);
@@ -2817,7 +2866,7 @@ void android_main(struct android_app *app)
 			}
 			const int numStorageLevels = 1;
 			const int arrayLayerCount = faceCount * layerCount;
-			auto texture = &appState.Renderer.Framebuffer[i].Framebuffer.renderTexture;
+			auto texture = &framebuffer.Framebuffer.renderTexture;
 			texture->width = width;
 			texture->height = height;
 			texture->depth = depth;
@@ -2851,7 +2900,7 @@ void android_main(struct android_app *app)
 			VkMemoryAllocateInfo memoryAllocateInfo { };
 			memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 			memoryAllocateInfo.allocationSize = memoryRequirements.size;
-			memoryAllocateInfo.memoryTypeIndex = VkGetMemoryTypeIndex(appState.Context.device, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+			memoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(appState.Context.device, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 			VK(appState.Context.device->vkAllocateMemory(appState.Context.device->device, &memoryAllocateInfo, nullptr, &texture->memory));
 			VK(appState.Context.device->vkBindImageMemory(appState.Context.device->device, texture->image, texture->memory, 0));
 			beginSetupCommandBuffer(&appState.Context);
@@ -2916,10 +2965,10 @@ void android_main(struct android_app *app)
 		}
 		if (appState.Renderer.RenderPassSingleView.internalDepthFormat != VK_FORMAT_UNDEFINED)
 		{
-			const auto depthBuffer = &appState.Renderer.Framebuffer[i].Framebuffer.depthBuffer;
+			const auto depthBuffer = &framebuffer.Framebuffer.depthBuffer;
 			const auto depthFormat = appState.Renderer.RenderPassSingleView.depthFormat;
-			const auto width = appState.Renderer.Framebuffer[i].Width;
-			const auto height = appState.Renderer.Framebuffer[i].Height;
+			const auto width = framebuffer.Width;
+			const auto height = framebuffer.Height;
 			const auto numLayers = (isMultiview ? 2 : 1);
 			depthBuffer->format = depthFormat;
 			if (depthFormat == SURFACE_DEPTH_FORMAT_NONE)
@@ -2949,7 +2998,7 @@ void android_main(struct android_app *app)
 				VkMemoryAllocateInfo memoryAllocateInfo { };
 				memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 				memoryAllocateInfo.allocationSize = memoryRequirements.size;
-				memoryAllocateInfo.memoryTypeIndex = VkGetMemoryTypeIndex(appState.Context.device, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+				memoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(appState.Context.device, memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 				VK(appState.Context.device->vkAllocateMemory(appState.Context.device->device, &memoryAllocateInfo, nullptr, &depthBuffer->memory));
 				VK(appState.Context.device->vkBindImageMemory(appState.Context.device->device, depthBuffer->image, depthBuffer->memory, 0));
 				VkImageViewCreateInfo imageViewCreateInfo { };
@@ -2987,43 +3036,43 @@ void android_main(struct android_app *app)
 				depthBuffer->imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			}
 		}
-		for (auto j = 0; j < appState.Renderer.Framebuffer[i].TextureSwapChainLength; j++)
+		for (auto j = 0; j < framebuffer.TextureSwapChainLength; j++)
 		{
 			uint32_t attachmentCount = 0;
 			VkImageView attachments[4];
 			if (appState.Renderer.RenderPassSingleView.sampleCount > VK_SAMPLE_COUNT_1_BIT)
 			{
-				attachments[attachmentCount++] = appState.Renderer.Framebuffer[i].Framebuffer.renderTexture.view;
+				attachments[attachmentCount++] = framebuffer.Framebuffer.renderTexture.view;
 			}
-			attachments[attachmentCount++] = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[j].view;
+			attachments[attachmentCount++] = framebuffer.Framebuffer.colorTextures[j].view;
 			if (appState.Renderer.RenderPassSingleView.internalDepthFormat != VK_FORMAT_UNDEFINED)
 			{
-				attachments[attachmentCount++] = appState.Renderer.Framebuffer[i].Framebuffer.depthBuffer.view;
+				attachments[attachmentCount++] = framebuffer.Framebuffer.depthBuffer.view;
 			}
-			if (appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures.size() > 0 && appState.Renderer.RenderPassSingleView.useFragmentDensity)
+			if (framebuffer.Framebuffer.fragmentDensityTextures.size() > 0 && appState.Renderer.RenderPassSingleView.useFragmentDensity)
 			{
-				attachments[attachmentCount++] = appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures[j].view;
+				attachments[attachmentCount++] = framebuffer.Framebuffer.fragmentDensityTextures[j].view;
 			}
 			VkFramebufferCreateInfo framebufferCreateInfo { };
 			framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			framebufferCreateInfo.renderPass = appState.Renderer.RenderPassSingleView.renderPass;
 			framebufferCreateInfo.attachmentCount = attachmentCount;
 			framebufferCreateInfo.pAttachments = attachments;
-			framebufferCreateInfo.width = appState.Renderer.Framebuffer[i].Framebuffer.width;
-			framebufferCreateInfo.height = appState.Renderer.Framebuffer[i].Framebuffer.height;
+			framebufferCreateInfo.width = framebuffer.Framebuffer.width;
+			framebufferCreateInfo.height = framebuffer.Framebuffer.height;
 			framebufferCreateInfo.layers = 1;
-			VK(appState.Context.device->vkCreateFramebuffer(appState.Context.device->device, &framebufferCreateInfo, nullptr, &appState.Renderer.Framebuffer[i].Framebuffer.framebuffers[j]));
+			VK(appState.Context.device->vkCreateFramebuffer(appState.Context.device->device, &framebufferCreateInfo, nullptr, &framebuffer.Framebuffer.framebuffers[j]));
 		}
-		const auto numBuffers = appState.Renderer.Framebuffer[i].Framebuffer.numBuffers;
-		appState.Renderer.EyeCommandBuffer[i].type = COMMAND_BUFFER_TYPE_PRIMARY;
-		appState.Renderer.EyeCommandBuffer[i].numBuffers = numBuffers;
-		appState.Renderer.EyeCommandBuffer[i].currentBuffer = 0;
-		appState.Renderer.EyeCommandBuffer[i].context = &appState.Context;
-		appState.Renderer.EyeCommandBuffer[i].cmdBuffers.resize(numBuffers);
-		appState.Renderer.EyeCommandBuffer[i].fences.resize(numBuffers);
-		appState.Renderer.EyeCommandBuffer[i].mappedBuffers.resize(numBuffers);
-		appState.Renderer.EyeCommandBuffer[i].oldMappedBuffers.resize(numBuffers);
-		appState.Renderer.EyeCommandBuffer[i].pipelineResources.resize(numBuffers);
+		const auto numBuffers = framebuffer.Framebuffer.numBuffers;
+		auto& commandBuffer = appState.Renderer.EyeCommandBuffer[i];
+		commandBuffer.numBuffers = numBuffers;
+		commandBuffer.currentBuffer = 0;
+		commandBuffer.context = &appState.Context;
+		commandBuffer.cmdBuffers.resize(numBuffers);
+		commandBuffer.fences.resize(numBuffers);
+		commandBuffer.mappedBuffers.resize(numBuffers);
+		commandBuffer.oldMappedBuffers.resize(numBuffers);
+		commandBuffer.pipelineResources.resize(numBuffers);
 		for (auto j = 0; j < numBuffers; j++)
 		{
 			VkCommandBufferAllocateInfo commandBufferAllocateInfo { };
@@ -3031,11 +3080,11 @@ void android_main(struct android_app *app)
 			commandBufferAllocateInfo.commandPool = appState.Context.commandPool;
 			commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 			commandBufferAllocateInfo.commandBufferCount = 1;
-			VK(appState.Context.device->vkAllocateCommandBuffers(appState.Context.device->device, &commandBufferAllocateInfo, &appState.Renderer.EyeCommandBuffer[i].cmdBuffers[j]));
+			VK(appState.Context.device->vkAllocateCommandBuffers(appState.Context.device->device, &commandBufferAllocateInfo, &commandBuffer.cmdBuffers[j]));
 			VkFenceCreateInfo fenceCreateInfo { };
 			fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-			VK(appState.Context.device->vkCreateFence(appState.Context.device->device, &fenceCreateInfo, nullptr, &appState.Renderer.EyeCommandBuffer[i].fences[j].fence));
-			appState.Renderer.EyeCommandBuffer[i].fences[j].submitted = false;
+			VK(appState.Context.device->vkCreateFence(appState.Context.device->device, &fenceCreateInfo, nullptr, &commandBuffer.fences[j].fence));
+			commandBuffer.fences[j].submitted = false;
 		}
 	}
 	for (int eye = 0; eye < VRAPI_FRAME_LAYER_EYE_MAX; eye++)
@@ -3044,7 +3093,7 @@ void android_main(struct android_app *app)
 		appState.Renderer.ProjectionMatrix[eye] = ovrMatrix4f_CreateIdentity();
 	}
 	app->userData = &appState;
-	app->onAppCmd = appHandleCmd;
+	app->onAppCmd = appHandleCommands;
 	while (app->destroyRequested == 0)
 	{
 		for (;;)
@@ -3070,64 +3119,35 @@ void android_main(struct android_app *app)
 					parms.ModeParms.WindowSurface = (size_t)appState.NativeWindow;
 					parms.ModeParms.Display = 0;
 					parms.ModeParms.ShareContext = 0;
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "        vrapi_EnterVrMode()");
 					appState.Ovr = vrapi_EnterVrMode((ovrModeParms*)&parms);
 					if (appState.Ovr == nullptr)
 					{
-						__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Invalid ANativeWindow.");
+						__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main: vrapi_EnterVRMode() failed: invalid ANativeWindow");
 						appState.NativeWindow = nullptr;
 					}
 					if (appState.Ovr != nullptr)
 					{
 						vrapi_SetClockLevels(appState.Ovr, appState.CpuLevel, appState.GpuLevel);
-						__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "		vrapi_SetClockLevels( %d, %d )", appState.CpuLevel, appState.GpuLevel);
 						vrapi_SetPerfThread(appState.Ovr, VRAPI_PERF_THREAD_TYPE_MAIN, appState.MainThreadTid);
-						__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "		vrapi_SetPerfThread( MAIN, %d )", appState.MainThreadTid);
 						vrapi_SetPerfThread(appState.Ovr, VRAPI_PERF_THREAD_TYPE_RENDERER, appState.RenderThreadTid);
-						__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "		vrapi_SetPerfThread( RENDERER, %d )", appState.RenderThreadTid);
 					}
 				}
 			}
 			else if (appState.Ovr != nullptr)
 			{
-				__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "        vrapi_LeaveVrMode()");
 				vrapi_LeaveVrMode(appState.Ovr);
 				appState.Ovr = nullptr;
 			}
 		}
-		ovrEventDataBuffer eventDataBuffer { };
-		for (;;)
-		{
-			ovrEventHeader *eventHeader = (ovrEventHeader *)(&eventDataBuffer);
-			ovrResult res = vrapi_PollEvent(eventHeader);
-			if (res != ovrSuccess)
-			{
-				break;
-			}
-			switch (eventHeader->EventType)
-			{
-				case VRAPI_EVENT_DATA_LOST:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_DATA_LOST");
-					break;
-				case VRAPI_EVENT_VISIBILITY_GAINED:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_VISIBILITY_GAINED");
-					break;
-				case VRAPI_EVENT_VISIBILITY_LOST:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_VISIBILITY_LOST");
-					break;
-				case VRAPI_EVENT_FOCUS_GAINED:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_FOCUS_GAINED");
-					break;
-				case VRAPI_EVENT_FOCUS_LOST:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Received VRAPI_EVENT_FOCUS_LOST");
-					break;
-				default:
-					__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "vrapi_PollEvent: Unknown event");
-					break;
-			}
-		}
-		bool backButtonDownThisFrame = false;
-		for (int i = 0;; i++)
+		auto leftRemoteFound = false;
+		auto rightRemoteFound = false;
+		appState.LeftButtons = 0;
+		appState.RightButtons = 0;
+		appState.LeftJoystick.x = 0;
+		appState.LeftJoystick.y = 0;
+		appState.RightJoystick.x = 0;
+		appState.RightJoystick.y = 0;
+		for (auto i = 0; ; i++)
 		{
 			ovrInputCapabilityHeader cap;
 			ovrResult result = vrapi_EnumerateInputDevices(appState.Ovr, i, &cap);
@@ -3142,19 +3162,189 @@ void android_main(struct android_app *app)
 				result = vrapi_GetCurrentInputState(appState.Ovr, cap.DeviceID, &trackedRemoteState.Header);
 				if (result == ovrSuccess)
 				{
-					backButtonDownThisFrame |= trackedRemoteState.Buttons & ovrButton_Back;
-					backButtonDownThisFrame |= trackedRemoteState.Buttons & ovrButton_B;
-					backButtonDownThisFrame |= trackedRemoteState.Buttons & ovrButton_Y;
+					result = vrapi_GetInputDeviceCapabilities(appState.Ovr, &cap);
+					if (result == ovrSuccess)
+					{
+						auto trCap = (ovrInputTrackedRemoteCapabilities*) &cap;
+						if ((trCap->ControllerCapabilities & ovrControllerCaps_LeftHand) != 0)
+						{
+							leftRemoteFound = true;
+							appState.LeftButtons = trackedRemoteState.Buttons;
+							appState.LeftJoystick = trackedRemoteState.Joystick;
+						}
+						else if ((trCap->ControllerCapabilities & ovrControllerCaps_RightHand) != 0)
+						{
+							rightRemoteFound = true;
+							appState.RightButtons = trackedRemoteState.Buttons;
+							appState.RightJoystick = trackedRemoteState.Joystick;
+						}
+					}
 				}
 			}
 		}
-		bool backButtonDownLastFrame = appState.BackButtonDownLastFrame;
-		appState.BackButtonDownLastFrame = backButtonDownThisFrame;
-		if (backButtonDownLastFrame && !backButtonDownThisFrame)
+		if (leftRemoteFound && rightRemoteFound)
 		{
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "back button short press");
-			__android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "        vrapi_ShowSystemUI( confirmQuit )");
-			vrapi_ShowSystemUI(&appState.Java, VRAPI_SYS_UI_CONFIRM_QUIT_MENU);
+			if (appState.Mode == AppStartupMode)
+			{
+				if (appState.StartupButtonsPressed)
+				{
+					if ((appState.LeftButtons & ovrButton_X) == 0 && (appState.RightButtons & ovrButton_A) == 0)
+					{
+						appState.Mode = AppCylinderMode;
+						appState.StartupButtonsPressed = false;
+					}
+				}
+				else if ((appState.LeftButtons & ovrButton_X) != 0 && (appState.RightButtons & ovrButton_A) != 0)
+				{
+					appState.StartupButtonsPressed = true;
+				}
+			}
+			else if (appState.Mode == AppCylinderMode)
+			{
+				if (host_initialized)
+				{
+					if (leftButtonIsDown(appState, ovrButton_Enter))
+					{
+						Key_Event(K_ESCAPE, true);
+					}
+					if (leftButtonIsUp(appState, ovrButton_Enter))
+					{
+						Key_Event(K_ESCAPE, false);
+					}
+					if (key_dest == key_game)
+					{
+						if (joy_initialized)
+						{
+							joy_avail = true;
+							pdwRawValue[JOY_AXIS_X] = -appState.LeftJoystick.x;
+							pdwRawValue[JOY_AXIS_Y] = -appState.LeftJoystick.y;
+							pdwRawValue[JOY_AXIS_Z] = appState.RightJoystick.x;
+							pdwRawValue[JOY_AXIS_R] = appState.RightJoystick.y;
+						}
+						if (leftButtonIsDown(appState, ovrButton_Trigger) || rightButtonIsDown(appState, ovrButton_Trigger))
+						{
+							Cmd_ExecuteString("+attack", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_Trigger) || rightButtonIsUp(appState, ovrButton_Trigger))
+						{
+							Cmd_ExecuteString("-attack", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_GripTrigger))
+						{
+							Cmd_ExecuteString("+speed", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_GripTrigger))
+						{
+							Cmd_ExecuteString("-speed", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_Joystick))
+						{
+							Cmd_ExecuteString("impulse 10", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_B))
+						{
+							Cmd_ExecuteString("+jump", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_B))
+						{
+							Cmd_ExecuteString("-jump", src_command);
+						}
+						if (leftButtonIsDown(appState, ovrButton_X) || rightButtonIsDown(appState, ovrButton_A))
+						{
+							Cmd_ExecuteString("+movedown", src_command);
+						}
+						if (leftButtonIsUp(appState, ovrButton_X) || rightButtonIsUp(appState, ovrButton_A))
+						{
+							Cmd_ExecuteString("-movedown", src_command);
+						}
+						if (rightButtonIsDown(appState, ovrButton_Joystick))
+						{
+							Cmd_ExecuteString("+mlook", src_command);
+						}
+						if (rightButtonIsUp(appState, ovrButton_Joystick))
+						{
+							Cmd_ExecuteString("-mlook", src_command);
+						}
+					}
+					else
+					{
+						if ((appState.LeftJoystick.y > 0.5 && appState.PreviousLeftJoystick.y <= 0.5) || (appState.RightJoystick.y > 0.5 && appState.PreviousRightJoystick.y <= 0.5))
+						{
+							Key_Event(K_UPARROW, true);
+						}
+						if ((appState.LeftJoystick.y <= 0.5 && appState.PreviousLeftJoystick.y > 0.5) || (appState.RightJoystick.y <= 0.5 && appState.PreviousRightJoystick.y > 0.5))
+						{
+							Key_Event(K_UPARROW, false);
+						}
+						if ((appState.LeftJoystick.y < -0.5 && appState.PreviousLeftJoystick.y >= -0.5) || (appState.RightJoystick.y < -0.5 && appState.PreviousRightJoystick.y >= -0.5))
+						{
+							Key_Event(K_DOWNARROW, true);
+						}
+						if ((appState.LeftJoystick.y >= -0.5 && appState.PreviousLeftJoystick.y < -0.5) || (appState.RightJoystick.y >= -0.5 && appState.PreviousRightJoystick.y < -0.5))
+						{
+							Key_Event(K_DOWNARROW, false);
+						}
+						if ((appState.LeftJoystick.x > 0.5 && appState.PreviousLeftJoystick.x <= 0.5) || (appState.RightJoystick.x > 0.5 && appState.PreviousRightJoystick.x <= 0.5))
+						{
+							Key_Event(K_RIGHTARROW, true);
+						}
+						if ((appState.LeftJoystick.x <= 0.5 && appState.PreviousLeftJoystick.x > 0.5) || (appState.RightJoystick.x <= 0.5 && appState.PreviousRightJoystick.x > 0.5))
+						{
+							Key_Event(K_RIGHTARROW, false);
+						}
+						if ((appState.LeftJoystick.x < -0.5 && appState.PreviousLeftJoystick.x >= -0.5) || (appState.RightJoystick.x < -0.5 && appState.PreviousRightJoystick.x >= -0.5))
+						{
+							Key_Event(K_LEFTARROW, true);
+						}
+						if ((appState.LeftJoystick.x >= -0.5 && appState.PreviousLeftJoystick.x < -0.5) || (appState.RightJoystick.x >= -0.5 && appState.PreviousRightJoystick.x < -0.5))
+						{
+							Key_Event(K_LEFTARROW, false);
+						}
+						if (leftButtonIsDown(appState, ovrButton_Trigger) || leftButtonIsDown(appState, ovrButton_X) || rightButtonIsDown(appState, ovrButton_Trigger) || rightButtonIsDown(appState, ovrButton_A))
+						{
+							Key_Event(K_ENTER, true);
+						}
+						if (leftButtonIsUp(appState, ovrButton_Trigger) || leftButtonIsUp(appState, ovrButton_X) || rightButtonIsUp(appState, ovrButton_Trigger) || rightButtonIsUp(appState, ovrButton_A))
+						{
+							Key_Event(K_ENTER, false);
+						}
+						if (leftButtonIsDown(appState, ovrButton_GripTrigger) || leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_B))
+						{
+							Key_Event(K_ESCAPE, true);
+						}
+						if (leftButtonIsUp(appState, ovrButton_GripTrigger) || leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_B))
+						{
+							Key_Event(K_ESCAPE, false);
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			joy_avail = false;
+		}
+		if (leftRemoteFound)
+		{
+			appState.PreviousLeftButtons = appState.LeftButtons;
+			appState.PreviousLeftJoystick = appState.LeftJoystick;
+		}
+		else
+		{
+			appState.PreviousLeftButtons = 0;
+			appState.PreviousLeftJoystick.x = 0;
+			appState.PreviousLeftJoystick.y = 0;
+		}
+		if (rightRemoteFound)
+		{
+			appState.PreviousRightButtons = appState.RightButtons;
+			appState.PreviousRightJoystick = appState.RightJoystick;
+		}
+		else
+		{
+			appState.PreviousRightButtons = 0;
+			appState.PreviousRightJoystick.x = 0;
+			appState.PreviousRightJoystick.y = 0;
 		}
 		if (appState.Ovr == nullptr)
 		{
@@ -3177,6 +3367,84 @@ void android_main(struct android_app *app)
 			frameDesc.LayerCount = 2;
 			frameDesc.Layers = layers;
 			vrapi_SubmitFrame2(appState.Ovr, &frameDesc);
+			appState.CylinderWidth = 640;
+			appState.CylinderHeight = 400;
+			appState.CylinderSwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.CylinderWidth, appState.CylinderHeight, 1, 1);
+			appState.CylinderTexData.resize(appState.CylinderWidth * appState.CylinderHeight, 255 << 24);
+			appState.CylinderTexImage = vrapi_GetTextureSwapChainBufferVulkan(appState.CylinderSwapChain, 0);
+			auto playImageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
+			auto playImageFileLength = AAsset_getLength(playImageFile);
+			std::vector<stbi_uc> playImageSource(playImageFileLength);
+			AAsset_read(playImageFile, playImageSource.data(), playImageFileLength);
+			int playImageWidth;
+			int playImageHeight;
+			int playImageComponents;
+			auto playImage = stbi_load_from_memory(playImageSource.data(), playImageFileLength, &playImageWidth, &playImageHeight, &playImageComponents, 4);
+			auto texIndex = ((appState.CylinderHeight - playImageHeight) * appState.CylinderWidth + appState.CylinderWidth - playImageWidth) / 2;
+			auto playIndex = 0;
+			for (auto y = 0; y < playImageHeight; y++)
+			{
+				for (auto x = 0; x < playImageWidth; x++)
+				{
+					auto r = playImage[playIndex];
+					playIndex++;
+					auto g = playImage[playIndex];
+					playIndex++;
+					auto b = playImage[playIndex];
+					playIndex++;
+					auto a = playImage[playIndex];
+					playIndex++;
+					auto factor = (double)a / 255;
+					r = (unsigned char)((double)r * factor);
+					g = (unsigned char)((double)g * factor);
+					b = (unsigned char)((double)b * factor);
+					appState.CylinderTexData[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+					texIndex++;
+				}
+				texIndex += appState.CylinderWidth - playImageWidth;
+			}
+			stbi_image_free(playImage);
+			for (auto b = 0; b < 5; b++)
+			{
+				auto i = (unsigned char)(192.0 * sin(M_PI / (double)(b - 1)));
+				auto color = ((uint32_t)255 << 24) | ((uint32_t)i << 16) | ((uint32_t)i << 8) | i;
+				auto texTopIndex = b * appState.CylinderWidth + b;
+				auto texBottomIndex = (appState.CylinderHeight - 1 - b) * appState.CylinderWidth + b;
+				for (auto x = 0; x < appState.CylinderWidth - b - b; x++)
+				{
+					appState.CylinderTexData[texTopIndex] = color;
+					texTopIndex++;
+					appState.CylinderTexData[texBottomIndex] = color;
+					texBottomIndex++;
+				}
+				auto texLeftIndex = (b + 1) * appState.CylinderWidth + b;
+				auto texRightIndex = (b + 1) * appState.CylinderWidth + appState.CylinderWidth - 1 - b;
+				for (auto y = 0; y < appState.CylinderHeight - b - 1 - b - 1; y++)
+				{
+					appState.CylinderTexData[texLeftIndex] = color;
+					texLeftIndex += appState.CylinderWidth;
+					appState.CylinderTexData[texRightIndex] = color;
+					texRightIndex += appState.CylinderWidth;
+				}
+			}
+			createBuffer(&appState.Context, &appState.CylinderTexBuffer, (BufferType)0, appState.CylinderTexData.size() * sizeof(uint32_t), appState.CylinderTexData.data(), true);
+			{
+				beginSetupCommandBuffer(&appState.Context);
+				VkBufferImageCopy region { };
+				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.imageSubresource.layerCount = 1;
+				region.imageExtent.width = appState.CylinderWidth;
+				region.imageExtent.height = appState.CylinderHeight;
+				region.imageExtent.depth = 1;
+				VC(appState.Device.vkCmdCopyBufferToImage(appState.Context.setupCommandBuffer, appState.CylinderTexBuffer.buffer, appState.CylinderTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+				flushSetupCommandBuffer(&appState.Context);
+			}
+			VkCommandBufferAllocateInfo commandBufferAllocateInfo { };
+			commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			commandBufferAllocateInfo.commandPool = appState.Context.commandPool;
+			commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			commandBufferAllocateInfo.commandBufferCount = 1;
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Context.device->device, &commandBufferAllocateInfo, &appState.CylinderCommandBuffer));
 			const bool isMultiview = appState.Context.device->supportsMultiview;
 			appState.Scene.NumViews = (isMultiview) ? 2 : 1;
 			static const ovrVector3f cubePositions[8] = {
@@ -3544,12 +3812,129 @@ void android_main(struct android_app *app)
 				appState.Scene.CubePositions[insert].z = rz;
 				appState.Scene.CubeRotations[insert] = (int) (randomFloat(appState.Scene) * (NUM_ROTATIONS - 0.1f));
 			}
+			appState.FirstFrame = true;
 			appState.Scene.CreatedScene = true;
+		}
+		if (appState.PreviousMode != appState.Mode)
+		{
+			if (appState.PreviousMode == AppStartupMode)
+			{
+				sys_argc = 5;
+				sys_argv = new char *[sys_argc];
+				sys_argv[0] = (char *) "SlipNFrag";
+				sys_argv[1] = (char *) "-basedir";
+				sys_argv[2] = (char *) "/sdcard/android/data/com.heribertodelgado.slipnfrag/files";
+				sys_argv[3] = (char *) "+map";
+				sys_argv[4] = (char *) "start";
+				Sys_Init(sys_argc, sys_argv);
+				if (sys_errormessage.length() > 0)
+				{
+					if (sys_nogamedata)
+					{
+						__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Game data not found. Upload the game data files to your headset and try again.");
+					}
+					exit(0);
+				}
+				appState.PreviousLeftButtons = 0;
+				appState.PreviousRightButtons = 0;
+			}
+			if (appState.Mode == AppCylinderMode)
+			{
+				Cvar_SetValue("joystick", 1);
+				Cvar_SetValue("joyadvanced", 1);
+				Cvar_SetValue("joyadvaxisx", AxisSide);
+				Cvar_SetValue("joyadvaxisy", AxisForward);
+				Cvar_SetValue("joyadvaxisz", AxisTurn);
+				Cvar_SetValue("joyadvaxisr", AxisLook);
+				Joy_AdvancedUpdate_f();
+			}
+			appState.PreviousMode = appState.Mode;
 		}
 		appState.FrameIndex++;
 		const double predictedDisplayTime = vrapi_GetPredictedDisplayTime(appState.Ovr, appState.FrameIndex);
 		const ovrTracking2 tracking = vrapi_GetPredictedTracking2(appState.Ovr, predictedDisplayTime);
 		appState.DisplayTime = predictedDisplayTime;
+		if (host_initialized)
+		{
+			if (appState.PreviousTime < 0)
+			{
+				struct timespec now;
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				appState.PreviousTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
+			}
+			else if (appState.CurrentTime < 0)
+			{
+				struct timespec now;
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				appState.CurrentTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
+			}
+			else
+			{
+				appState.PreviousTime = appState.CurrentTime;
+				struct timespec now;
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				appState.CurrentTime = (now.tv_sec * 1e9 + now.tv_nsec) * 0.000000001;
+				frame_lapse = (float) (appState.CurrentTime - appState.PreviousTime);
+			}
+			if (appState.FirstFrame)
+			{
+				vid_width = appState.CylinderWidth;
+				vid_height = appState.CylinderHeight;
+				auto factor = (double) vid_width / 320;
+				double new_conwidth = 320;
+				auto new_conheight = ceil((double) vid_height / factor);
+				if (new_conheight < 200)
+				{
+					factor = (double) vid_height / 200;
+					new_conheight = 200;
+					new_conwidth = (double) (((int) ceil((double) vid_width / factor) + 3) & ~3);
+				}
+				con_width = (int) new_conwidth;
+				con_height = (int) new_conheight;
+				VID_Resize();
+				appState.FirstFrame = false;
+			}
+			if (r_cache_thrash)
+			{
+				VID_ReallocSurfCache();
+			}
+			Sys_Frame(frame_lapse);
+			if (sys_errormessage.length() > 0)
+			{
+				exit(0);
+			}
+			if (appState.Mode == AppCylinderMode)
+			{
+				auto index = 0;
+				for (auto y = 0; y < vid_height; y++)
+				{
+					for (auto x = 0; x < vid_width; x++)
+					{
+						appState.CylinderTexData[index] = d_8to24table[vid_buffer[index]];
+						index++;
+					}
+				}
+				VK(appState.Context.device->vkMapMemory(appState.Context.device->device, appState.CylinderTexBuffer.memory, 0, appState.CylinderTexBuffer.size, 0, &appState.CylinderTexBuffer.mapped));
+				memcpy(appState.CylinderTexBuffer.mapped, appState.CylinderTexData.data(), appState.CylinderTexData.size() * sizeof(uint32_t));
+				VC(appState.Context.device->vkUnmapMemory(appState.Context.device->device, appState.CylinderTexBuffer.memory));
+				VkCommandBufferBeginInfo commandBufferBeginInfo { };
+				commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+				VK(appState.Device.vkBeginCommandBuffer(appState.CylinderCommandBuffer, &commandBufferBeginInfo));
+				VkBufferImageCopy region { };
+				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.imageSubresource.layerCount = 1;
+				region.imageExtent.width = appState.CylinderWidth;
+				region.imageExtent.height = appState.CylinderHeight;
+				region.imageExtent.depth = 1;
+				VC(appState.Device.vkCmdCopyBufferToImage(appState.CylinderCommandBuffer, appState.CylinderTexBuffer.buffer, appState.CylinderTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+				VK(appState.Device.vkEndCommandBuffer(appState.CylinderCommandBuffer));
+				VkSubmitInfo submitInfo { };
+				submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+				submitInfo.commandBufferCount = 1;
+				submitInfo.pCommandBuffers = &appState.CylinderCommandBuffer;
+				VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &submitInfo, VK_NULL_HANDLE));
+			}
+		}
 		appState.Simulation.CurrentRotation.x = (float)predictedDisplayTime;
 		appState.Simulation.CurrentRotation.y = (float)predictedDisplayTime;
 		appState.Simulation.CurrentRotation.z = (float)predictedDisplayTime;
@@ -3565,12 +3950,14 @@ void android_main(struct android_app *app)
 		appState.Renderer.ProjectionMatrix[1] = projectionMatrixTransposed[1];
 		for (auto i = 0; i < appState.Renderer.NumEyes; i++)
 		{
+			auto& framebuffer = appState.Renderer.Framebuffer[i];
 			VkRect2D screenRect { };
-			screenRect.extent.width = appState.Renderer.Framebuffer[i].Framebuffer.width;
-			screenRect.extent.height = appState.Renderer.Framebuffer[i].Framebuffer.height;
-			auto device = appState.Renderer.EyeCommandBuffer[i].context->device;
-			appState.Renderer.EyeCommandBuffer[i].currentBuffer = (appState.Renderer.EyeCommandBuffer[i].currentBuffer + 1) % appState.Renderer.EyeCommandBuffer[i].numBuffers;
-			auto fence = &appState.Renderer.EyeCommandBuffer[i].fences[appState.Renderer.EyeCommandBuffer[i].currentBuffer];
+			screenRect.extent.width = framebuffer.Framebuffer.width;
+			screenRect.extent.height = framebuffer.Framebuffer.height;
+			auto& commandBuffer = appState.Renderer.EyeCommandBuffer[i];
+			auto device = commandBuffer.context->device;
+			commandBuffer.currentBuffer = (commandBuffer.currentBuffer + 1) % commandBuffer.numBuffers;
+			auto fence = &commandBuffer.fences[commandBuffer.currentBuffer];
 			if (fence->submitted)
 			{
 				VK(device->vkWaitForFences(device->device, 1, &fence->fence, VK_TRUE, 1ULL * 1000 * 1000 * 1000));
@@ -3578,7 +3965,7 @@ void android_main(struct android_app *app)
 				fence->submitted = false;
 			}
 			{
-				for (Buffer **b = &appState.Renderer.EyeCommandBuffer[i].oldMappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer]; *b != nullptr; )
+				for (Buffer **b = &commandBuffer.oldMappedBuffers[commandBuffer.currentBuffer]; *b != nullptr; )
 				{
 					if ((*b)->unusedCount++ >= MAX_VERTEX_BUFFER_UNUSED_COUNT)
 					{
@@ -3600,22 +3987,22 @@ void android_main(struct android_app *app)
 						b = &(*b)->next;
 					}
 				}
-				for (Buffer *b = appState.Renderer.EyeCommandBuffer[i].mappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], *next = nullptr; b != nullptr; b = next)
+				for (Buffer *b = commandBuffer.mappedBuffers[commandBuffer.currentBuffer], *next = nullptr; b != nullptr; b = next)
 				{
 					next = b->next;
-					b->next = appState.Renderer.EyeCommandBuffer[i].oldMappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer];
-					appState.Renderer.EyeCommandBuffer[i].oldMappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer] = b;
+					b->next = commandBuffer.oldMappedBuffers[commandBuffer.currentBuffer];
+					commandBuffer.oldMappedBuffers[commandBuffer.currentBuffer] = b;
 				}
-				appState.Renderer.EyeCommandBuffer[i].mappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer] = nullptr;
+				commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = nullptr;
 			}
 			{
-				for (PipelineResources **r = &appState.Renderer.EyeCommandBuffer[i].pipelineResources[appState.Renderer.EyeCommandBuffer[i].currentBuffer]; *r != nullptr; )
+				for (PipelineResources **r = &commandBuffer.pipelineResources[commandBuffer.currentBuffer]; *r != nullptr; )
 				{
 					if ((*r)->unusedCount++ >= MAX_PIPELINE_RESOURCES_UNUSED_COUNT)
 					{
 						PipelineResources *next = (*r)->next;
-						VC(appState.Renderer.EyeCommandBuffer[i].context->device->vkFreeDescriptorSets(appState.Renderer.EyeCommandBuffer[i].context->device->device, (*r)->descriptorPool, 1, &(*r)->descriptorSet));
-						VC(appState.Renderer.EyeCommandBuffer[i].context->device->vkDestroyDescriptorPool(appState.Renderer.EyeCommandBuffer[i].context->device->device, (*r)->descriptorPool, nullptr));
+						VC(commandBuffer.context->device->vkFreeDescriptorSets(commandBuffer.context->device->device, (*r)->descriptorPool, 1, &(*r)->descriptorSet));
+						VC(commandBuffer.context->device->vkDestroyDescriptorPool(commandBuffer.context->device->device, (*r)->descriptorPool, nullptr));
 						free(*r);
 						*r = next;
 					}
@@ -3625,15 +4012,15 @@ void android_main(struct android_app *app)
 					}
 				}
 			}
-			appState.Renderer.EyeCommandBuffer[i].currentGraphicsState.pipeline = nullptr;
-			appState.Renderer.EyeCommandBuffer[i].currentGraphicsState.vertexBuffer = nullptr;
-			appState.Renderer.EyeCommandBuffer[i].currentGraphicsState.instanceBuffer = nullptr;
-			memset((void *)&appState.Renderer.EyeCommandBuffer[i].currentGraphicsState.parmState, 0, sizeof(ProgramParmState));
-			appState.Renderer.EyeCommandBuffer[i].currentGraphicsState.numInstances = 1;
-			VK(device->vkResetCommandBuffer(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], 0));
+			commandBuffer.currentGraphicsState.pipeline = nullptr;
+			commandBuffer.currentGraphicsState.vertexBuffer = nullptr;
+			commandBuffer.currentGraphicsState.instanceBuffer = nullptr;
+			memset((void *)&commandBuffer.currentGraphicsState.parmState, 0, sizeof(ProgramParmState));
+			commandBuffer.currentGraphicsState.numInstances = 1;
+			VK(device->vkResetCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], 0));
 			VkCommandBufferBeginInfo commandBufferBeginInfo { };
 			commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			VK(device->vkBeginCommandBuffer(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], &commandBufferBeginInfo));
+			VK(device->vkBeginCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], &commandBufferBeginInfo));
 			{
 				VkMemoryBarrier memoryBarrier { };
 				memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -3641,33 +4028,33 @@ void android_main(struct android_app *app)
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;
 				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], src_stages, dst_stages, flags, 1, &memoryBarrier, 0, nullptr, 0, nullptr));
+				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 1, &memoryBarrier, 0, nullptr, 0, nullptr));
 			}
-			appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer = (appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer + 1) % appState.Renderer.Framebuffer[i].Framebuffer.numBuffers;
-			appState.Renderer.Framebuffer[i].Framebuffer.currentLayer = 0;
+			framebuffer.Framebuffer.currentBuffer = (framebuffer.Framebuffer.currentBuffer + 1) % framebuffer.Framebuffer.numBuffers;
+			framebuffer.Framebuffer.currentLayer = 0;
 			const VkImageLayout newImageLayout = layoutForTextureUsage(TEXTURE_USAGE_COLOR_ATTACHMENT);
 			VkImageMemoryBarrier imageMemoryBarrier { };
 			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			imageMemoryBarrier.srcAccessMask = accessForTextureUsage(appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].usage);
+			imageMemoryBarrier.srcAccessMask = accessForTextureUsage(framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].usage);
 			imageMemoryBarrier.dstAccessMask = accessForTextureUsage(TEXTURE_USAGE_COLOR_ATTACHMENT);
-			imageMemoryBarrier.oldLayout = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].imageLayout;
+			imageMemoryBarrier.oldLayout = framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].imageLayout;
 			imageMemoryBarrier.newLayout = newImageLayout;
 			imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageMemoryBarrier.image = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].image;
+			imageMemoryBarrier.image = framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].image;
 			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			imageMemoryBarrier.subresourceRange.levelCount = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].mipCount;
-			imageMemoryBarrier.subresourceRange.layerCount = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].layerCount;
-			const VkPipelineStageFlags src_stages = pipelineStagesForTextureUsage(appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].usage, true);
+			imageMemoryBarrier.subresourceRange.levelCount = framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].mipCount;
+			imageMemoryBarrier.subresourceRange.layerCount = framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].layerCount;
+			const VkPipelineStageFlags src_stages = pipelineStagesForTextureUsage(framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].usage, true);
 			const VkPipelineStageFlags dst_stages = pipelineStagesForTextureUsage(TEXTURE_USAGE_COLOR_ATTACHMENT, false);
 			const VkDependencyFlags flags = 0;
-			VC(appState.Context.device->vkCmdPipelineBarrier(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-			appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].usage = TEXTURE_USAGE_COLOR_ATTACHMENT;
-			appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer].imageLayout = newImageLayout;
-			appState.Renderer.EyeCommandBuffer[i].currentFramebuffer = &appState.Renderer.Framebuffer[i].Framebuffer;
+			VC(appState.Context.device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+			framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].usage = TEXTURE_USAGE_COLOR_ATTACHMENT;
+			framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].imageLayout = newImageLayout;
+			commandBuffer.currentFramebuffer = &framebuffer.Framebuffer;
 			ovrMatrix4f *sceneMatrices = nullptr;
 			Buffer *newBuffer = nullptr;
-			for (Buffer **b = &appState.Renderer.EyeCommandBuffer[i].oldMappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer]; *b != nullptr; b = &(*b)->next)
+			for (Buffer **b = &commandBuffer.oldMappedBuffers[commandBuffer.currentBuffer]; *b != nullptr; b = &(*b)->next)
 			{
 				if ((*b)->size == appState.Scene.SceneMatrices.size && (*b)->type == appState.Scene.SceneMatrices.type)
 				{
@@ -3679,17 +4066,17 @@ void android_main(struct android_app *app)
 			if (newBuffer == nullptr)
 			{
 				newBuffer = (Buffer *)malloc(sizeof(Buffer));
-				createBuffer(appState.Renderer.EyeCommandBuffer[i].context, newBuffer, appState.Scene.SceneMatrices.type, appState.Scene.SceneMatrices.size, nullptr, true);
+				createBuffer(commandBuffer.context, newBuffer, appState.Scene.SceneMatrices.type, appState.Scene.SceneMatrices.size, nullptr, true);
 			}
 			newBuffer->unusedCount = 0;
-			newBuffer->next = appState.Renderer.EyeCommandBuffer[i].mappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer];
-			appState.Renderer.EyeCommandBuffer[i].mappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer] = newBuffer;
-			VK(device->vkMapMemory(appState.Renderer.EyeCommandBuffer[i].context->device->device, newBuffer->memory, 0, newBuffer->size, 0, &newBuffer->mapped));
+			newBuffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
+			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = newBuffer;
+			VK(device->vkMapMemory(commandBuffer.context->device->device, newBuffer->memory, 0, newBuffer->size, 0, &newBuffer->mapped));
 			*((void **)&sceneMatrices) = newBuffer->mapped;
 			Buffer *sceneMatricesBuffer = newBuffer;
 			memcpy(sceneMatrices, &appState.Renderer.ViewMatrix[i], appState.Scene.NumViews * sizeof(ovrMatrix4f));
 			memcpy(sceneMatrices + appState.Scene.NumViews, &appState.Renderer.ProjectionMatrix[i], appState.Scene.NumViews * sizeof(ovrMatrix4f));
-			VC(device->vkUnmapMemory(appState.Renderer.EyeCommandBuffer[i].context->device->device, sceneMatricesBuffer->memory));
+			VC(device->vkUnmapMemory(commandBuffer.context->device->device, sceneMatricesBuffer->memory));
 			sceneMatricesBuffer->mapped = nullptr;
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
@@ -3703,14 +4090,14 @@ void android_main(struct android_app *app)
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;
 				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
 			{
 				VkBufferCopy bufferCopy;
 				bufferCopy.srcOffset = 0;
 				bufferCopy.dstOffset = 0;
 				bufferCopy.size = appState.Scene.SceneMatrices.size;
-				VC(device->vkCmdCopyBuffer(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], sceneMatricesBuffer->buffer, appState.Scene.SceneMatrices.buffer, 1, &bufferCopy));
+				VC(device->vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], sceneMatricesBuffer->buffer, appState.Scene.SceneMatrices.buffer, 1, &bufferCopy));
 			}
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
@@ -3724,7 +4111,7 @@ void android_main(struct android_app *app)
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkPipelineStageFlags dst_stages = pipelineStagesForBufferUsage(appState.Scene.SceneMatrices.type);
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
 			ovrMatrix4f rotationMatrices[NUM_ROTATIONS];
 			for (auto j = 0; j < NUM_ROTATIONS; j++)
@@ -3734,7 +4121,7 @@ void android_main(struct android_app *app)
 			DefaultVertexAttributeArrays attribs;
 			void *data = nullptr;
 			newBuffer = nullptr;
-			for (Buffer **b = &appState.Renderer.EyeCommandBuffer[i].oldMappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer]; *b != nullptr; b = &(*b)->next)
+			for (Buffer **b = &commandBuffer.oldMappedBuffers[commandBuffer.currentBuffer]; *b != nullptr; b = &(*b)->next)
 			{
 				if ((*b)->size == appState.Scene.Cube.instanceBuffer.size && (*b)->type == appState.Scene.Cube.instanceBuffer.type)
 				{
@@ -3746,12 +4133,12 @@ void android_main(struct android_app *app)
 			if (newBuffer == nullptr)
 			{
 				newBuffer = (Buffer *)malloc(sizeof(Buffer));
-				createBuffer(appState.Renderer.EyeCommandBuffer[i].context, newBuffer, appState.Scene.Cube.instanceBuffer.type, appState.Scene.Cube.instanceBuffer.size, nullptr, true);
+				createBuffer(commandBuffer.context, newBuffer, appState.Scene.Cube.instanceBuffer.type, appState.Scene.Cube.instanceBuffer.size, nullptr, true);
 			}
 			newBuffer->unusedCount = 0;
-			newBuffer->next = appState.Renderer.EyeCommandBuffer[i].mappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer];
-			appState.Renderer.EyeCommandBuffer[i].mappedBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer] = newBuffer;
-			VK(device->vkMapMemory(appState.Renderer.EyeCommandBuffer[i].context->device->device, newBuffer->memory, 0, newBuffer->size, 0, &newBuffer->mapped));
+			newBuffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
+			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = newBuffer;
+			VK(device->vkMapMemory(commandBuffer.context->device->device, newBuffer->memory, 0, newBuffer->size, 0, &newBuffer->mapped));
 			*(&data) = newBuffer->mapped;
 			Buffer *buffer = newBuffer;
 			attribs.base.layout = appState.Scene.Cube.layout;
@@ -3793,7 +4180,7 @@ void android_main(struct android_app *app)
 				transforms[j].M[3][2] = appState.Scene.CubePositions[j].z;
 				transforms[j].M[3][3] = 1.0f;
 			}
-			VC(device->vkUnmapMemory(appState.Renderer.EyeCommandBuffer[i].context->device->device, instanceBuffer->memory));
+			VC(device->vkUnmapMemory(commandBuffer.context->device->device, instanceBuffer->memory));
 			instanceBuffer->mapped = NULL;
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
@@ -3808,14 +4195,14 @@ void android_main(struct android_app *app)
 				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkDependencyFlags flags = 0;
 
-				VC(device->vkCmdPipelineBarrier(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
 			{
 				VkBufferCopy bufferCopy;
 				bufferCopy.srcOffset = 0;
 				bufferCopy.dstOffset = 0;
 				bufferCopy.size = appState.Scene.Cube.instanceBuffer.size;
-				VC(device->vkCmdCopyBuffer(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], instanceBuffer->buffer, appState.Scene.Cube.instanceBuffer.buffer, 1, &bufferCopy));
+				VC(device->vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], instanceBuffer->buffer, appState.Scene.Cube.instanceBuffer.buffer, 1, &bufferCopy));
 			}
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
@@ -3829,9 +4216,9 @@ void android_main(struct android_app *app)
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkPipelineStageFlags dst_stages = pipelineStagesForBufferUsage(buffer->type);
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
-			auto cmdBuffer = appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer];
+			auto cmdBuffer = commandBuffer.cmdBuffers[commandBuffer.currentBuffer];
 			uint32_t clearValueCount = 0;
 			VkClearValue clearValues[3] { };
 			clearValues[clearValueCount].color.float32[0] = appState.Renderer.RenderPassSingleView.clearColor.x;
@@ -3855,13 +4242,13 @@ void android_main(struct android_app *app)
 			VkRenderPassBeginInfo renderPassBeginInfo { };
 			renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 			renderPassBeginInfo.renderPass = appState.Renderer.RenderPassSingleView.renderPass;
-			renderPassBeginInfo.framebuffer = appState.Renderer.Framebuffer[i].Framebuffer.framebuffers[appState.Renderer.Framebuffer[i].Framebuffer.currentBuffer + appState.Renderer.Framebuffer[i].Framebuffer.currentLayer];
+			renderPassBeginInfo.framebuffer = framebuffer.Framebuffer.framebuffers[framebuffer.Framebuffer.currentBuffer + framebuffer.Framebuffer.currentLayer];
 			renderPassBeginInfo.renderArea = screenRect;
 			renderPassBeginInfo.clearValueCount = clearValueCount;
 			renderPassBeginInfo.pClearValues = clearValues;
 			VkSubpassContents contents = appState.Renderer.RenderPassSingleView.type;
 			VC(device->vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo, contents));
-			appState.Renderer.EyeCommandBuffer[i].currentRenderPass = &appState.Renderer.RenderPassSingleView;
+			commandBuffer.currentRenderPass = &appState.Renderer.RenderPassSingleView;
 			VkViewport viewport;
 			viewport.x = (float) screenRect.offset.x;
 			viewport.y = (float) screenRect.offset.y;
@@ -3876,7 +4263,7 @@ void android_main(struct android_app *app)
 			command.pipeline = &appState.Scene.Pipeline;
 			command.parmState.parms[PROGRAM_UNIFORM_SCENE_MATRICES] = &appState.Scene.SceneMatrices;
 			command.numInstances = NUM_INSTANCES;
-			auto state = &appState.Renderer.EyeCommandBuffer[i].currentGraphicsState;
+			auto state = &commandBuffer.currentGraphicsState;
 			if (command.pipeline != state->pipeline)
 			{
 				VC(device->vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, command.pipeline->pipeline));
@@ -3886,7 +4273,7 @@ void android_main(struct android_app *app)
 			if (!descriptorsMatch(commandLayout, &command.parmState, stateLayout, &state->parmState))
 			{
 				PipelineResources *resources = nullptr;
-				for (PipelineResources *r = appState.Renderer.EyeCommandBuffer[i].pipelineResources[appState.Renderer.EyeCommandBuffer[i].currentBuffer]; r != nullptr; r = r->next)
+				for (PipelineResources *r = commandBuffer.pipelineResources[commandBuffer.currentBuffer]; r != nullptr; r = r->next)
 				{
 					if (descriptorsMatch(commandLayout, &command.parmState, r->parmLayout, &r->parms))
 					{
@@ -3987,8 +4374,8 @@ void android_main(struct android_app *app)
 							VC(appState.Context.device->vkUpdateDescriptorSets(appState.Context.device->device, numWrites, writes, 0, nullptr));
 						}
 					}
-					resources->next = appState.Renderer.EyeCommandBuffer[i].pipelineResources[appState.Renderer.EyeCommandBuffer[i].currentBuffer];
-					appState.Renderer.EyeCommandBuffer[i].pipelineResources[appState.Renderer.EyeCommandBuffer[i].currentBuffer] = resources;
+					resources->next = commandBuffer.pipelineResources[commandBuffer.currentBuffer];
+					commandBuffer.pipelineResources[commandBuffer.currentBuffer] = resources;
 				}
 				VC(device->vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, commandLayout->pipelineLayout, 0, 1, &resources->descriptorSet, 0, nullptr));
 			}
@@ -4038,38 +4425,38 @@ void android_main(struct android_app *app)
 				VC(device->vkCmdBindIndexBuffer(cmdBuffer, geometry->indexBuffer.buffer, 0, indexType));
 			}
 			VC(device->vkCmdDrawIndexed(cmdBuffer, geometry->indexCount, command.numInstances, 0, 0, 0));
-			appState.Renderer.EyeCommandBuffer[i].currentGraphicsState = command;
+			commandBuffer.currentGraphicsState = command;
 			VC(device->vkCmdEndRenderPass(cmdBuffer));
-			appState.Renderer.EyeCommandBuffer[i].currentRenderPass = nullptr;
+			commandBuffer.currentRenderPass = nullptr;
 			{
 				const VkImageLayout newImageLayout = layoutForTextureUsage(TEXTURE_USAGE_SAMPLED);
 				VkImageMemoryBarrier imageMemoryBarrier { };
 				imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-				imageMemoryBarrier.srcAccessMask = accessForTextureUsage(appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].usage);
+				imageMemoryBarrier.srcAccessMask = accessForTextureUsage(framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].usage);
 				imageMemoryBarrier.dstAccessMask = accessForTextureUsage(TEXTURE_USAGE_SAMPLED);
-				imageMemoryBarrier.oldLayout = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].imageLayout;
+				imageMemoryBarrier.oldLayout = framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].imageLayout;
 				imageMemoryBarrier.newLayout = newImageLayout;
 				imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				imageMemoryBarrier.image = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].image;
+				imageMemoryBarrier.image = framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].image;
 				imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				imageMemoryBarrier.subresourceRange.levelCount = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].mipCount;
-				imageMemoryBarrier.subresourceRange.layerCount = appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].layerCount;
-				const VkPipelineStageFlags src_stages = pipelineStagesForTextureUsage(appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].usage, true);
+				imageMemoryBarrier.subresourceRange.levelCount = framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].mipCount;
+				imageMemoryBarrier.subresourceRange.layerCount = framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].layerCount;
+				const VkPipelineStageFlags src_stages = pipelineStagesForTextureUsage(framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].usage, true);
 				const VkPipelineStageFlags dst_stages = pipelineStagesForTextureUsage(TEXTURE_USAGE_SAMPLED, false);
 				const VkDependencyFlags flags = 0;
 				VC(appState.Context.device->vkCmdPipelineBarrier(cmdBuffer, src_stages, dst_stages, flags, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-				appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].usage = TEXTURE_USAGE_SAMPLED;
-				appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[appState.Renderer.EyeCommandBuffer[i].currentBuffer].imageLayout = newImageLayout;
+				framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].usage = TEXTURE_USAGE_SAMPLED;
+				framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].imageLayout = newImageLayout;
 			}
-			appState.Renderer.EyeCommandBuffer[i].currentFramebuffer = nullptr;
-			VK(device->vkEndCommandBuffer(appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer]));
+			commandBuffer.currentFramebuffer = nullptr;
+			VK(device->vkEndCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer]));
 			const VkPipelineStageFlags stageFlags[1] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 			VkSubmitInfo submitInfo { };
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1;
-			submitInfo.pCommandBuffers = &appState.Renderer.EyeCommandBuffer[i].cmdBuffers[appState.Renderer.EyeCommandBuffer[i].currentBuffer];
-			VK(device->vkQueueSubmit(appState.Renderer.EyeCommandBuffer[i].context->queue, 1, &submitInfo, fence->fence));
+			submitInfo.pCommandBuffers = &commandBuffer.cmdBuffers[commandBuffer.currentBuffer];
+			VK(device->vkQueueSubmit(commandBuffer.context->queue, 1, &submitInfo, fence->fence));
 			fence->submitted = true;
 		}
 		ovrLayerProjection2 worldLayer = vrapi_DefaultLayerProjection2();
@@ -4081,66 +4468,103 @@ void android_main(struct android_app *app)
 			worldLayer.Textures[eye].SwapChainIndex = appState.Renderer.Framebuffer[eyeToSample].Framebuffer.currentBuffer;
 			worldLayer.Textures[eye].TexCoordsFromTanAngles = ovrMatrix4f_TanAngleMatrixFromProjection(&tracking.Eye[eye].ProjectionMatrix);
 		}
-		const ovrLayerHeader2* layers[] = { &worldLayer.Header };
+		auto screenLayer = vrapi_DefaultLayerCylinder2();
+		const float fadeLevel = 1.0f;
+		screenLayer.Header.ColorScale.x = screenLayer.Header.ColorScale.y = screenLayer.Header.ColorScale.z =
+		screenLayer.Header.ColorScale.w = fadeLevel;
+		screenLayer.Header.SrcBlend = VRAPI_FRAME_LAYER_BLEND_SRC_ALPHA;
+		screenLayer.Header.DstBlend = VRAPI_FRAME_LAYER_BLEND_ONE_MINUS_SRC_ALPHA;
+		screenLayer.HeadPose = tracking.HeadPose;
+		const float density = 4500.0f;
+		float rotateYaw = 0.0f;
+		float rotatePitch = 0.0f;
+		const float radius = 1.0f;
+		const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.CylinderHeight * VRAPI_PI / density, radius);
+		const ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
+		const ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
+		const ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
+		ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
+		const float circScale = density * 0.5f / appState.CylinderWidth;
+		const float circBias = -circScale * (0.5f * (1.0f - 1.0f / circScale));
+		for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
+		{
+			ovrMatrix4f modelViewMatrix = ovrMatrix4f_Multiply(&tracking.Eye[i].ViewMatrix, &cylinderTransform);
+			screenLayer.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_Inverse(&modelViewMatrix);
+			screenLayer.Textures[i].ColorSwapChain = appState.CylinderSwapChain;
+			screenLayer.Textures[i].SwapChainIndex = 0;
+			const float texScaleX = circScale;
+			const float texBiasX = circBias;
+			const float texScaleY = 0.5f;
+			const float texBiasY = -texScaleY * (0.5f * (1.0f - (1.0f / texScaleY)));
+			screenLayer.Textures[i].TextureMatrix.M[0][0] = texScaleX;
+			screenLayer.Textures[i].TextureMatrix.M[0][2] = texBiasX;
+			screenLayer.Textures[i].TextureMatrix.M[1][1] = texScaleY;
+			screenLayer.Textures[i].TextureMatrix.M[1][2] = texBiasY;
+			screenLayer.Textures[i].TextureRect.width = 1.0f;
+			screenLayer.Textures[i].TextureRect.height = 1.0f;
+		}
+		const ovrLayerHeader2* layers[] = { &worldLayer.Header, &screenLayer.Header };
 		ovrSubmitFrameDescription2 frameDesc = { };
 		frameDesc.SwapInterval = appState.SwapInterval;
 		frameDesc.FrameIndex = appState.FrameIndex;
 		frameDesc.DisplayTime = appState.DisplayTime;
-		frameDesc.LayerCount = 1;
+		frameDesc.LayerCount = 2;
 		frameDesc.Layers = layers;
 		vrapi_SubmitFrame2(appState.Ovr, &frameDesc);
 	}
 	for (auto i = 0; i < appState.Renderer.NumEyes; i++)
 	{
-		for (auto j = 0; j < appState.Renderer.Framebuffer[i].TextureSwapChainLength; j++)
+		auto& framebuffer = appState.Renderer.Framebuffer[i];
+		for (auto j = 0; j < framebuffer.TextureSwapChainLength; j++)
 		{
-			if (appState.Renderer.Framebuffer[i].Framebuffer.framebuffers.size() > 0)
+			if (framebuffer.Framebuffer.framebuffers.size() > 0)
 			{
-				VC(appState.Context.device->vkDestroyFramebuffer(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.framebuffers[j], nullptr));
+				VC(appState.Context.device->vkDestroyFramebuffer(appState.Context.device->device, framebuffer.Framebuffer.framebuffers[j], nullptr));
 			}
-			if (appState.Renderer.Framebuffer[i].Framebuffer.colorTextures.size() > 0)
+			if (framebuffer.Framebuffer.colorTextures.size() > 0)
 			{
-				VC(appState.Context.device->vkDestroySampler(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[j].sampler, nullptr));
-				if (appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[j].memory != VK_NULL_HANDLE)
+				VC(appState.Context.device->vkDestroySampler(appState.Context.device->device, framebuffer.Framebuffer.colorTextures[j].sampler, nullptr));
+				if (framebuffer.Framebuffer.colorTextures[j].memory != VK_NULL_HANDLE)
 				{
-					VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[j].view, nullptr));
-					VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[j].image, nullptr));
-					VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.colorTextures[j].memory, nullptr));
+					VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, framebuffer.Framebuffer.colorTextures[j].view, nullptr));
+					VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, framebuffer.Framebuffer.colorTextures[j].image, nullptr));
+					VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, framebuffer.Framebuffer.colorTextures[j].memory, nullptr));
 				}
 			}
-			if (appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures.size() > 0)
+			if (framebuffer.Framebuffer.fragmentDensityTextures.size() > 0)
 			{
-				VC(appState.Context.device->vkDestroySampler(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures[j].sampler, nullptr));
-				if (appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures[j].memory != VK_NULL_HANDLE)
+				VC(appState.Context.device->vkDestroySampler(appState.Context.device->device, framebuffer.Framebuffer.fragmentDensityTextures[j].sampler, nullptr));
+				if (framebuffer.Framebuffer.fragmentDensityTextures[j].memory != VK_NULL_HANDLE)
 				{
-					VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures[j].view, nullptr));
-					VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures[j].image, nullptr));
-					VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.fragmentDensityTextures[j].memory, nullptr));
+					VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, framebuffer.Framebuffer.fragmentDensityTextures[j].view, nullptr));
+					VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, framebuffer.Framebuffer.fragmentDensityTextures[j].image, nullptr));
+					VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, framebuffer.Framebuffer.fragmentDensityTextures[j].memory, nullptr));
 				}
 			}
 		}
-		if (appState.Renderer.Framebuffer[i].Framebuffer.depthBuffer.image != VK_NULL_HANDLE && appState.Renderer.Framebuffer[i].Framebuffer.depthBuffer.internalFormat != VK_FORMAT_UNDEFINED)
+		if (framebuffer.Framebuffer.depthBuffer.image != VK_NULL_HANDLE && framebuffer.Framebuffer.depthBuffer.internalFormat != VK_FORMAT_UNDEFINED)
 		{
-			VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.depthBuffer.view, nullptr));
-			VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.depthBuffer.image, nullptr));
-			VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.depthBuffer.memory, nullptr));
+			VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, framebuffer.Framebuffer.depthBuffer.view, nullptr));
+			VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, framebuffer.Framebuffer.depthBuffer.image, nullptr));
+			VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, framebuffer.Framebuffer.depthBuffer.memory, nullptr));
 		}
-		if (appState.Renderer.Framebuffer[i].Framebuffer.renderTexture.image != VK_NULL_HANDLE)
+		if (framebuffer.Framebuffer.renderTexture.image != VK_NULL_HANDLE)
 		{
-			VC(appState.Context.device->vkDestroySampler(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.renderTexture.sampler, nullptr));
-			if (appState.Renderer.Framebuffer[i].Framebuffer.renderTexture.memory != VK_NULL_HANDLE)
+			VC(appState.Context.device->vkDestroySampler(appState.Context.device->device, framebuffer.Framebuffer.renderTexture.sampler, nullptr));
+			if (framebuffer.Framebuffer.renderTexture.memory != VK_NULL_HANDLE)
 			{
-				VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.renderTexture.view, nullptr));
-				VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.renderTexture.image, nullptr));
-				VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, appState.Renderer.Framebuffer[i].Framebuffer.renderTexture.memory, nullptr));
+				VC(appState.Context.device->vkDestroyImageView(appState.Context.device->device, framebuffer.Framebuffer.renderTexture.view, nullptr));
+				VC(appState.Context.device->vkDestroyImage(appState.Context.device->device, framebuffer.Framebuffer.renderTexture.image, nullptr));
+				VC(appState.Context.device->vkFreeMemory(appState.Context.device->device, framebuffer.Framebuffer.renderTexture.memory, nullptr));
 			}
 		}
-		vrapi_DestroyTextureSwapChain(appState.Renderer.Framebuffer[i].ColorTextureSwapChain);
-		for (auto j = 0; j < appState.Renderer.EyeCommandBuffer[i].numBuffers; j++)
+		vrapi_DestroyTextureSwapChain(framebuffer.ColorTextureSwapChain);
+		auto& commandBuffer = appState.Renderer.EyeCommandBuffer[i];
+		for (auto j = 0; j < commandBuffer.numBuffers; j++)
 		{
-			VC(appState.Context.device->vkFreeCommandBuffers(appState.Context.device->device, appState.Context.commandPool, 1, &appState.Renderer.EyeCommandBuffer[i].cmdBuffers[j]));
-			VC(appState.Context.device->vkDestroyFence(appState.Context.device->device, appState.Renderer.EyeCommandBuffer[i].fences[j].fence, nullptr));
-			for (Buffer *b = appState.Renderer.EyeCommandBuffer[i].mappedBuffers[j], *next = nullptr; b != nullptr; b = next)
+			VC(appState.Context.device->vkFreeCommandBuffers(appState.Context.device->device, appState.Context.commandPool, 1, &commandBuffer.cmdBuffers[j]));
+			VC(appState.Context.device->vkDestroyFence(appState.Context.device->device, commandBuffer.fences[j].fence, nullptr));
+			for (Buffer *b = commandBuffer.mappedBuffers[j], *next = nullptr; b != nullptr; b = next)
 			{
 				next = b->next;
 				if (b->mapped != nullptr)
@@ -4154,7 +4578,7 @@ void android_main(struct android_app *app)
 				}
 				free(b);
 			}
-			for (Buffer *b = appState.Renderer.EyeCommandBuffer[i].oldMappedBuffers[j], *next = nullptr; b != nullptr; b = next)
+			for (Buffer *b = commandBuffer.oldMappedBuffers[j], *next = nullptr; b != nullptr; b = next)
 			{
 				next = b->next;
 				if (b->mapped != nullptr)
@@ -4168,16 +4592,17 @@ void android_main(struct android_app *app)
 				}
 				free(b);
 			}
-			for (PipelineResources *r = appState.Renderer.EyeCommandBuffer[i].pipelineResources[j], *next = nullptr; r != nullptr; r = next)
+			for (PipelineResources *r = commandBuffer.pipelineResources[j], *next = nullptr; r != nullptr; r = next)
 			{
 				next = r->next;
 				VC(appState.Context.device->vkFreeDescriptorSets(appState.Context.device->device, r->descriptorPool, 1, &r->descriptorSet));
 				VC(appState.Context.device->vkDestroyDescriptorPool(appState.Context.device->device, r->descriptorPool, nullptr));
 				free(r);
 			}
-			appState.Renderer.EyeCommandBuffer[i].pipelineResources[j] = nullptr;
+			commandBuffer.pipelineResources[j] = nullptr;
 		}
 	}
+	VC(appState.Context.device->vkFreeCommandBuffers(appState.Context.device->device, appState.Context.commandPool, 1, &appState.CylinderCommandBuffer));
 	VC(appState.Context.device->vkDestroyRenderPass(appState.Context.device->device, appState.Renderer.RenderPassSingleView.renderPass, nullptr));
 	VK(appState.Context.device->vkQueueWaitIdle(appState.Context.queue));
 	VC(appState.Context.device->vkDestroyPipeline(appState.Context.device->device, appState.Scene.Pipeline.pipeline, nullptr));
