@@ -17,6 +17,10 @@ android {
     targetSdkVersion 25
     compileSdkVersion 26
 
+    shaders {
+      glslcArgs.addAll(['-c', '-g'])
+    }
+
     // override app plugin abiFilters for 64-bit support
     externalNativeBuild {
         ndk {
@@ -35,6 +39,7 @@ android {
       jniLibs.srcDir 'libs'
       res.srcDirs = ['../../res']
       assets.srcDirs = ['../../assets']
+      shaders.srcDirs = ['../../shaders']
     }
   }
 
