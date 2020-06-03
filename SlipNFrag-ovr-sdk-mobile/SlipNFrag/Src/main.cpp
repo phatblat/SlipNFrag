@@ -21,12 +21,9 @@
 #define DEBUG 1
 #define _DEBUG 1
 
-#define OFFSETOF_MEMBER(type, member) (size_t) & ((type*)0)->member
-#define SIZEOF_MEMBER(type, member) sizeof(((type*)0)->member)
 #define VK(func) checkErrors(func, #func);
 #define VC(func) func;
 #define MAX_PROGRAM_PARMS 16
-#define MAX_VERTEX_ATTRIBUTES 16
 #define ARRAY_SIZE(a) (sizeof((a)) / sizeof((a)[0]))
 #define MAX_SAVED_PUSH_CONSTANT_BYTES 512
 #define MAX_VERTEX_BUFFER_UNUSED_COUNT 16
@@ -40,13 +37,6 @@ enum BufferType
 	BUFFER_TYPE_VERTEX,
 	BUFFER_TYPE_INDEX,
 	BUFFER_TYPE_UNIFORM
-};
-
-enum DefaultVertexAttributeFlags
-{
-	VERTEX_ATTRIBUTE_FLAG_POSITION = 1,
-	VERTEX_ATTRIBUTE_FLAG_COLOR = 2,
-	VERTEX_ATTRIBUTE_FLAG_TRANSFORM = 4
 };
 
 enum TextureUsage
@@ -205,16 +195,6 @@ struct Context
 	VkCommandBuffer setupCommandBuffer;
 };
 
-struct VertexAttribute
-{
-	int attributeFlag;
-	size_t attributeOffset;
-	size_t attributeSize;
-	VkFormat attributeFormat;
-	int locationCount;
-	const char* name;
-};
-
 struct Buffer
 {
 	Buffer* next;
@@ -230,30 +210,11 @@ struct Buffer
 
 struct Geometry
 {
-	const VertexAttribute* layout;
-	int vertexAttribsFlags;
-	int instanceAttribsFlags;
 	int vertexCount;
-	int instanceCount;
 	int indexCount;
 	Buffer vertexBuffer;
 	Buffer instanceBuffer;
 	Buffer indexBuffer;
-};
-
-struct VertexAttributeArrays
-{
-	const Buffer* buffer;
-	const VertexAttribute* layout;
-	void* data;
-};
-
-struct DefaultVertexAttributeArrays
-{
-	VertexAttributeArrays base;
-	ovrVector3f* position;
-	ovrVector4f* color;
-	ovrMatrix4f* transform;
 };
 
 struct ProgramParm
@@ -336,7 +297,6 @@ struct GraphicsProgram
 	VkShaderModule fragmentShaderModule;
 	VkPipelineShaderStageCreateInfo pipelineStages[2];
 	ProgramParmLayout parmLayout;
-	int vertexAttribsFlags;
 };
 
 struct RasterOperations
@@ -362,15 +322,14 @@ struct RasterOperations
 
 struct GraphicsPipeline
 {
-	RasterOperations rop;
 	const GraphicsProgram *program;
 	const Geometry *geometry;
 	int vertexAttributeCount;
 	int vertexBindingCount;
 	int firstInstanceBinding;
-	VkVertexInputAttributeDescription vertexAttributes[MAX_VERTEX_ATTRIBUTES];
-	VkVertexInputBindingDescription vertexBindings[MAX_VERTEX_ATTRIBUTES];
-	VkDeviceSize vertexBindingOffsets[MAX_VERTEX_ATTRIBUTES];
+	VkVertexInputAttributeDescription vertexAttributes[6];
+	VkVertexInputBindingDescription vertexBindings[3];
+	VkDeviceSize vertexBindingOffsets[3];
 	VkPipelineVertexInputStateCreateInfo vertexInputState;
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyState;
 	VkPipeline pipeline;
@@ -515,42 +474,6 @@ struct AppState
 	ovrVector2f PreviousRightJoystick;
 	ovrVector2f LeftJoystick;
 	ovrVector2f RightJoystick;
-};
-
-static const VertexAttribute DefaultVertexAttributeLayout[]
-{
-	{
-		VERTEX_ATTRIBUTE_FLAG_POSITION,
-		OFFSETOF_MEMBER(DefaultVertexAttributeArrays, position),
-		SIZEOF_MEMBER(DefaultVertexAttributeArrays, position[0]),
-		VK_FORMAT_R32G32B32_SFLOAT,
-		1,
-		"vertexPosition"
-	},
-	{
-		VERTEX_ATTRIBUTE_FLAG_COLOR,
-		OFFSETOF_MEMBER(DefaultVertexAttributeArrays, color),
-		SIZEOF_MEMBER(DefaultVertexAttributeArrays, color[0]),
-		VK_FORMAT_R32G32B32A32_SFLOAT,
-		1,
-		"vertexColor"
-	},
-	{
-		VERTEX_ATTRIBUTE_FLAG_TRANSFORM,
-		OFFSETOF_MEMBER(DefaultVertexAttributeArrays, transform),
-		SIZEOF_MEMBER(DefaultVertexAttributeArrays, transform[0]),
-		VK_FORMAT_R32G32B32A32_SFLOAT,
-		4,
-		"vertexTransform"
-	},
-	{
-		0,
-		0,
-		0,
-		(VkFormat)0,
-		0,
-		""
-	}
 };
 
 static const int queueCount = 1;
@@ -961,38 +884,6 @@ float randomFloat(Scene& scene)
 	scene.Random = 1664525L * scene.Random + 1013904223L;
 	unsigned int rf = 0x3F800000 | (scene.Random & 0x007FFFFF);
 	return (*(float *) &rf) - 1.0f;
-}
-
-void initVertexAttributes(const bool instance, const VertexAttribute *vertexLayout, const int numAttribs, const int storedAttribsFlags, const int usedAttribsFlags, GraphicsPipeline& pipeline)
-{
-	size_t offset = 0;
-	for (int i = 0; vertexLayout[i].attributeFlag != 0; i++)
-	{
-		const VertexAttribute *v = &vertexLayout[i];
-		if ((v->attributeFlag & storedAttribsFlags) != 0)
-		{
-			if ((v->attributeFlag & usedAttribsFlags) != 0)
-			{
-				for (int location = 0; location < v->locationCount; location++)
-				{
-					pipeline.vertexAttributes[pipeline.vertexAttributeCount + location].location = pipeline.vertexAttributeCount + location;
-					pipeline.vertexAttributes[pipeline.vertexAttributeCount + location].binding = pipeline.vertexBindingCount;
-					pipeline.vertexAttributes[pipeline.vertexAttributeCount + location].format = (VkFormat) v->attributeFormat;
-					pipeline.vertexAttributes[pipeline.vertexAttributeCount + location].offset = (uint32_t) (location * v->attributeSize / v->locationCount);
-				}
-
-				pipeline.vertexBindings[pipeline.vertexBindingCount].binding = pipeline.vertexBindingCount;
-				pipeline.vertexBindings[pipeline.vertexBindingCount].stride = (uint32_t) v->attributeSize;
-				pipeline.vertexBindings[pipeline.vertexBindingCount].inputRate = instance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
-
-				pipeline.vertexBindingOffsets[pipeline.vertexBindingCount] = (VkDeviceSize)offset;
-
-				pipeline.vertexAttributeCount += v->locationCount;
-				pipeline.vertexBindingCount += 1;
-			}
-			offset += numAttribs * v->attributeSize;
-		}
-	}
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallback(VkDebugReportFlagsEXT msgFlags, VkDebugReportObjectTypeEXT objType, uint64_t srcObject, size_t location, int32_t msgCode, const char *pLayerPrefix, const char *pMsg, void *pUserData)
@@ -3006,16 +2897,11 @@ void android_main(struct android_app *app)
 				3, 5, 6, 6, 2, 3,
 				0, 1, 7, 7, 4, 0
 			};
-			appState.Scene.Cube.layout = DefaultVertexAttributeLayout;
-			appState.Scene.Cube.vertexAttribsFlags = VERTEX_ATTRIBUTE_FLAG_POSITION | VERTEX_ATTRIBUTE_FLAG_COLOR;
 			appState.Scene.Cube.vertexCount = 8;
 			appState.Scene.Cube.indexCount = 36;
-			appState.Scene.Cube.instanceCount = NUM_INSTANCES;
-			appState.Scene.Cube.instanceAttribsFlags = VERTEX_ATTRIBUTE_FLAG_TRANSFORM;
 			createBuffer(&appState.Context, &appState.Scene.Cube.vertexBuffer, BUFFER_TYPE_VERTEX, 8 * 3 * sizeof(float) + 8 * 4 * sizeof(float), vertices, false);
 			createBuffer(&appState.Context, &appState.Scene.Cube.indexBuffer, BUFFER_TYPE_INDEX, 36 * sizeof(unsigned short), indices, false);
 			createBuffer(&appState.Context, &appState.Scene.Cube.instanceBuffer, BUFFER_TYPE_VERTEX, NUM_INSTANCES * 16 * sizeof(float), nullptr, false);
-			appState.Scene.Program.vertexAttribsFlags = VERTEX_ATTRIBUTE_FLAG_POSITION | VERTEX_ATTRIBUTE_FLAG_COLOR | VERTEX_ATTRIBUTE_FLAG_TRANSFORM;
 			auto vertexShaderFile = AAssetManager_open(app->activity->assetManager, (isMultiview ? "shaders/colorOnlyMultiviewVertexProgram.vert.spv" : "shaders/colorOnlyVertexProgram.vert.spv"), AASSET_MODE_BUFFER);
 			size_t vertexShaderFileLength = AAsset_getLength(vertexShaderFile);
 			if ((vertexShaderFileLength % 4) != 0)
@@ -3090,12 +2976,39 @@ void android_main(struct android_app *app)
 			pipelineParms.renderPass = &appState.Renderer.RenderPassSingleView;
 			pipelineParms.program = &appState.Scene.Program;
 			pipelineParms.geometry = &appState.Scene.Cube;
-			appState.Scene.Pipeline.rop = pipelineParms.rop;
 			appState.Scene.Pipeline.program = pipelineParms.program;
 			appState.Scene.Pipeline.geometry = pipelineParms.geometry;
-			initVertexAttributes(false, pipelineParms.geometry->layout, pipelineParms.geometry->vertexCount, pipelineParms.geometry->vertexAttribsFlags, pipelineParms.program->vertexAttribsFlags, appState.Scene.Pipeline);
-			appState.Scene.Pipeline.firstInstanceBinding = appState.Scene.Pipeline.vertexBindingCount;
-			initVertexAttributes(true, pipelineParms.geometry->layout, pipelineParms.geometry->instanceCount, pipelineParms.geometry->instanceAttribsFlags, pipelineParms.program->vertexAttribsFlags, appState.Scene.Pipeline);
+			appState.Scene.Pipeline.vertexAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+			appState.Scene.Pipeline.vertexBindings[0].stride = 3 * sizeof(float);
+			appState.Scene.Pipeline.vertexBindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			appState.Scene.Pipeline.vertexAttributes[1].location = 1;
+			appState.Scene.Pipeline.vertexAttributes[1].binding = 1;
+			appState.Scene.Pipeline.vertexAttributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.Pipeline.vertexBindings[1].binding = 1;
+			appState.Scene.Pipeline.vertexBindings[1].stride = 4 * sizeof(float);
+			appState.Scene.Pipeline.vertexBindings[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			appState.Scene.Pipeline.vertexBindingOffsets[1] = pipelineParms.geometry->vertexCount * 3 * sizeof(float);
+			appState.Scene.Pipeline.firstInstanceBinding = 2;
+			appState.Scene.Pipeline.vertexAttributes[2].location = 2;
+			appState.Scene.Pipeline.vertexAttributes[2].binding = 2;
+			appState.Scene.Pipeline.vertexAttributes[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.Pipeline.vertexAttributes[3].location = 3;
+			appState.Scene.Pipeline.vertexAttributes[3].binding = 2;
+			appState.Scene.Pipeline.vertexAttributes[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.Pipeline.vertexAttributes[3].offset = 4 * sizeof(float);
+			appState.Scene.Pipeline.vertexAttributes[4].location = 4;
+			appState.Scene.Pipeline.vertexAttributes[4].binding = 2;
+			appState.Scene.Pipeline.vertexAttributes[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.Pipeline.vertexAttributes[4].offset = 8 * sizeof(float);
+			appState.Scene.Pipeline.vertexAttributes[5].location = 5;
+			appState.Scene.Pipeline.vertexAttributes[5].binding = 2;
+			appState.Scene.Pipeline.vertexAttributes[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.Pipeline.vertexAttributes[5].offset = 12 * sizeof(float);
+			appState.Scene.Pipeline.vertexBindings[2].binding = 2;
+			appState.Scene.Pipeline.vertexBindings[2].stride = 16 * sizeof(float);
+			appState.Scene.Pipeline.vertexBindings[2].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+			appState.Scene.Pipeline.vertexAttributeCount = 6;
+			appState.Scene.Pipeline.vertexBindingCount = 3;
 			appState.Scene.Pipeline.vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 			appState.Scene.Pipeline.vertexInputState.vertexBindingDescriptionCount = appState.Scene.Pipeline.vertexBindingCount;
 			appState.Scene.Pipeline.vertexInputState.pVertexBindingDescriptions = appState.Scene.Pipeline.vertexBindings;
@@ -3391,7 +3304,7 @@ void android_main(struct android_app *app)
 							VC(device->vkDestroyBuffer(device->device, (*b)->buffer, nullptr));
 							VC(device->vkFreeMemory(device->device, (*b)->memory, nullptr));
 						}
-						free(*b);
+						delete *b;
 						*b = next;
 					}
 					else
@@ -3415,7 +3328,7 @@ void android_main(struct android_app *app)
 						PipelineResources *next = (*r)->next;
 						VC(commandBuffer.context->device->vkFreeDescriptorSets(commandBuffer.context->device->device, (*r)->descriptorPool, 1, &(*r)->descriptorSet));
 						VC(commandBuffer.context->device->vkDestroyDescriptorPool(commandBuffer.context->device->device, (*r)->descriptorPool, nullptr));
-						free(*r);
+						delete *r;
 						*r = next;
 					}
 					else
@@ -3464,27 +3377,27 @@ void android_main(struct android_app *app)
 			framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].usage = TEXTURE_USAGE_COLOR_ATTACHMENT;
 			framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].imageLayout = newImageLayout;
 			ovrMatrix4f *sceneMatrices = nullptr;
-			Buffer *newBuffer = nullptr;
+			Buffer *buffer = nullptr;
 			for (Buffer **b = &commandBuffer.oldMappedBuffers[commandBuffer.currentBuffer]; *b != nullptr; b = &(*b)->next)
 			{
 				if ((*b)->size == appState.Scene.SceneMatrices.size && (*b)->type == appState.Scene.SceneMatrices.type)
 				{
-					newBuffer = *b;
+					buffer = *b;
 					*b = (*b)->next;
 					break;
 				}
 			}
-			if (newBuffer == nullptr)
+			if (buffer == nullptr)
 			{
-				newBuffer = (Buffer *)malloc(sizeof(Buffer));
-				createBuffer(commandBuffer.context, newBuffer, appState.Scene.SceneMatrices.type, appState.Scene.SceneMatrices.size, nullptr, true);
+				buffer = new Buffer();
+				createBuffer(commandBuffer.context, buffer, appState.Scene.SceneMatrices.type, appState.Scene.SceneMatrices.size, nullptr, true);
 			}
-			newBuffer->unusedCount = 0;
-			newBuffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
-			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = newBuffer;
-			VK(device->vkMapMemory(commandBuffer.context->device->device, newBuffer->memory, 0, newBuffer->size, 0, &newBuffer->mapped));
-			*((void **)&sceneMatrices) = newBuffer->mapped;
-			Buffer *sceneMatricesBuffer = newBuffer;
+			buffer->unusedCount = 0;
+			buffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
+			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = buffer;
+			VK(device->vkMapMemory(commandBuffer.context->device->device, buffer->memory, 0, buffer->size, 0, &buffer->mapped));
+			*((void **)&sceneMatrices) = buffer->mapped;
+			Buffer *sceneMatricesBuffer = buffer;
 			memcpy(sceneMatrices, &appState.Renderer.ViewMatrix[i], appState.Scene.NumViews * sizeof(ovrMatrix4f));
 			memcpy(sceneMatrices + appState.Scene.NumViews, &appState.Renderer.ProjectionMatrix[i], appState.Scene.NumViews * sizeof(ovrMatrix4f));
 			VC(device->vkUnmapMemory(commandBuffer.context->device->device, sceneMatricesBuffer->memory));
@@ -3529,70 +3442,38 @@ void android_main(struct android_app *app)
 			{
 				rotationMatrices[j] = ovrMatrix4f_CreateRotation(appState.Scene.Rotations[j].x * appState.Simulation.CurrentRotation.x, appState.Scene.Rotations[j].y * appState.Simulation.CurrentRotation.y, appState.Scene.Rotations[j].z * appState.Simulation.CurrentRotation.z);
 			}
-			DefaultVertexAttributeArrays attribs;
-			void *data = nullptr;
-			newBuffer = nullptr;
+			buffer = nullptr;
 			for (Buffer **b = &commandBuffer.oldMappedBuffers[commandBuffer.currentBuffer]; *b != nullptr; b = &(*b)->next)
 			{
 				if ((*b)->size == appState.Scene.Cube.instanceBuffer.size && (*b)->type == appState.Scene.Cube.instanceBuffer.type)
 				{
-					newBuffer = *b;
+					buffer = *b;
 					*b = (*b)->next;
 					break;
 				}
 			}
-			if (newBuffer == nullptr)
+			if (buffer == nullptr)
 			{
-				newBuffer = (Buffer *)malloc(sizeof(Buffer));
-				createBuffer(commandBuffer.context, newBuffer, appState.Scene.Cube.instanceBuffer.type, appState.Scene.Cube.instanceBuffer.size, nullptr, true);
+				buffer = new Buffer();
+				createBuffer(commandBuffer.context, buffer, appState.Scene.Cube.instanceBuffer.type, appState.Scene.Cube.instanceBuffer.size, nullptr, true);
 			}
-			newBuffer->unusedCount = 0;
-			newBuffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
-			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = newBuffer;
-			VK(device->vkMapMemory(commandBuffer.context->device->device, newBuffer->memory, 0, newBuffer->size, 0, &newBuffer->mapped));
-			*(&data) = newBuffer->mapped;
-			Buffer *buffer = newBuffer;
-			attribs.base.layout = appState.Scene.Cube.layout;
-			unsigned char *dataBytePtr = (unsigned char *)data;
-			size_t offset = 0;
-			for (auto j = 0; attribs.base.layout[j].attributeFlag != 0; j++)
-			{
-				const VertexAttribute *v = &attribs.base.layout[j];
-				void **attribPtr = (void **)(((char *)&attribs.base) + v->attributeOffset);
-				if ((v->attributeFlag & appState.Scene.Cube.instanceAttribsFlags) != 0)
-				{
-					*attribPtr = (dataBytePtr + offset);
-					offset += appState.Scene.Cube.instanceCount * v->attributeSize;
-				}
-				else
-				{
-					*attribPtr = nullptr;
-				}
-			}
-			Buffer *instanceBuffer = buffer;
-			ovrMatrix4f *transforms = &attribs.transform[0];
+			buffer->unusedCount = 0;
+			buffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
+			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = buffer;
+			VK(device->vkMapMemory(commandBuffer.context->device->device, buffer->memory, 0, buffer->size, 0, &buffer->mapped));
+			auto data = (float*)buffer->mapped;
 			for (auto j = 0; j < NUM_INSTANCES; j++)
 			{
 				const int index = appState.Scene.CubeRotations[j];
-				transforms[j].M[0][0] = rotationMatrices[index].M[0][0];
-				transforms[j].M[0][1] = rotationMatrices[index].M[0][1];
-				transforms[j].M[0][2] = rotationMatrices[index].M[0][2];
-				transforms[j].M[0][3] = rotationMatrices[index].M[0][3];
-				transforms[j].M[1][0] = rotationMatrices[index].M[1][0];
-				transforms[j].M[1][1] = rotationMatrices[index].M[1][1];
-				transforms[j].M[1][2] = rotationMatrices[index].M[1][2];
-				transforms[j].M[1][3] = rotationMatrices[index].M[1][3];
-				transforms[j].M[2][0] = rotationMatrices[index].M[2][0];
-				transforms[j].M[2][1] = rotationMatrices[index].M[2][1];
-				transforms[j].M[2][2] = rotationMatrices[index].M[2][2];
-				transforms[j].M[2][3] = rotationMatrices[index].M[2][3];
-				transforms[j].M[3][0] = appState.Scene.CubePositions[j].x;
-				transforms[j].M[3][1] = appState.Scene.CubePositions[j].y;
-				transforms[j].M[3][2] = appState.Scene.CubePositions[j].z;
-				transforms[j].M[3][3] = 1.0f;
+				memcpy(data, rotationMatrices[index].M, 12 * sizeof(float));
+				data += 12;
+				*(data++) = appState.Scene.CubePositions[j].x;
+				*(data++) = appState.Scene.CubePositions[j].y;
+				*(data++) = appState.Scene.CubePositions[j].z;
+				*(data++) = 1;
 			}
-			VC(device->vkUnmapMemory(commandBuffer.context->device->device, instanceBuffer->memory));
-			instanceBuffer->mapped = nullptr;
+			VC(device->vkUnmapMemory(commandBuffer.context->device->device, buffer->memory));
+			buffer->mapped = nullptr;
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
 				bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
@@ -3600,8 +3481,8 @@ void android_main(struct android_app *app)
 				bufferMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 				bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				bufferMemoryBarrier.buffer = instanceBuffer->buffer;
-				bufferMemoryBarrier.size = instanceBuffer->size;
+				bufferMemoryBarrier.buffer = buffer->buffer;
+				bufferMemoryBarrier.size = buffer->size;
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;
 				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkDependencyFlags flags = 0;
@@ -3613,7 +3494,7 @@ void android_main(struct android_app *app)
 				bufferCopy.srcOffset = 0;
 				bufferCopy.dstOffset = 0;
 				bufferCopy.size = appState.Scene.Cube.instanceBuffer.size;
-				VC(device->vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], instanceBuffer->buffer, appState.Scene.Cube.instanceBuffer.buffer, 1, &bufferCopy));
+				VC(device->vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], buffer->buffer, appState.Scene.Cube.instanceBuffer.buffer, 1, &bufferCopy));
 			}
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
@@ -3694,7 +3575,7 @@ void android_main(struct android_app *app)
 				}
 				if (resources == nullptr)
 				{
-					resources = (PipelineResources *)malloc(sizeof(PipelineResources));
+					resources = new PipelineResources();
 					memset(resources, 0, sizeof(PipelineResources));
 					resources->parmLayout = commandLayout;
 					memcpy((void *)&resources->parms, &command.parmState, sizeof(ProgramParmState));
@@ -3954,7 +3835,7 @@ void android_main(struct android_app *app)
 					VC(appState.Device.vkDestroyBuffer(appState.Device.device, b->buffer, nullptr));
 					VC(appState.Device.vkFreeMemory(appState.Device.device, b->memory, nullptr));
 				}
-				free(b);
+				delete b;
 			}
 			for (Buffer *b = commandBuffer.oldMappedBuffers[j], *next = nullptr; b != nullptr; b = next)
 			{
@@ -3968,14 +3849,14 @@ void android_main(struct android_app *app)
 					VC(appState.Device.vkDestroyBuffer(appState.Device.device, b->buffer, nullptr));
 					VC(appState.Device.vkFreeMemory(appState.Device.device, b->memory, nullptr));
 				}
-				free(b);
+				delete b;
 			}
 			for (PipelineResources *r = commandBuffer.pipelineResources[j], *next = nullptr; r != nullptr; r = next)
 			{
 				next = r->next;
 				VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, r->descriptorPool, 1, &r->descriptorSet));
 				VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, r->descriptorPool, nullptr));
-				free(r);
+				delete r;
 			}
 			commandBuffer.pipelineResources[j] = nullptr;
 		}
