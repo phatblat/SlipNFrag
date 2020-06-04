@@ -73,7 +73,6 @@ struct Instance
 	VkBool32 validate;
 	PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
 	PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
-	PFN_vkEnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionProperties;
 	PFN_vkCreateInstance vkCreateInstance;
 	PFN_vkDestroyInstance vkDestroyInstance;
 	PFN_vkEnumeratePhysicalDevices vkEnumeratePhysicalDevices;
@@ -217,15 +216,6 @@ struct Geometry
 	Buffer indexBuffer;
 };
 
-struct ProgramParm
-{
-	VkDescriptorType type;
-	int index;
-	const char* name;
-	int binding;
-	int size;
-};
-
 struct Texture
 {
 	int width;
@@ -283,12 +273,9 @@ struct FramebufferTextures
 
 struct ProgramParmLayout
 {
-	const ProgramParm *parms;
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkPipelineLayout pipelineLayout;
 	std::vector<int> offsetForIndex;
-	std::vector<ProgramParm*> bindings;
-	unsigned int hash;
 };
 
 struct GraphicsProgram
@@ -359,19 +346,9 @@ struct PipelineResources
 {
 	PipelineResources *next;
 	int unusedCount;
-	const ProgramParmLayout *parmLayout;
 	ProgramParmState parms;
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet descriptorSet;
-};
-
-struct GraphicsCommand
-{
-	const GraphicsPipeline *pipeline;
-	const Buffer* vertexBuffer;
-	const Buffer* instanceBuffer;
-	ProgramParmState parmState;
-	int numInstances;
 };
 
 struct CommandBuffer
@@ -384,7 +361,6 @@ struct CommandBuffer
 	std::vector<Buffer*> mappedBuffers;
 	std::vector<Buffer*> oldMappedBuffers;
 	std::vector<PipelineResources*> pipelineResources;
-	GraphicsCommand currentGraphicsState;
 };
 
 struct ColorSwapChain
@@ -776,28 +752,6 @@ int integerLog2(int i)
 	return (r | (i >> 1));
 }
 
-VkImageLayout layoutForTextureUsage(const TextureUsage usage)
-{
-	return (
-			(usage == TEXTURE_USAGE_UNDEFINED)
-			? VK_IMAGE_LAYOUT_UNDEFINED
-			: ((usage == TEXTURE_USAGE_GENERAL)
-			   ? VK_IMAGE_LAYOUT_GENERAL
-			   : ((usage == TEXTURE_USAGE_TRANSFER_SRC)
-				  ? VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-				  : ((usage == TEXTURE_USAGE_TRANSFER_DST)
-					 ? VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-					 : ((usage == TEXTURE_USAGE_SAMPLED)
-						? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-						: ((usage == TEXTURE_USAGE_STORAGE)
-						   ? VK_IMAGE_LAYOUT_GENERAL
-						   : ((usage == TEXTURE_USAGE_COLOR_ATTACHMENT)
-							  ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-							  : ((usage == TEXTURE_USAGE_PRESENTATION)
-								 ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-								 : (VkImageLayout) 0))))))));
-}
-
 VkAccessFlags accessForTextureUsage(const TextureUsage usage)
 {
 	return (
@@ -822,62 +776,9 @@ VkAccessFlags accessForTextureUsage(const TextureUsage usage)
 								 : 0))))))));
 }
 
-VkAccessFlags getBufferAccess(const BufferType type)
-{
-	return (
-			(type == BUFFER_TYPE_INDEX)
-			? VK_ACCESS_INDEX_READ_BIT
-			: ((type == BUFFER_TYPE_VERTEX)
-			   ? VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT
-			   : ((type == BUFFER_TYPE_UNIFORM) ? VK_ACCESS_UNIFORM_READ_BIT : 0)));
-}
-
-VkPipelineStageFlags pipelineStagesForBufferUsage(const BufferType type)
-{
-	return (
-			(type == BUFFER_TYPE_INDEX)
-			? VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT
-			: ((type == BUFFER_TYPE_VERTEX)
-			   ? VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
-			   : ((type == BUFFER_TYPE_UNIFORM) ? VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT : 0)));
-}
-
-bool descriptorsMatch(const ProgramParmLayout *layout1, const ProgramParmState *parmState1, const ProgramParmLayout *layout2, const ProgramParmState *parmState2)
-{
-	if (layout1 == nullptr || layout2 == nullptr)
-	{
-		return false;
-	}
-	if (layout1->hash != layout2->hash)
-	{
-		return false;
-	}
-	if (layout1->bindings.size() != layout2->bindings.size())
-	{
-		return false;
-	}
-	for (int i = 0; i < layout1->bindings.size(); i++)
-	{
-		if (parmState1->parms[layout1->bindings[i]->index] != parmState2->parms[layout2->bindings[i]->index])
-		{
-			return false;
-		}
-	}
-	return true;
-}
-
 static const int CPU_LEVEL = 2;
 static const int GPU_LEVEL = 3;
 static VkSampleCountFlagBits SAMPLE_COUNT = VK_SAMPLE_COUNT_4_BIT;
-
-static ProgramParm colorOnlyProgramParms[] =
-{
-	{
-		VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		0,
-		"SceneMatrices"
-	}
-};
 
 float randomFloat(Scene& scene)
 {
@@ -1035,7 +936,6 @@ void android_main(struct android_app *app)
 	}
 	instance.vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr) dlsym(instance.loader, "vkGetInstanceProcAddr");
 	instance.vkEnumerateInstanceLayerProperties = (PFN_vkEnumerateInstanceLayerProperties) dlsym(instance.loader, "vkEnumerateInstanceLayerProperties");
-	instance.vkEnumerateInstanceExtensionProperties = (PFN_vkEnumerateInstanceExtensionProperties) dlsym(instance.loader, "vkEnumerateInstanceExtensionProperties");
 	instance.vkCreateInstance = (PFN_vkCreateInstance) dlsym(instance.loader, "vkCreateInstance");
 	if (instance.validate)
 	{
@@ -2192,8 +2092,6 @@ void android_main(struct android_app *app)
 				imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 				imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 				imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				imageMemoryBarrier.image = colorSwapChains[i].ColorTextures[j];
 				imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				imageMemoryBarrier.subresourceRange.levelCount = 1;
@@ -2243,8 +2141,6 @@ void android_main(struct android_app *app)
 					imageMemoryBarrier.dstAccessMask = VK_ACCESS_FRAGMENT_DENSITY_MAP_READ_BIT_EXT;
 					imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 					imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
-					imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					imageMemoryBarrier.image = colorSwapChains[i].FragmentDensityTextures[i];
 					imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 					imageMemoryBarrier.subresourceRange.levelCount = 1;
@@ -2332,8 +2228,6 @@ void android_main(struct android_app *app)
 				imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 				imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 				imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				imageMemoryBarrier.image = texture->image;
 				imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				imageMemoryBarrier.subresourceRange.levelCount = numStorageLevels;
@@ -2370,8 +2264,6 @@ void android_main(struct android_app *app)
 				imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 				imageMemoryBarrier.oldLayout = texture->imageLayout;
 				imageMemoryBarrier.newLayout = newImageLayout;
-				imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				imageMemoryBarrier.image = texture->image;
 				imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				imageMemoryBarrier.subresourceRange.levelCount = texture->mipCount;
@@ -2443,8 +2335,6 @@ void android_main(struct android_app *app)
 					imageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 					imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 					imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-					imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-					imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 					imageMemoryBarrier.image = depthBuffer->image;
 					imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 					imageMemoryBarrier.subresourceRange.levelCount = 1;
@@ -2936,10 +2826,8 @@ void android_main(struct android_app *app)
 			appState.Scene.Program.pipelineStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 			appState.Scene.Program.pipelineStages[1].module = appState.Scene.Program.fragmentShaderModule;
 			appState.Scene.Program.pipelineStages[1].pName = "main";
-			appState.Scene.Program.parmLayout.parms = colorOnlyProgramParms;
 			appState.Scene.Program.parmLayout.offsetForIndex.resize(MAX_PROGRAM_PARMS);
 			std::fill(appState.Scene.Program.parmLayout.offsetForIndex.begin(), appState.Scene.Program.parmLayout.offsetForIndex.end(), -1);
-			appState.Scene.Program.parmLayout.bindings.push_back(&colorOnlyProgramParms[0]);
 			VkDescriptorSetLayoutBinding descriptorSetBindings[1];
 			VkShaderStageFlags stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 			descriptorSetBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -2955,9 +2843,6 @@ void android_main(struct android_app *app)
 			pipelineLayoutCreateInfo.setLayoutCount = 1;
 			pipelineLayoutCreateInfo.pSetLayouts = &appState.Scene.Program.parmLayout.descriptorSetLayout;
 			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.Program.parmLayout.pipelineLayout));
-			unsigned int hash = 5381;
-			hash = ((hash << 5) - hash) + ((const char *)colorOnlyProgramParms)[0];
-			appState.Scene.Program.parmLayout.hash = hash;
 			GraphicsPipelineParms pipelineParms { };
 			pipelineParms.rop.redWriteEnable = true;
 			pipelineParms.rop.blueWriteEnable = true;
@@ -3047,20 +2932,20 @@ void android_main(struct android_app *app)
 			depthStencilStateCreateInfo.back.compareOp = VK_COMPARE_OP_ALWAYS;
 			depthStencilStateCreateInfo.minDepthBounds = 0.0f;
 			depthStencilStateCreateInfo.maxDepthBounds = 1.0f;
-			VkPipelineColorBlendAttachmentState colorBlendAttachementState[1] { };
-			colorBlendAttachementState[0].blendEnable = pipelineParms.rop.blendEnable ? VK_TRUE : VK_FALSE;
-			colorBlendAttachementState[0].srcColorBlendFactor = (VkBlendFactor) pipelineParms.rop.blendSrcColor;
-			colorBlendAttachementState[0].dstColorBlendFactor = (VkBlendFactor) pipelineParms.rop.blendDstColor;
-			colorBlendAttachementState[0].colorBlendOp = (VkBlendOp) pipelineParms.rop.blendOpColor;
-			colorBlendAttachementState[0].srcAlphaBlendFactor = (VkBlendFactor) pipelineParms.rop.blendSrcAlpha;
-			colorBlendAttachementState[0].dstAlphaBlendFactor = (VkBlendFactor) pipelineParms.rop.blendDstAlpha;
-			colorBlendAttachementState[0].alphaBlendOp = (VkBlendOp) pipelineParms.rop.blendOpAlpha;
-			colorBlendAttachementState[0].colorWriteMask = (pipelineParms.rop.redWriteEnable ? VK_COLOR_COMPONENT_R_BIT : 0) | (pipelineParms.rop.blueWriteEnable ? VK_COLOR_COMPONENT_G_BIT : 0) | (pipelineParms.rop.greenWriteEnable ? VK_COLOR_COMPONENT_B_BIT : 0) | (pipelineParms.rop.alphaWriteEnable ? VK_COLOR_COMPONENT_A_BIT : 0);
+			VkPipelineColorBlendAttachmentState colorBlendAttachmentState[1] { };
+			colorBlendAttachmentState[0].blendEnable = pipelineParms.rop.blendEnable ? VK_TRUE : VK_FALSE;
+			colorBlendAttachmentState[0].srcColorBlendFactor = (VkBlendFactor) pipelineParms.rop.blendSrcColor;
+			colorBlendAttachmentState[0].dstColorBlendFactor = (VkBlendFactor) pipelineParms.rop.blendDstColor;
+			colorBlendAttachmentState[0].colorBlendOp = (VkBlendOp) pipelineParms.rop.blendOpColor;
+			colorBlendAttachmentState[0].srcAlphaBlendFactor = (VkBlendFactor) pipelineParms.rop.blendSrcAlpha;
+			colorBlendAttachmentState[0].dstAlphaBlendFactor = (VkBlendFactor) pipelineParms.rop.blendDstAlpha;
+			colorBlendAttachmentState[0].alphaBlendOp = (VkBlendOp) pipelineParms.rop.blendOpAlpha;
+			colorBlendAttachmentState[0].colorWriteMask = (pipelineParms.rop.redWriteEnable ? VK_COLOR_COMPONENT_R_BIT : 0) | (pipelineParms.rop.blueWriteEnable ? VK_COLOR_COMPONENT_G_BIT : 0) | (pipelineParms.rop.greenWriteEnable ? VK_COLOR_COMPONENT_B_BIT : 0) | (pipelineParms.rop.alphaWriteEnable ? VK_COLOR_COMPONENT_A_BIT : 0);
 			VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfo { };
 			colorBlendStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 			colorBlendStateCreateInfo.logicOp = VK_LOGIC_OP_CLEAR;
 			colorBlendStateCreateInfo.attachmentCount = 1;
-			colorBlendStateCreateInfo.pAttachments = colorBlendAttachementState;
+			colorBlendStateCreateInfo.pAttachments = colorBlendAttachmentState;
 			colorBlendStateCreateInfo.blendConstants[0] = pipelineParms.rop.blendColor.x;
 			colorBlendStateCreateInfo.blendConstants[1] = pipelineParms.rop.blendColor.y;
 			colorBlendStateCreateInfo.blendConstants[2] = pipelineParms.rop.blendColor.z;
@@ -3280,13 +3165,12 @@ void android_main(struct android_app *app)
 			screenRect.extent.width = framebuffer.Framebuffer.width;
 			screenRect.extent.height = framebuffer.Framebuffer.height;
 			auto& commandBuffer = appState.Renderer.EyeCommandBuffer[i];
-			auto device = commandBuffer.context->device;
 			commandBuffer.currentBuffer = (commandBuffer.currentBuffer + 1) % commandBuffer.numBuffers;
 			auto fence = &commandBuffer.fences[commandBuffer.currentBuffer];
 			if (fence->submitted)
 			{
-				VK(device->vkWaitForFences(device->device, 1, &fence->fence, VK_TRUE, 1ULL * 1000 * 1000 * 1000));
-				VK(device->vkResetFences(device->device, 1, &fence->fence));
+				VK(appState.Device.vkWaitForFences(appState.Device.device, 1, &fence->fence, VK_TRUE, 1ULL * 1000 * 1000 * 1000));
+				VK(appState.Device.vkResetFences(appState.Device.device, 1, &fence->fence));
 				fence->submitted = false;
 			}
 			{
@@ -3297,12 +3181,12 @@ void android_main(struct android_app *app)
 						Buffer *next = (*b)->next;
 						if ((*b)->mapped != nullptr)
 						{
-							VC(device->vkUnmapMemory(device->device, (*b)->memory));
+							VC(appState.Device.vkUnmapMemory(appState.Device.device, (*b)->memory));
 						}
 						if ((*b)->owner)
 						{
-							VC(device->vkDestroyBuffer(device->device, (*b)->buffer, nullptr));
-							VC(device->vkFreeMemory(device->device, (*b)->memory, nullptr));
+							VC(appState.Device.vkDestroyBuffer(appState.Device.device, (*b)->buffer, nullptr));
+							VC(appState.Device.vkFreeMemory(appState.Device.device, (*b)->memory, nullptr));
 						}
 						delete *b;
 						*b = next;
@@ -3326,8 +3210,8 @@ void android_main(struct android_app *app)
 					if ((*r)->unusedCount++ >= MAX_PIPELINE_RESOURCES_UNUSED_COUNT)
 					{
 						PipelineResources *next = (*r)->next;
-						VC(commandBuffer.context->device->vkFreeDescriptorSets(commandBuffer.context->device->device, (*r)->descriptorPool, 1, &(*r)->descriptorSet));
-						VC(commandBuffer.context->device->vkDestroyDescriptorPool(commandBuffer.context->device->device, (*r)->descriptorPool, nullptr));
+						VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->descriptorPool, 1, &(*r)->descriptorSet));
+						VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, (*r)->descriptorPool, nullptr));
 						delete *r;
 						*r = next;
 					}
@@ -3337,15 +3221,10 @@ void android_main(struct android_app *app)
 					}
 				}
 			}
-			commandBuffer.currentGraphicsState.pipeline = nullptr;
-			commandBuffer.currentGraphicsState.vertexBuffer = nullptr;
-			commandBuffer.currentGraphicsState.instanceBuffer = nullptr;
-			memset((void *)&commandBuffer.currentGraphicsState.parmState, 0, sizeof(ProgramParmState));
-			commandBuffer.currentGraphicsState.numInstances = 1;
-			VK(device->vkResetCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], 0));
+			VK(appState.Device.vkResetCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], 0));
 			VkCommandBufferBeginInfo commandBufferBeginInfo { };
 			commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			VK(device->vkBeginCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], &commandBufferBeginInfo));
+			VK(appState.Device.vkBeginCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], &commandBufferBeginInfo));
 			{
 				VkMemoryBarrier memoryBarrier { };
 				memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
@@ -3353,19 +3232,17 @@ void android_main(struct android_app *app)
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;
 				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 1, &memoryBarrier, 0, nullptr, 0, nullptr));
+				VC(appState.Device.vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 1, &memoryBarrier, 0, nullptr, 0, nullptr));
 			}
 			framebuffer.Framebuffer.currentBuffer = (framebuffer.Framebuffer.currentBuffer + 1) % framebuffer.Framebuffer.numBuffers;
 			framebuffer.Framebuffer.currentLayer = 0;
-			const VkImageLayout newImageLayout = layoutForTextureUsage(TEXTURE_USAGE_COLOR_ATTACHMENT);
+			const VkImageLayout newImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			VkImageMemoryBarrier imageMemoryBarrier { };
 			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			imageMemoryBarrier.srcAccessMask = accessForTextureUsage(framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].usage);
 			imageMemoryBarrier.dstAccessMask = accessForTextureUsage(TEXTURE_USAGE_COLOR_ATTACHMENT);
 			imageMemoryBarrier.oldLayout = framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].imageLayout;
 			imageMemoryBarrier.newLayout = newImageLayout;
-			imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 			imageMemoryBarrier.image = framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].image;
 			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			imageMemoryBarrier.subresourceRange.levelCount = framebuffer.Framebuffer.colorTextures[framebuffer.Framebuffer.currentBuffer].mipCount;
@@ -3395,47 +3272,39 @@ void android_main(struct android_app *app)
 			buffer->unusedCount = 0;
 			buffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
 			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = buffer;
-			VK(device->vkMapMemory(commandBuffer.context->device->device, buffer->memory, 0, buffer->size, 0, &buffer->mapped));
+			VK(appState.Device.vkMapMemory(appState.Device.device, buffer->memory, 0, buffer->size, 0, &buffer->mapped));
 			*((void **)&sceneMatrices) = buffer->mapped;
 			Buffer *sceneMatricesBuffer = buffer;
 			memcpy(sceneMatrices, &appState.Renderer.ViewMatrix[i], appState.Scene.NumViews * sizeof(ovrMatrix4f));
 			memcpy(sceneMatrices + appState.Scene.NumViews, &appState.Renderer.ProjectionMatrix[i], appState.Scene.NumViews * sizeof(ovrMatrix4f));
-			VC(device->vkUnmapMemory(commandBuffer.context->device->device, sceneMatricesBuffer->memory));
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, sceneMatricesBuffer->memory));
 			sceneMatricesBuffer->mapped = nullptr;
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
 				bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 				bufferMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
 				bufferMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-				bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				bufferMemoryBarrier.buffer = sceneMatricesBuffer->buffer;
 				bufferMemoryBarrier.size = sceneMatricesBuffer->size;
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;
 				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(appState.Device.vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
-			{
-				VkBufferCopy bufferCopy;
-				bufferCopy.srcOffset = 0;
-				bufferCopy.dstOffset = 0;
-				bufferCopy.size = appState.Scene.SceneMatrices.size;
-				VC(device->vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], sceneMatricesBuffer->buffer, appState.Scene.SceneMatrices.buffer, 1, &bufferCopy));
-			}
+			VkBufferCopy bufferCopy { };
+			bufferCopy.size = appState.Scene.SceneMatrices.size;
+			VC(appState.Device.vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], sceneMatricesBuffer->buffer, appState.Scene.SceneMatrices.buffer, 1, &bufferCopy));
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
 				bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 				bufferMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				bufferMemoryBarrier.dstAccessMask = getBufferAccess(appState.Scene.SceneMatrices.type);
-				bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				bufferMemoryBarrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
 				bufferMemoryBarrier.buffer = appState.Scene.SceneMatrices.buffer;
 				bufferMemoryBarrier.size = appState.Scene.SceneMatrices.size;
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
-				const VkPipelineStageFlags dst_stages = pipelineStagesForBufferUsage(appState.Scene.SceneMatrices.type);
+				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(appState.Device.vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
 			ovrMatrix4f rotationMatrices[NUM_ROTATIONS];
 			for (auto j = 0; j < NUM_ROTATIONS; j++)
@@ -3460,7 +3329,7 @@ void android_main(struct android_app *app)
 			buffer->unusedCount = 0;
 			buffer->next = commandBuffer.mappedBuffers[commandBuffer.currentBuffer];
 			commandBuffer.mappedBuffers[commandBuffer.currentBuffer] = buffer;
-			VK(device->vkMapMemory(commandBuffer.context->device->device, buffer->memory, 0, buffer->size, 0, &buffer->mapped));
+			VK(appState.Device.vkMapMemory(appState.Device.device, buffer->memory, 0, buffer->size, 0, &buffer->mapped));
 			auto data = (float*)buffer->mapped;
 			for (auto j = 0; j < NUM_INSTANCES; j++)
 			{
@@ -3472,43 +3341,34 @@ void android_main(struct android_app *app)
 				*(data++) = appState.Scene.CubePositions[j].z;
 				*(data++) = 1;
 			}
-			VC(device->vkUnmapMemory(commandBuffer.context->device->device, buffer->memory));
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, buffer->memory));
 			buffer->mapped = nullptr;
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
 				bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 				bufferMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
 				bufferMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-				bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				bufferMemoryBarrier.buffer = buffer->buffer;
 				bufferMemoryBarrier.size = buffer->size;
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_HOST_BIT;
 				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
 				const VkDependencyFlags flags = 0;
 
-				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(appState.Device.vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
-			{
-				VkBufferCopy bufferCopy;
-				bufferCopy.srcOffset = 0;
-				bufferCopy.dstOffset = 0;
-				bufferCopy.size = appState.Scene.Cube.instanceBuffer.size;
-				VC(device->vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], buffer->buffer, appState.Scene.Cube.instanceBuffer.buffer, 1, &bufferCopy));
-			}
+			bufferCopy.size = appState.Scene.Cube.instanceBuffer.size;
+			VC(appState.Device.vkCmdCopyBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], buffer->buffer, appState.Scene.Cube.instanceBuffer.buffer, 1, &bufferCopy));
 			{
 				VkBufferMemoryBarrier bufferMemoryBarrier { };
 				bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
 				bufferMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-				bufferMemoryBarrier.dstAccessMask = getBufferAccess(buffer->type);
-				bufferMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				bufferMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+				bufferMemoryBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
 				bufferMemoryBarrier.buffer = appState.Scene.Cube.instanceBuffer.buffer;
 				bufferMemoryBarrier.size = appState.Scene.Cube.instanceBuffer.size;
 				const VkPipelineStageFlags src_stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
-				const VkPipelineStageFlags dst_stages = pipelineStagesForBufferUsage(buffer->type);
+				const VkPipelineStageFlags dst_stages = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
 				const VkDependencyFlags flags = 0;
-				VC(device->vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+				VC(appState.Device.vkCmdPipelineBarrier(commandBuffer.cmdBuffers[commandBuffer.currentBuffer], src_stages, dst_stages, flags, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			}
 			auto cmdBuffer = commandBuffer.cmdBuffers[commandBuffer.currentBuffer];
 			uint32_t clearValueCount = 0;
@@ -3539,7 +3399,7 @@ void android_main(struct android_app *app)
 			renderPassBeginInfo.clearValueCount = clearValueCount;
 			renderPassBeginInfo.pClearValues = clearValues;
 			VkSubpassContents contents = appState.Renderer.RenderPassSingleView.type;
-			VC(device->vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo, contents));
+			VC(appState.Device.vkCmdBeginRenderPass(cmdBuffer, &renderPassBeginInfo, contents));
 			VkViewport viewport;
 			viewport.x = (float) screenRect.offset.x;
 			viewport.y = (float) screenRect.offset.y;
@@ -3547,157 +3407,86 @@ void android_main(struct android_app *app)
 			viewport.height = (float) screenRect.extent.height;
 			viewport.minDepth = 0.0f;
 			viewport.maxDepth = 1.0f;
-			VC(device->vkCmdSetViewport(cmdBuffer, 0, 1, &viewport));
-			VC(device->vkCmdSetScissor(cmdBuffer, 0, 1, &screenRect));
-			GraphicsCommand command { };
-			command.numInstances = 1;
-			command.pipeline = &appState.Scene.Pipeline;
-			command.parmState.parms[0] = &appState.Scene.SceneMatrices;
-			command.numInstances = NUM_INSTANCES;
-			auto state = &commandBuffer.currentGraphicsState;
-			if (command.pipeline != state->pipeline)
+			VC(appState.Device.vkCmdSetViewport(cmdBuffer, 0, 1, &viewport));
+			VC(appState.Device.vkCmdSetScissor(cmdBuffer, 0, 1, &screenRect));
+			VC(appState.Device.vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.Pipeline.pipeline));
+			const ProgramParmLayout *commandLayout = &appState.Scene.Pipeline.program->parmLayout;
+			auto resources = new PipelineResources();
+			memset(resources, 0, sizeof(PipelineResources));
+			resources->parms.parms[0] = &appState.Scene.SceneMatrices;
 			{
-				VC(device->vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, command.pipeline->pipeline));
-			}
-			const ProgramParmLayout *commandLayout = &command.pipeline->program->parmLayout;
-			const ProgramParmLayout *stateLayout = (state->pipeline != nullptr) ? &state->pipeline->program->parmLayout : nullptr;
-			if (!descriptorsMatch(commandLayout, &command.parmState, stateLayout, &state->parmState))
-			{
-				PipelineResources *resources = nullptr;
-				for (PipelineResources *r = commandBuffer.pipelineResources[commandBuffer.currentBuffer]; r != nullptr; r = r->next)
+				VkDescriptorPoolSize typeCounts[MAX_PROGRAM_PARMS];
+				auto count = 0;
+				VkDescriptorType type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+				for (auto j = 0; j < count; j++)
 				{
-					if (descriptorsMatch(commandLayout, &command.parmState, r->parmLayout, &r->parms))
+					if (typeCounts[j].type == type)
 					{
-						r->unusedCount = 0;
-						resources = r;
+						typeCounts[j].descriptorCount++;
+						type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
 						break;
 					}
 				}
-				if (resources == nullptr)
+				if (type != VK_DESCRIPTOR_TYPE_MAX_ENUM)
 				{
-					resources = new PipelineResources();
-					memset(resources, 0, sizeof(PipelineResources));
-					resources->parmLayout = commandLayout;
-					memcpy((void *)&resources->parms, &command.parmState, sizeof(ProgramParmState));
-					{
-						VkDescriptorPoolSize typeCounts[MAX_PROGRAM_PARMS];
-						auto count = 0;
-						for (auto& binding : commandLayout->bindings)
-						{
-							VkDescriptorType type = binding->type;
-							for (auto j = 0; j < count; j++)
-							{
-								if (typeCounts[j].type == type)
-								{
-									typeCounts[j].descriptorCount++;
-									type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-									break;
-								}
-							}
-							if (type != VK_DESCRIPTOR_TYPE_MAX_ENUM)
-							{
-								typeCounts[count].type = type;
-								typeCounts[count].descriptorCount = 1;
-								count++;
-							}
-						}
-						if (count == 0)
-						{
-							typeCounts[count].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-							typeCounts[count].descriptorCount = 1;
-							count++;
-						}
-						VkDescriptorPoolCreateInfo descriptorPoolCreateInfo { };
-						descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-						descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-						descriptorPoolCreateInfo.maxSets = 1;
-						descriptorPoolCreateInfo.poolSizeCount = count;
-						descriptorPoolCreateInfo.pPoolSizes = (count != 0) ? typeCounts : nullptr;
-						VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->descriptorPool));
-					}
-					{
-						VkDescriptorSetAllocateInfo descriptorSetAllocateInfo { };
-						descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-						descriptorSetAllocateInfo.descriptorPool = resources->descriptorPool;
-						descriptorSetAllocateInfo.descriptorSetCount = 1;
-						descriptorSetAllocateInfo.pSetLayouts = &commandLayout->descriptorSetLayout;
-						VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->descriptorSet));
-						VkWriteDescriptorSet writes[MAX_PROGRAM_PARMS] { };
-						VkDescriptorImageInfo imageInfo[MAX_PROGRAM_PARMS] { };
-						VkDescriptorBufferInfo bufferInfo[MAX_PROGRAM_PARMS] { };
-						int numWrites = 0;
-						for (auto& binding : commandLayout->bindings)
-						{
-							writes[numWrites].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-							writes[numWrites].dstSet = resources->descriptorSet;
-							writes[numWrites].dstBinding = binding->binding;
-							writes[numWrites].dstArrayElement = 0;
-							writes[numWrites].descriptorCount = 1;
-							writes[numWrites].descriptorType = binding->type;
-							writes[numWrites].pImageInfo = &imageInfo[numWrites];
-							writes[numWrites].pBufferInfo = &bufferInfo[numWrites];
-							if (binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-							{
-								auto texture = (const Texture *)command.parmState.parms[binding->index];
-								imageInfo[numWrites].sampler = texture->sampler;
-								imageInfo[numWrites].imageView = texture->view;
-								imageInfo[numWrites].imageLayout = texture->imageLayout;
-							}
-							else if (binding->type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-							{
-								auto texture = (const Texture *)command.parmState.parms[binding->index];
-								imageInfo[numWrites].sampler = VK_NULL_HANDLE;
-								imageInfo[numWrites].imageView = texture->view;
-								imageInfo[numWrites].imageLayout = texture->imageLayout;
-							}
-							else if (binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
-							{
-								auto buffer = (const Buffer *)command.parmState.parms[binding->index];
-								bufferInfo[numWrites].buffer = buffer->buffer;
-								bufferInfo[numWrites].offset = 0;
-								bufferInfo[numWrites].range = buffer->size;
-							}
-							numWrites++;
-						}
-						if (numWrites > 0)
-						{
-							VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, numWrites, writes, 0, nullptr));
-						}
-					}
-					resources->next = commandBuffer.pipelineResources[commandBuffer.currentBuffer];
-					commandBuffer.pipelineResources[commandBuffer.currentBuffer] = resources;
+					typeCounts[count].type = type;
+					typeCounts[count].descriptorCount = 1;
+					count++;
 				}
-				VC(device->vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, commandLayout->pipelineLayout, 0, 1, &resources->descriptorSet, 0, nullptr));
+				if (count == 0)
+				{
+					typeCounts[count].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+					typeCounts[count].descriptorCount = 1;
+					count++;
+				}
+				VkDescriptorPoolCreateInfo descriptorPoolCreateInfo { };
+				descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+				descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+				descriptorPoolCreateInfo.maxSets = 1;
+				descriptorPoolCreateInfo.poolSizeCount = count;
+				descriptorPoolCreateInfo.pPoolSizes = (count != 0) ? typeCounts : nullptr;
+				VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->descriptorPool));
 			}
-			const Geometry *geometry = command.pipeline->geometry;
-			if (state->pipeline == nullptr || geometry != state->pipeline->geometry || command.vertexBuffer != state->vertexBuffer || command.instanceBuffer != state->instanceBuffer)
+			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo { };
+			descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			descriptorSetAllocateInfo.descriptorPool = resources->descriptorPool;
+			descriptorSetAllocateInfo.descriptorSetCount = 1;
+			descriptorSetAllocateInfo.pSetLayouts = &commandLayout->descriptorSetLayout;
+			VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->descriptorSet));
+			VkDescriptorBufferInfo bufferInfo { };
+			bufferInfo.buffer = appState.Scene.SceneMatrices.buffer;
+			bufferInfo.range = appState.Scene.SceneMatrices.size;
+			VkWriteDescriptorSet write { };
+			write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			write.dstSet = resources->descriptorSet;
+			write.descriptorCount = 1;
+			write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			write.pBufferInfo = &bufferInfo;
+			VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 1, &write, 0, nullptr));
+			resources->next = commandBuffer.pipelineResources[commandBuffer.currentBuffer];
+			commandBuffer.pipelineResources[commandBuffer.currentBuffer] = resources;
+			VC(appState.Device.vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, commandLayout->pipelineLayout, 0, 1, &resources->descriptorSet, 0, nullptr));
+			const Geometry *geometry = appState.Scene.Pipeline.geometry;
+			for (auto j = 0; j < appState.Scene.Pipeline.firstInstanceBinding; j++)
 			{
-				const VkBuffer vertexBuffer = (command.vertexBuffer != nullptr) ? command.vertexBuffer->buffer : geometry->vertexBuffer.buffer;
-				for (int i = 0; i < command.pipeline->firstInstanceBinding; i++)
-				{
-					VC(device->vkCmdBindVertexBuffers(cmdBuffer, i, 1, &vertexBuffer, &command.pipeline->vertexBindingOffsets[i]));
-				}
-				const VkBuffer instanceBuffer = (command.instanceBuffer != nullptr) ? command.instanceBuffer->buffer : geometry->instanceBuffer.buffer;
-				for (int i = command.pipeline->firstInstanceBinding; i < command.pipeline->vertexBindingCount; i++)
-				{
-					VC(device->vkCmdBindVertexBuffers(cmdBuffer, i, 1, &instanceBuffer, &command.pipeline->vertexBindingOffsets[i]));
-				}
-				const VkIndexType indexType = VK_INDEX_TYPE_UINT16;
-				VC(device->vkCmdBindIndexBuffer(cmdBuffer, geometry->indexBuffer.buffer, 0, indexType));
+				VC(appState.Device.vkCmdBindVertexBuffers(cmdBuffer, j, 1, &geometry->vertexBuffer.buffer, &appState.Scene.Pipeline.vertexBindingOffsets[j]));
 			}
-			VC(device->vkCmdDrawIndexed(cmdBuffer, geometry->indexCount, command.numInstances, 0, 0, 0));
-			commandBuffer.currentGraphicsState = command;
-			VC(device->vkCmdEndRenderPass(cmdBuffer));
+			for (auto j = appState.Scene.Pipeline.firstInstanceBinding; j < appState.Scene.Pipeline.vertexBindingCount; j++)
 			{
-				const VkImageLayout newImageLayout = layoutForTextureUsage(TEXTURE_USAGE_SAMPLED);
+				VC(appState.Device.vkCmdBindVertexBuffers(cmdBuffer, j, 1, &geometry->instanceBuffer.buffer, &appState.Scene.Pipeline.vertexBindingOffsets[j]));
+			}
+			const VkIndexType indexType = VK_INDEX_TYPE_UINT16;
+			VC(appState.Device.vkCmdBindIndexBuffer(cmdBuffer, geometry->indexBuffer.buffer, 0, indexType));
+			VC(appState.Device.vkCmdDrawIndexed(cmdBuffer, geometry->indexCount, NUM_INSTANCES, 0, 0, 0));
+			VC(appState.Device.vkCmdEndRenderPass(cmdBuffer));
+			{
+				const VkImageLayout newImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 				VkImageMemoryBarrier imageMemoryBarrier { };
 				imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 				imageMemoryBarrier.srcAccessMask = accessForTextureUsage(framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].usage);
 				imageMemoryBarrier.dstAccessMask = accessForTextureUsage(TEXTURE_USAGE_SAMPLED);
 				imageMemoryBarrier.oldLayout = framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].imageLayout;
 				imageMemoryBarrier.newLayout = newImageLayout;
-				imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-				imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 				imageMemoryBarrier.image = framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].image;
 				imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				imageMemoryBarrier.subresourceRange.levelCount = framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].mipCount;
@@ -3709,13 +3498,12 @@ void android_main(struct android_app *app)
 				framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].usage = TEXTURE_USAGE_SAMPLED;
 				framebuffer.Framebuffer.colorTextures[commandBuffer.currentBuffer].imageLayout = newImageLayout;
 			}
-			VK(device->vkEndCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer]));
-			const VkPipelineStageFlags stageFlags[1] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+			VK(appState.Device.vkEndCommandBuffer(commandBuffer.cmdBuffers[commandBuffer.currentBuffer]));
 			VkSubmitInfo submitInfo { };
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			submitInfo.commandBufferCount = 1;
 			submitInfo.pCommandBuffers = &commandBuffer.cmdBuffers[commandBuffer.currentBuffer];
-			VK(device->vkQueueSubmit(commandBuffer.context->queue, 1, &submitInfo, fence->fence));
+			VK(appState.Device.vkQueueSubmit(commandBuffer.context->queue, 1, &submitInfo, fence->fence));
 			fence->submitted = true;
 		}
 		ovrLayerProjection2 worldLayer = vrapi_DefaultLayerProjection2();
