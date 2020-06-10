@@ -34,8 +34,8 @@
 enum AppMode
 {
 	AppStartupMode,
-	AppCylinderMode,
-	AppProjectionMode
+	AppScreenMode,
+	AppWorldMode
 };
 
 struct Instance
@@ -327,6 +327,18 @@ struct Scene
 	int CubeRotations[NUM_INSTANCES];
 };
 
+struct Screen
+{
+	ovrTextureSwapChain* SwapChain;
+	int Width;
+	int Height;
+	std::vector<uint32_t> Data;
+	VkImage Image;
+	Buffer Buffer;
+	VkCommandBuffer CommandBuffer;
+	VkSubmitInfo SubmitInfo;
+};
+
 struct AppState
 {
 	ovrJava Java;
@@ -354,14 +366,8 @@ struct AppState
 	std::vector<Framebuffer> Framebuffers;
 	ovrMatrix4f ViewMatrices[VRAPI_FRAME_LAYER_EYE_MAX];
 	ovrMatrix4f ProjectionMatrices[VRAPI_FRAME_LAYER_EYE_MAX];
-	ovrTextureSwapChain* CylinderSwapChain;
-	int CylinderWidth;
-	int CylinderHeight;
-	std::vector<uint32_t> CylinderTexData;
-	VkImage CylinderTexImage;
-	Buffer CylinderTexBuffer;
-	VkCommandBuffer CylinderCommandBuffer;
-	VkSubmitInfo CylinderSubmitInfo;
+	Screen Console;
+	Screen Screen;
 	bool FirstFrame;
 	double PreviousTime;
 	double CurrentTime;
@@ -2217,7 +2223,7 @@ void android_main(struct android_app *app)
 				{
 					if ((appState.LeftButtons & ovrButton_X) == 0 && (appState.RightButtons & ovrButton_A) == 0)
 					{
-						appState.Mode = AppCylinderMode;
+						appState.Mode = AppScreenMode;
 						appState.StartupButtonsPressed = false;
 					}
 				}
@@ -2226,7 +2232,7 @@ void android_main(struct android_app *app)
 					appState.StartupButtonsPressed = true;
 				}
 			}
-			else if (appState.Mode == AppCylinderMode)
+			else if (appState.Mode == AppScreenMode)
 			{
 				if (host_initialized)
 				{
@@ -2394,81 +2400,26 @@ void android_main(struct android_app *app)
 			frameDesc.LayerCount = 2;
 			frameDesc.Layers = layers;
 			vrapi_SubmitFrame2(appState.Ovr, &frameDesc);
-			appState.CylinderWidth = 640;
-			appState.CylinderHeight = 400;
-			appState.CylinderSwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.CylinderWidth, appState.CylinderHeight, 1, 1);
-			appState.CylinderTexData.resize(appState.CylinderWidth * appState.CylinderHeight, 255 << 24);
-			appState.CylinderTexImage = vrapi_GetTextureSwapChainBufferVulkan(appState.CylinderSwapChain, 0);
-			auto playImageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
-			auto playImageFileLength = AAsset_getLength(playImageFile);
-			std::vector<stbi_uc> playImageSource(playImageFileLength);
-			AAsset_read(playImageFile, playImageSource.data(), playImageFileLength);
-			int playImageWidth;
-			int playImageHeight;
-			int playImageComponents;
-			auto playImage = stbi_load_from_memory(playImageSource.data(), playImageFileLength, &playImageWidth, &playImageHeight, &playImageComponents, 4);
-			auto texIndex = ((appState.CylinderHeight - playImageHeight) * appState.CylinderWidth + appState.CylinderWidth - playImageWidth) / 2;
-			auto playIndex = 0;
-			for (auto y = 0; y < playImageHeight; y++)
-			{
-				for (auto x = 0; x < playImageWidth; x++)
-				{
-					auto r = playImage[playIndex];
-					playIndex++;
-					auto g = playImage[playIndex];
-					playIndex++;
-					auto b = playImage[playIndex];
-					playIndex++;
-					auto a = playImage[playIndex];
-					playIndex++;
-					auto factor = (double)a / 255;
-					r = (unsigned char)((double)r * factor);
-					g = (unsigned char)((double)g * factor);
-					b = (unsigned char)((double)b * factor);
-					appState.CylinderTexData[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
-					texIndex++;
-				}
-				texIndex += appState.CylinderWidth - playImageWidth;
-			}
-			stbi_image_free(playImage);
-			for (auto b = 0; b < 5; b++)
-			{
-				auto i = (unsigned char)(192.0 * sin(M_PI / (double)(b - 1)));
-				auto color = ((uint32_t)255 << 24) | ((uint32_t)i << 16) | ((uint32_t)i << 8) | i;
-				auto texTopIndex = b * appState.CylinderWidth + b;
-				auto texBottomIndex = (appState.CylinderHeight - 1 - b) * appState.CylinderWidth + b;
-				for (auto x = 0; x < appState.CylinderWidth - b - b; x++)
-				{
-					appState.CylinderTexData[texTopIndex] = color;
-					texTopIndex++;
-					appState.CylinderTexData[texBottomIndex] = color;
-					texBottomIndex++;
-				}
-				auto texLeftIndex = (b + 1) * appState.CylinderWidth + b;
-				auto texRightIndex = (b + 1) * appState.CylinderWidth + appState.CylinderWidth - 1 - b;
-				for (auto y = 0; y < appState.CylinderHeight - b - 1 - b - 1; y++)
-				{
-					appState.CylinderTexData[texLeftIndex] = color;
-					texLeftIndex += appState.CylinderWidth;
-					appState.CylinderTexData[texRightIndex] = color;
-					texRightIndex += appState.CylinderWidth;
-				}
-			}
-			appState.CylinderTexBuffer.size = appState.CylinderTexData.size() * sizeof(uint32_t);
-			appState.CylinderTexBuffer.owner = true;
+			appState.Console.Width = 640;
+			appState.Console.Height = 400;
+			appState.Console.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Console.Width, appState.Console.Height, 1, 1);
+			appState.Console.Data.resize(appState.Console.Width * appState.Console.Height);
+			appState.Console.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.Console.SwapChain, 0);
+			appState.Console.Buffer.size = appState.Console.Data.size() * sizeof(uint32_t);
+			appState.Console.Buffer.owner = true;
 			VkBufferCreateInfo bufferCreateInfo { };
 			bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufferCreateInfo.size = appState.CylinderTexBuffer.size;
+			bufferCreateInfo.size = appState.Console.Buffer.size;
 			bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &appState.CylinderTexBuffer.buffer));
-			appState.CylinderTexBuffer.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+			VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &appState.Console.Buffer.buffer));
+			appState.Console.Buffer.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 			VkMemoryRequirements memoryRequirements;
-			VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, appState.CylinderTexBuffer.buffer, &memoryRequirements));
+			VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, appState.Console.Buffer.buffer, &memoryRequirements));
 			VkMemoryAllocateInfo memoryAllocateInfo { };
 			memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 			memoryAllocateInfo.allocationSize = memoryRequirements.size;
-			auto requiredProperties = appState.CylinderTexBuffer.flags;
+			auto requiredProperties = appState.Console.Buffer.flags;
 			auto typeFound = false;
 			for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
 			{
@@ -2489,15 +2440,109 @@ void android_main(struct android_app *app)
 				vrapi_Shutdown();
 				exit(0);
 			}
-			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.CylinderTexBuffer.memory));
-			VK(appState.Device.vkBindBufferMemory(appState.Device.device, appState.CylinderTexBuffer.buffer, appState.CylinderTexBuffer.memory, 0));
-			VK(appState.Device.vkMapMemory(appState.Device.device, appState.CylinderTexBuffer.memory, 0, memoryRequirements.size, 0, &appState.CylinderTexBuffer.mapped));
-			memcpy(appState.CylinderTexBuffer.mapped, appState.CylinderTexData.data(), appState.CylinderTexBuffer.size);
-			VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.CylinderTexBuffer.memory));
-			appState.CylinderTexBuffer.mapped = nullptr;
+			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.Console.Buffer.memory));
+			VK(appState.Device.vkBindBufferMemory(appState.Device.device, appState.Console.Buffer.buffer, appState.Console.Buffer.memory, 0));
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &appState.Console.CommandBuffer));
+			appState.Console.SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			appState.Console.SubmitInfo.commandBufferCount = 1;
+			appState.Console.SubmitInfo.pCommandBuffers = &appState.Console.CommandBuffer;
+			appState.Screen.Width = 640;
+			appState.Screen.Height = 400;
+			appState.Screen.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Screen.Width, appState.Screen.Height, 1, 1);
+			appState.Screen.Data.resize(appState.Screen.Width * appState.Screen.Height, 255 << 24);
+			appState.Screen.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.Screen.SwapChain, 0);
+			auto playImageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
+			auto playImageFileLength = AAsset_getLength(playImageFile);
+			std::vector<stbi_uc> playImageSource(playImageFileLength);
+			AAsset_read(playImageFile, playImageSource.data(), playImageFileLength);
+			int playImageWidth;
+			int playImageHeight;
+			int playImageComponents;
+			auto playImage = stbi_load_from_memory(playImageSource.data(), playImageFileLength, &playImageWidth, &playImageHeight, &playImageComponents, 4);
+			auto texIndex = ((appState.Screen.Height - playImageHeight) * appState.Screen.Width + appState.Screen.Width - playImageWidth) / 2;
+			auto playIndex = 0;
+			for (auto y = 0; y < playImageHeight; y++)
+			{
+				for (auto x = 0; x < playImageWidth; x++)
+				{
+					auto r = playImage[playIndex];
+					playIndex++;
+					auto g = playImage[playIndex];
+					playIndex++;
+					auto b = playImage[playIndex];
+					playIndex++;
+					auto a = playImage[playIndex];
+					playIndex++;
+					auto factor = (double)a / 255;
+					r = (unsigned char)((double)r * factor);
+					g = (unsigned char)((double)g * factor);
+					b = (unsigned char)((double)b * factor);
+					appState.Screen.Data[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+					texIndex++;
+				}
+				texIndex += appState.Screen.Width - playImageWidth;
+			}
+			stbi_image_free(playImage);
+			for (auto b = 0; b < 5; b++)
+			{
+				auto i = (unsigned char)(192.0 * sin(M_PI / (double)(b - 1)));
+				auto color = ((uint32_t)255 << 24) | ((uint32_t)i << 16) | ((uint32_t)i << 8) | i;
+				auto texTopIndex = b * appState.Screen.Width + b;
+				auto texBottomIndex = (appState.Screen.Height - 1 - b) * appState.Screen.Width + b;
+				for (auto x = 0; x < appState.Screen.Width - b - b; x++)
+				{
+					appState.Screen.Data[texTopIndex] = color;
+					texTopIndex++;
+					appState.Screen.Data[texBottomIndex] = color;
+					texBottomIndex++;
+				}
+				auto texLeftIndex = (b + 1) * appState.Screen.Width + b;
+				auto texRightIndex = (b + 1) * appState.Screen.Width + appState.Screen.Width - 1 - b;
+				for (auto y = 0; y < appState.Screen.Height - b - 1 - b - 1; y++)
+				{
+					appState.Screen.Data[texLeftIndex] = color;
+					texLeftIndex += appState.Screen.Width;
+					appState.Screen.Data[texRightIndex] = color;
+					texRightIndex += appState.Screen.Width;
+				}
+			}
+			appState.Screen.Buffer.size = appState.Screen.Data.size() * sizeof(uint32_t);
+			appState.Screen.Buffer.owner = true;
+			bufferCreateInfo.size = appState.Screen.Buffer.size;
+			VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &appState.Screen.Buffer.buffer));
+			appState.Screen.Buffer.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+			VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, appState.Screen.Buffer.buffer, &memoryRequirements));
+			memoryAllocateInfo.allocationSize = memoryRequirements.size;
+			requiredProperties = appState.Screen.Buffer.flags;
+			typeFound = false;
+			for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
+			{
+				if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
+				{
+					const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
+					if ((propertyFlags & requiredProperties) == requiredProperties)
+					{
+						typeFound = true;
+						memoryAllocateInfo.memoryTypeIndex = type;
+						break;
+					}
+				}
+			}
+			if (!typeFound)
+			{
+				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
+				vrapi_Shutdown();
+				exit(0);
+			}
+			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.Screen.Buffer.memory));
+			VK(appState.Device.vkBindBufferMemory(appState.Device.device, appState.Screen.Buffer.buffer, appState.Screen.Buffer.memory, 0));
+			VK(appState.Device.vkMapMemory(appState.Device.device, appState.Screen.Buffer.memory, 0, memoryRequirements.size, 0, &appState.Screen.Buffer.mapped));
+			memcpy(appState.Screen.Buffer.mapped, appState.Screen.Data.data(), appState.Screen.Buffer.size);
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.Screen.Buffer.memory));
+			appState.Screen.Buffer.mapped = nullptr;
 			VkMappedMemoryRange mappedMemoryRange { };
 			mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-			mappedMemoryRange.memory = appState.CylinderTexBuffer.memory;
+			mappedMemoryRange.memory = appState.Screen.Buffer.memory;
 			mappedMemoryRange.size = VK_WHOLE_SIZE;
 			VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
 			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
@@ -2505,18 +2550,18 @@ void android_main(struct android_app *app)
 			VkBufferImageCopy region { };
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			region.imageSubresource.layerCount = 1;
-			region.imageExtent.width = appState.CylinderWidth;
-			region.imageExtent.height = appState.CylinderHeight;
+			region.imageExtent.width = appState.Screen.Width;
+			region.imageExtent.height = appState.Screen.Height;
 			region.imageExtent.depth = 1;
-			VC(appState.Device.vkCmdCopyBufferToImage(setupCommandBuffer, appState.CylinderTexBuffer.buffer, appState.CylinderTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+			VC(appState.Device.vkCmdCopyBufferToImage(setupCommandBuffer, appState.Screen.Buffer.buffer, appState.Screen.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
 			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
 			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
 			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
-			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &appState.CylinderCommandBuffer));
-			appState.CylinderSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			appState.CylinderSubmitInfo.commandBufferCount = 1;
-			appState.CylinderSubmitInfo.pCommandBuffers = &appState.CylinderCommandBuffer;
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &appState.Screen.CommandBuffer));
+			appState.Screen.SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			appState.Screen.SubmitInfo.commandBufferCount = 1;
+			appState.Screen.SubmitInfo.pCommandBuffers = &appState.Screen.CommandBuffer;
 			appState.Scene.NumViews = (isMultiview) ? 2 : 1;
 			static const float vertices[]
 			{
@@ -3006,7 +3051,7 @@ void android_main(struct android_app *app)
 				appState.PreviousLeftButtons = 0;
 				appState.PreviousRightButtons = 0;
 			}
-			if (appState.Mode == AppCylinderMode)
+			if (appState.Mode == AppScreenMode)
 			{
 				Cvar_SetValue("joystick", 1);
 				Cvar_SetValue("joyadvanced", 1);
@@ -3040,19 +3085,10 @@ void android_main(struct android_app *app)
 			}
 			if (appState.FirstFrame)
 			{
-				vid_width = appState.CylinderWidth;
-				vid_height = appState.CylinderHeight;
-				auto factor = (double) vid_width / 320;
-				double new_conwidth = 320;
-				auto new_conheight = ceil((double) vid_height / factor);
-				if (new_conheight < 200)
-				{
-					factor = (double) vid_height / 200;
-					new_conheight = 200;
-					new_conwidth = (double) (((int) ceil((double) vid_width / factor) + 3) & ~3);
-				}
-				con_width = (int) new_conwidth;
-				con_height = (int) new_conheight;
+				vid_width = appState.Screen.Width;
+				vid_height = appState.Screen.Height;
+				con_width = appState.Console.Width;
+				con_height = appState.Console.Height;
 				VID_Resize();
 				appState.FirstFrame = false;
 			}
@@ -3065,31 +3101,62 @@ void android_main(struct android_app *app)
 			{
 				exit(0);
 			}
-			if (appState.Mode == AppCylinderMode)
+			if (appState.Mode == AppScreenMode)
 			{
 				auto index = 0;
 				for (auto y = 0; y < vid_height; y++)
 				{
 					for (auto x = 0; x < vid_width; x++)
 					{
-						appState.CylinderTexData[index] = d_8to24table[vid_buffer[index]];
+						auto entry = con_buffer[index];
+						if (entry == 255)
+						{
+							entry = vid_buffer[index];
+						}
+						appState.Screen.Data[index] = d_8to24table[entry];
 						index++;
 					}
 				}
-				VK(appState.Device.vkMapMemory(appState.Device.device, appState.CylinderTexBuffer.memory, 0, appState.CylinderTexBuffer.size, 0, &appState.CylinderTexBuffer.mapped));
-				memcpy(appState.CylinderTexBuffer.mapped, appState.CylinderTexData.data(), appState.CylinderTexData.size() * sizeof(uint32_t));
-				VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.CylinderTexBuffer.memory));
-				appState.CylinderTexBuffer.mapped = nullptr;
-				VK(appState.Device.vkBeginCommandBuffer(appState.CylinderCommandBuffer, &commandBufferBeginInfo));
+				VK(appState.Device.vkMapMemory(appState.Device.device, appState.Screen.Buffer.memory, 0, appState.Screen.Buffer.size, 0, &appState.Screen.Buffer.mapped));
+				memcpy(appState.Screen.Buffer.mapped, appState.Screen.Data.data(), appState.Screen.Data.size() * sizeof(uint32_t));
+				VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.Screen.Buffer.memory));
+				appState.Screen.Buffer.mapped = nullptr;
+				VK(appState.Device.vkBeginCommandBuffer(appState.Screen.CommandBuffer, &commandBufferBeginInfo));
 				VkBufferImageCopy region { };
 				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 				region.imageSubresource.layerCount = 1;
-				region.imageExtent.width = appState.CylinderWidth;
-				region.imageExtent.height = appState.CylinderHeight;
+				region.imageExtent.width = appState.Screen.Width;
+				region.imageExtent.height = appState.Screen.Height;
 				region.imageExtent.depth = 1;
-				VC(appState.Device.vkCmdCopyBufferToImage(appState.CylinderCommandBuffer, appState.CylinderTexBuffer.buffer, appState.CylinderTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
-				VK(appState.Device.vkEndCommandBuffer(appState.CylinderCommandBuffer));
-				VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &appState.CylinderSubmitInfo, VK_NULL_HANDLE));
+				VC(appState.Device.vkCmdCopyBufferToImage(appState.Screen.CommandBuffer, appState.Screen.Buffer.buffer, appState.Screen.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+				VK(appState.Device.vkEndCommandBuffer(appState.Screen.CommandBuffer));
+				VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &appState.Screen.SubmitInfo, VK_NULL_HANDLE));
+			}
+			else if (appState.Mode == AppWorldMode)
+			{
+				auto index = 0;
+				for (auto y = 0; y < con_height; y++)
+				{
+					for (auto x = 0; x < con_width; x++)
+					{
+						appState.Console.Data[index] = d_8to24table[con_buffer[index]];
+						index++;
+					}
+				}
+				VK(appState.Device.vkMapMemory(appState.Device.device, appState.Console.Buffer.memory, 0, appState.Console.Buffer.size, 0, &appState.Console.Buffer.mapped));
+				memcpy(appState.Console.Buffer.mapped, appState.Console.Data.data(), appState.Console.Data.size() * sizeof(uint32_t));
+				VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.Console.Buffer.memory));
+				appState.Console.Buffer.mapped = nullptr;
+				VK(appState.Device.vkBeginCommandBuffer(appState.Console.CommandBuffer, &commandBufferBeginInfo));
+				VkBufferImageCopy region { };
+				region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				region.imageSubresource.layerCount = 1;
+				region.imageExtent.width = appState.Console.Width;
+				region.imageExtent.height = appState.Console.Height;
+				region.imageExtent.depth = 1;
+				VC(appState.Device.vkCmdCopyBufferToImage(appState.Console.CommandBuffer, appState.Console.Buffer.buffer, appState.Console.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+				VK(appState.Device.vkEndCommandBuffer(appState.Console.CommandBuffer));
+				VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &appState.Console.SubmitInfo, VK_NULL_HANDLE));
 			}
 		}
 		appState.CurrentRotation.x = (float)predictedDisplayTime;
@@ -3486,42 +3553,104 @@ void android_main(struct android_app *app)
 			worldLayer.Textures[i].SwapChainIndex = appState.Framebuffers[toSample].Framebuffer.currentBuffer;
 			worldLayer.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_TanAngleMatrixFromProjection(&tracking.Eye[i].ProjectionMatrix);
 		}
-		auto screenLayer = vrapi_DefaultLayerCylinder2();
-		const float fadeLevel = 1.0f;
-		screenLayer.Header.ColorScale.x = screenLayer.Header.ColorScale.y = screenLayer.Header.ColorScale.z =
-		screenLayer.Header.ColorScale.w = fadeLevel;
-		screenLayer.Header.SrcBlend = VRAPI_FRAME_LAYER_BLEND_SRC_ALPHA;
-		screenLayer.Header.DstBlend = VRAPI_FRAME_LAYER_BLEND_ONE_MINUS_SRC_ALPHA;
-		screenLayer.HeadPose = tracking.HeadPose;
-		const float density = 4500.0f;
-		float rotateYaw = 0.0f;
-		float rotatePitch = 0.0f;
-		const float radius = 1.0f;
-		const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.CylinderHeight * VRAPI_PI / density, radius);
-		const ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
-		const ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
-		const ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
-		ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
-		const float circScale = density * 0.5f / appState.CylinderWidth;
-		const float circBias = -circScale * (0.5f * (1.0f - 1.0f / circScale));
-		for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
+		ovrLayerCylinder2 cylinderLayer;
+		if (appState.Mode == AppWorldMode)
 		{
-			ovrMatrix4f modelViewMatrix = ovrMatrix4f_Multiply(&tracking.Eye[i].ViewMatrix, &cylinderTransform);
-			screenLayer.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_Inverse(&modelViewMatrix);
-			screenLayer.Textures[i].ColorSwapChain = appState.CylinderSwapChain;
-			screenLayer.Textures[i].SwapChainIndex = 0;
-			const float texScaleX = circScale;
-			const float texBiasX = circBias;
-			const float texScaleY = 0.5f;
-			const float texBiasY = -texScaleY * (0.5f * (1.0f - (1.0f / texScaleY)));
-			screenLayer.Textures[i].TextureMatrix.M[0][0] = texScaleX;
-			screenLayer.Textures[i].TextureMatrix.M[0][2] = texBiasX;
-			screenLayer.Textures[i].TextureMatrix.M[1][1] = texScaleY;
-			screenLayer.Textures[i].TextureMatrix.M[1][2] = texBiasY;
-			screenLayer.Textures[i].TextureRect.width = 1.0f;
-			screenLayer.Textures[i].TextureRect.height = 1.0f;
+			auto console = vrapi_DefaultLayerCylinder2();
+			console.Header.ColorScale.x = 1;
+			console.Header.ColorScale.y = 1;
+			console.Header.ColorScale.z = 1;
+			console.Header.ColorScale.w = 1;
+			console.Header.SrcBlend = VRAPI_FRAME_LAYER_BLEND_SRC_ALPHA;
+			console.Header.DstBlend = VRAPI_FRAME_LAYER_BLEND_ONE_MINUS_SRC_ALPHA;
+			console.HeadPose = tracking.HeadPose;
+			float yaw = 0.0f;
+			float Q[3] = { tracking.HeadPose.Pose.Orientation.x, tracking.HeadPose.Pose.Orientation.y, tracking.HeadPose.Pose.Orientation.z };
+			float ww = tracking.HeadPose.Pose.Orientation.w * tracking.HeadPose.Pose.Orientation.w;
+			float Q11 = Q[1] * Q[1];
+			float Q22 = Q[0] * Q[0];
+			float Q33 = Q[2] * Q[2];
+			const float psign = -1;
+			float s2 = psign * 2 * (psign * tracking.HeadPose.Pose.Orientation.w * Q[0] + Q[1] * Q[2]);
+			const float singularityRadius = 1e-12;
+			if (s2 >= singularityRadius - 1 && s2 <= 1 - singularityRadius)
+			{
+				yaw = -1 * 1 * (atan2(-2 * (tracking.HeadPose.Pose.Orientation.w * Q[1] - psign * Q[0] * Q[2]), ww + Q33 - Q11 - Q22));
+			}
+			const float density = 4500;
+			float rotateYaw = yaw;
+			float rotatePitch = 0;
+			const float radius = 1;
+			const ovrVector3f translation = { tracking.HeadPose.Pose.Position.x, tracking.HeadPose.Pose.Position.y, tracking.HeadPose.Pose.Position.z };
+			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.Console.Height * VRAPI_PI / density, radius);
+			const ovrMatrix4f transMatrix = ovrMatrix4f_CreateTranslation(translation.x, translation.y, translation.z);
+			const ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0, 0);
+			const ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0, rotateYaw, 0);
+			const ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
+			const ovrMatrix4f m1 = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
+			ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&transMatrix, &m1);
+			float circScale = density * 0.5 / appState.Console.Width;
+			float circBias = -circScale * (0.5 * (1 - 1 / circScale));
+			for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
+			{
+				ovrMatrix4f modelViewMatrix = ovrMatrix4f_Multiply(&tracking.Eye[i].ViewMatrix, &cylinderTransform);
+				console.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_Inverse(&modelViewMatrix);
+				console.Textures[i].ColorSwapChain = appState.Console.SwapChain;
+				console.Textures[i].SwapChainIndex = 0;
+				const float texScaleX = circScale;
+				const float texBiasX = circBias;
+				const float texScaleY = 0.5;
+				const float texBiasY = -texScaleY * (0.5 * (1 - 1 / texScaleY));
+				console.Textures[i].TextureMatrix.M[0][0] = texScaleX;
+				console.Textures[i].TextureMatrix.M[0][2] = texBiasX;
+				console.Textures[i].TextureMatrix.M[1][1] = texScaleY;
+				console.Textures[i].TextureMatrix.M[1][2] = texBiasY;
+				console.Textures[i].TextureRect.width = 1;
+				console.Textures[i].TextureRect.height = 1;
+			}
+			cylinderLayer = console;
 		}
-		const ovrLayerHeader2* layers[] = { &worldLayer.Header, &screenLayer.Header };
+		else
+		{
+			auto screen = vrapi_DefaultLayerCylinder2();
+			screen.Header.ColorScale.x = 1;
+			screen.Header.ColorScale.y = 1;
+			screen.Header.ColorScale.z = 1;
+			screen.Header.ColorScale.w = 1;
+			screen.Header.SrcBlend = VRAPI_FRAME_LAYER_BLEND_SRC_ALPHA;
+			screen.Header.DstBlend = VRAPI_FRAME_LAYER_BLEND_ONE_MINUS_SRC_ALPHA;
+			screen.HeadPose = tracking.HeadPose;
+			const float density = 4500;
+			const float rotateYaw = 0;
+			float rotatePitch = 0;
+			const float radius = 1;
+			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.Screen.Height * VRAPI_PI / density, radius);
+			const ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
+			const ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
+			const ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
+			const ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
+			float circScale = density * 0.5f / appState.Screen.Width;
+			float circBias = -circScale * (0.5f * (1.0f - 1.0f / circScale));
+			for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
+			{
+				ovrMatrix4f modelViewMatrix = ovrMatrix4f_Multiply(&tracking.Eye[i].ViewMatrix, &cylinderTransform);
+				screen.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_Inverse(&modelViewMatrix);
+				screen.Textures[i].ColorSwapChain = appState.Screen.SwapChain;
+				screen.Textures[i].SwapChainIndex = 0;
+				const float texScaleX = circScale;
+				const float texBiasX = circBias;
+				const float texScaleY = 0.5;
+				const float texBiasY = -texScaleY * (0.5 * (1 - 1 / texScaleY));
+				screen.Textures[i].TextureMatrix.M[0][0] = texScaleX;
+				screen.Textures[i].TextureMatrix.M[0][2] = texBiasX;
+				screen.Textures[i].TextureMatrix.M[1][1] = texScaleY;
+				screen.Textures[i].TextureMatrix.M[1][2] = texBiasY;
+				screen.Textures[i].TextureRect.width = 1;
+				screen.Textures[i].TextureRect.height = 1;
+			}
+			cylinderLayer = screen;
+		}
+		const ovrLayerHeader2* layers[] = { &worldLayer.Header, &cyli			nderLayer.Header };
 		ovrSubmitFrameDescription2 frameDesc = { };
 		frameDesc.SwapInterval = appState.SwapInterval;
 		frameDesc.FrameIndex = appState.FrameIndex;
@@ -3620,7 +3749,8 @@ void android_main(struct android_app *app)
 			commandBuffer.pipelineResources[j] = nullptr;
 		}
 	}
-	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.CylinderCommandBuffer));
+	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.Screen.CommandBuffer));
+	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.Console.CommandBuffer));
 	VC(appState.Device.vkDestroyRenderPass(appState.Device.device, appState.RenderPass.renderPass, nullptr));
 	VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
 	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.Pipeline.pipeline, nullptr));
