@@ -3,11 +3,13 @@
 #extension GL_EXT_shader_io_blocks : enable
 #extension GL_ARB_enhanced_layouts : enable
 
-layout(set = 0, binding = 1) uniform sampler2D fragmentTexture;
+layout(binding = 1) uniform sampler2D fragmentTexture;
+layout(binding = 2) uniform sampler2D palette;
 layout(location = 0) in mediump vec2 fragmentTexCoords;
 layout(location = 0) out lowp vec4 outColor;
 
 void main()
 {
-	outColor = texture(fragmentTexture, fragmentTexCoords);
+	mediump vec4 entry = texture(fragmentTexture, fragmentTexCoords);
+	outColor = texture(palette, entry.xy);
 }

@@ -225,13 +225,3 @@ void Sys_Init(int argc, char** argv)
     __android_log_print(ANDROID_LOG_VERBOSE, LOG_TAG, "Host_Init");
     Host_Init(&parms);
 }
-
-void Sys_Frame(float frame_lapse)
-{
-    auto updated = Host_FrameUpdate(frame_lapse);
-    if (updated)
-    {
-        Host_FrameRender();
-    }
-    Host_FrameFinish(updated);
-}

@@ -89,6 +89,8 @@
 		28AA1D9C22C0803E00264AD0 /* snd_dma.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28AA1D9922C0803E00264AD0 /* snd_dma.cpp */; };
 		28AA1D9D22C0803E00264AD0 /* snd_mem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28AA1D9A22C0803E00264AD0 /* snd_mem.cpp */; };
 		28AA1DA122C089E600264AD0 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28AA1DA022C089E600264AD0 /* AudioToolbox.framework */; };
+		28ADFF1224A020C1004AA2B3 /* d_lists.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28ADFF1024A020C1004AA2B3 /* d_lists.cpp */; };
+		28ADFF1324A020E0004AA2B3 /* d_lists.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 28ADFF1024A020C1004AA2B3 /* d_lists.cpp */; };
 		28BA2A73229F3271001830E9 /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 28BA2A72229F3271001830E9 /* Shaders.metal */; };
 		28BA2A74229F403C001830E9 /* chase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 283D4B81229DD46300D68A47 /* chase.cpp */; };
 		28BA2A75229F403C001830E9 /* cl_demo.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 283D4B89229DD8CF00D68A47 /* cl_demo.cpp */; };
@@ -304,6 +306,8 @@
 		28AA1D9A22C0803E00264AD0 /* snd_mem.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = snd_mem.cpp; sourceTree = "<group>"; };
 		28AA1D9E22C0881200264AD0 /* AudioUnit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioUnit.framework; path = System/Library/Frameworks/AudioUnit.framework; sourceTree = SDKROOT; };
 		28AA1DA022C089E600264AD0 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		28ADFF1024A020C1004AA2B3 /* d_lists.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = d_lists.cpp; sourceTree = "<group>"; };
+		28ADFF1124A020C1004AA2B3 /* d_lists.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = d_lists.h; sourceTree = "<group>"; };
 		28BA2A6E229F31C2001830E9 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		28BA2A70229F31D1001830E9 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		28BA2A72229F3271001830E9 /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
@@ -423,6 +427,8 @@
 				283D4BC4229E01C900D68A47 /* d_edge.cpp */,
 				287A3246229DBFE800AE6BFA /* d_iface.h */,
 				283D4BB8229DF9CC00D68A47 /* d_init.cpp */,
+				28ADFF1024A020C1004AA2B3 /* d_lists.cpp */,
+				28ADFF1124A020C1004AA2B3 /* d_lists.h */,
 				287A324E229DC0DF00AE6BFA /* d_local.h */,
 				283D4BC8229E0AFD00D68A47 /* d_modech.cpp */,
 				283D4BD2229E0DE200D68A47 /* d_part.cpp */,
@@ -680,6 +686,7 @@
 				28BA2AA6229F403C001830E9 /* screen.cpp in Sources */,
 				2822EE5F229ED2BA00B5332D /* main.mm in Sources */,
 				28AA1D9B22C0803E00264AD0 /* snd_mix.cpp in Sources */,
+				28ADFF1324A020E0004AA2B3 /* d_lists.cpp in Sources */,
 				28BA2AAA229F403C001830E9 /* sv_user.cpp in Sources */,
 				28BA2A81229F403C001830E9 /* d_modech.cpp in Sources */,
 				28BA2A9A229F403C001830E9 /* r_draw.cpp in Sources */,
@@ -741,6 +748,7 @@
 				283D4BBF229DFBCD00D68A47 /* d_sprite.cpp in Sources */,
 				283D4B86229DD85500D68A47 /* sv_phys.cpp in Sources */,
 				283D4BD1229E0DA100D68A47 /* wad.cpp in Sources */,
+				28ADFF1224A020C1004AA2B3 /* d_lists.cpp in Sources */,
 				283D4BE9229E13EB00D68A47 /* net_none.cpp in Sources */,
 				283D4BCD229E0C3600D68A47 /* r_efrag.cpp in Sources */,
 				283D4B93229DDBB700D68A47 /* cl_tent.cpp in Sources */,

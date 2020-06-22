@@ -11,4 +11,3 @@ extern std::string sys_errormessage;
 extern int sys_nogamedata;
 
 void Sys_Init(int argc, char** argv);
-void Sys_Frame(float frame_lapse);
