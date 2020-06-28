@@ -300,13 +300,10 @@ extern int			current_skill;		// skill level for currently loaded level (in case
 
 extern qboolean		isDedicated;
 
-extern int			minimum_memory;
-
 //
 // chase
 //
 extern	cvar_t	chase_active;
 
 void Chase_Init (void);
-void Chase_Reset (void);
 void Chase_Update (void);

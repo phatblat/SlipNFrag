@@ -37,8 +37,6 @@ qboolean r_increaseledges = false;
 
 qboolean	r_dowarp, r_dowarpold, r_viewchanged;
 
-int			numbtofpolys;
-btofpoly_t	*pbtofpolys;
 mvertex_t	*r_pcurrentvertbase;
 
 int			c_surf;
@@ -81,20 +79,11 @@ mplane_t	screenedge[4];
 //
 int		r_framecount = 1;	// so frame counts initialized to 0 don't match
 int		r_visframecount;
-int		d_spanpixcount;
 int		r_polycount;
 int		r_drawnpolycount;
-int		r_wholepolycount;
-
-#define		VIEWMODNAME_LENGTH	256
-char		viewmodname[VIEWMODNAME_LENGTH+1];
-int			modcount;
 
 int			*pfrustum_indexes[4];
 int			r_frustum_indexes[4*6];
-
-int		reinit_surfcache = 1;	// if 1, surface cache is currently empty and
-								// must be reinitialized for current cache size
 
 mleaf_t		*r_viewleaf, *r_oldviewleaf;
 
@@ -143,7 +132,6 @@ void SetVisibilityByPassages (void);
 void entity_t::Clear()
 {
 	forcelink = false;
-	update_type = 0;
 	memset(&baseline, 0, sizeof(baseline));
 	msgtime = 0;
 	memset(&msg_origins, 0, sizeof(msg_origins));

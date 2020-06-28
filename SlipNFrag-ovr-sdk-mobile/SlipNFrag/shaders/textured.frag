@@ -11,5 +11,5 @@ layout(location = 0) out lowp vec4 outColor;
 void main()
 {
 	mediump vec4 entry = texture(fragmentTexture, fragmentTexCoords);
-	outColor = texture(palette, entry.xy);
+	outColor = texelFetch(palette, ivec2(entry.x * 255, 0), 0);
 }

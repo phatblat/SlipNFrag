@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "r_lists.h"
 
 //
 // current entity info
@@ -588,7 +589,14 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 					if ((surf->flags & SURF_PLANEBACK) &&
 						(surf->visframe == r_framecount))
 					{
+						if (r_uselists)
+						{
+							R_AddFaceToLists (surf);
+						}
+						else
+						{
 							R_RenderFace (surf, clipflags);
+						}
 					}
 
 					surf++;
@@ -601,7 +609,14 @@ void R_RecursiveWorldNode (mnode_t *node, int clipflags)
 					if (!(surf->flags & SURF_PLANEBACK) &&
 						(surf->visframe == r_framecount))
 					{
+						if (r_uselists)
+						{
+							R_AddFaceToLists (surf);
+						}
+						else
+						{
 							R_RenderFace (surf, clipflags);
+						}
 					}
 
 					surf++;

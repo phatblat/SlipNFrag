@@ -45,8 +45,6 @@ void Sys_MakeCodeWriteable (unsigned long startaddr, unsigned long length);
 //
 // system IO
 //
-void Sys_DebugLog(char *file, char *fmt, ...);
-
 void Sys_Error (const char *error, ...);
 // an error will cause the entire program to exit
 
@@ -68,6 +66,5 @@ void Sys_SendKeyEvents (void);
 
 void Sys_LowFPPrecision (void);
 void Sys_HighFPPrecision (void);
-void Sys_SetFPCW (void);
 
 int Sys_Random (void);

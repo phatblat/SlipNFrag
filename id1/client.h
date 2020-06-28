@@ -239,12 +239,9 @@ extern	cvar_t	cl_pitchspeed;
 
 extern	cvar_t	cl_anglespeedkey;
 
-extern	cvar_t	cl_autofire;
-
 extern	cvar_t	cl_shownet;
 extern	cvar_t	cl_nolerp;
 
-extern	cvar_t	cl_pitchdriftspeed;
 extern	cvar_t	lookspring;
 extern	cvar_t	lookstrafe;
 extern	cvar_t	sensitivity;
@@ -283,16 +280,10 @@ void	CL_DecayLights (void);
 void CL_Init (void);
 
 void CL_EstablishConnection (const char *host);
-void CL_Signon1 (void);
-void CL_Signon2 (void);
-void CL_Signon3 (void);
-void CL_Signon4 (void);
 
 void CL_Disconnect (void);
 void CL_Disconnect_f (void);
 void CL_NextDemo (void);
-
-#define			MAX_VISEDICTS	256
 
 extern std::vector<entity_t*> cl_visedicts;
 
@@ -322,7 +313,6 @@ void CL_ClearState (void);
 
 
 int  CL_ReadFromServer (void);
-void CL_WriteToServer (usercmd_t *cmd);
 void CL_BaseMove (usercmd_t *cmd);
 
 
@@ -354,7 +344,6 @@ void V_StopPitchDrift (void);
 
 void V_RenderView (void);
 void V_UpdatePalette (void);
-void V_Register (void);
 void V_ParseDamage (void);
 void V_SetContentsColor (int contents);
 

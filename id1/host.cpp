@@ -43,8 +43,6 @@ double		realtime;				// without any filtering or bounding
 double		oldrealtime;			// last frame run
 int			host_framecount;
 
-int			minimum_memory;
-
 client_t	*host_client;			// current client
 
 byte		*host_basepal;

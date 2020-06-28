@@ -117,6 +117,8 @@ extern void R_MakeSky (void);
 
 extern int	ubasestep, errorterm, erroradjustup, erroradjustdown;
 
+extern int mod_refcount;
+
 // flags in finalvert_t.flags
 #define ALIAS_LEFT_CLIP				0x0001
 #define ALIAS_TOP_CLIP				0x0002

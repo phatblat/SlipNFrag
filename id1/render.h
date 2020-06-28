@@ -20,8 +20,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // refresh.h -- public interface to refresh functions
 
-#define	MAXCLIPPLANES	11
-
 #define	TOP_RANGE		16			// soldier uniform colors
 #define	BOTTOM_RANGE	96
 
@@ -39,8 +37,6 @@ typedef struct efrag_s
 struct entity_t
 {
 	qboolean				forcelink;		// model changed
-
-	int						update_type;
 
 	entity_state_t			baseline;		// to fill in defaults in updates
 
@@ -103,12 +99,6 @@ typedef struct
 } refdef_t;
 
 
-//
-// refresh
-//
-extern	int		reinit_surfcache;
-
-
 extern	refdef_t	r_refdef;
 extern vec3_t	r_origin, vpn, vright, vup;
 
@@ -128,7 +118,6 @@ extern int warp_stack_index;
 
 void R_Init (void);
 void R_InitTextures (void);
-void R_InitEfrags (void);
 void R_RenderView (void);		// must set r_refdef first
 void R_ViewChanged (vrect_t *pvrect, int lineadj, float aspect);
 								// called whenever r_refdef or vid change
@@ -159,12 +148,10 @@ void R_ResizeEdges();
 //
 // surface cache related
 //
-extern	int		reinit_surfcache;	// if 1, surface cache is currently empty and
 extern qboolean	r_cache_thrash;	// set if thrashing the surface cache
 
 int	D_SurfaceCacheForRes (int width, int height);
 void D_FlushCaches (void);
-void D_DeleteSurfaceCache (void);
 void D_InitCaches (void *buffer, int size);
 void R_SetVrect (vrect_t *pvrect, vrect_t *pvrectin, int lineadj);
 
