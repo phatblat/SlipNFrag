@@ -65,16 +65,16 @@ typedef struct mplane_s
 	byte	pad[2];
 } mplane_t;
 
-typedef struct texture_s
+struct texture_t
 {
 	char		name[16];
 	unsigned	width, height;
 	int			anim_total;				// total tenths in sequence ( 0 = no)
 	int			anim_min, anim_max;		// time for this frame min <=time< max
-	struct texture_s *anim_next;		// in the animation sequence
-	struct texture_s *alternate_anims;	// bmodels in frmae 1 use these
+	texture_t*	anim_next;		// in the animation sequence
+	texture_t*	alternate_anims;	// bmodels in frmae 1 use these
 	unsigned	offsets[MIPLEVELS];		// four mip maps stored
-} texture_t;
+};
 
 
 #define	SURF_PLANEBACK		2

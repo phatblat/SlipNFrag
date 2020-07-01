@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "d_local.h"
+#include "d_lists.h"
 
 static int	miplevel;
 
@@ -295,6 +296,11 @@ void D_DrawSurfaces (void)
 				D_DrawSpans8 (s->spans);
 
 				D_DrawZSpans (s->spans);
+
+				if (d_uselists)
+				{
+					D_AddFaceToLists (pface, pcurrentcache);
+				}
 
 				if (s->insubmodel)
 				{

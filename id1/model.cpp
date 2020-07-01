@@ -59,7 +59,6 @@ struct mpool_t
 
     void Clear()
     {
-    	mod_refcount++;
         sprites.clear();
         submodels.clear();
         entities.clear();
@@ -81,8 +80,6 @@ struct mpool_t
 };
 
 mpool_t mod_pool;
-
-int mod_refcount = 0;
 
 std::vector<byte> mod_aliaspool;
 

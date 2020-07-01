@@ -32,8 +32,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 //===================================================================
 
-extern void	R_DrawLine (polyvert_t *polyvert0, polyvert_t *polyvert1);
-
 extern int		cachewidth;
 extern pixel_t	*cacheblock;
 extern int		screenwidth;
@@ -116,8 +114,6 @@ extern int	r_skymade;
 extern void R_MakeSky (void);
 
 extern int	ubasestep, errorterm, erroradjustup, erroradjustdown;
-
-extern int mod_refcount;
 
 // flags in finalvert_t.flags
 #define ALIAS_LEFT_CLIP				0x0001
