@@ -288,18 +288,20 @@ void D_DrawSurfaces (void)
 			// FIXME: make this passed in to D_CacheSurface
 				pcurrentcache = D_CacheSurface (pface, miplevel);
 
-				cacheblock = (pixel_t *)pcurrentcache->data;
-				cachewidth = pcurrentcache->width;
-
-				D_CalcGradients (pface);
-
-				D_DrawSpans8 (s->spans);
-
-				D_DrawZSpans (s->spans);
-
 				if (d_uselists)
 				{
 					D_AddFaceToLists (pface, pcurrentcache);
+				}
+				else
+				{
+					cacheblock = (pixel_t *)pcurrentcache->data;
+					cachewidth = pcurrentcache->width;
+
+					D_CalcGradients (pface);
+
+					D_DrawSpans8 (s->spans);
+
+					D_DrawZSpans (s->spans);
 				}
 
 				if (s->insubmodel)

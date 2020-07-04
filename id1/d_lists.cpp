@@ -8,7 +8,7 @@ qboolean d_uselists = false;
 
 void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
 {
-	if (face->numedges < 3)
+	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
 	{
 		return;
 	}
@@ -18,18 +18,16 @@ void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
 	{
 		d_lists.textured.emplace_back();
 	}
-	auto& entry = d_lists.textured[d_lists.last_textured];
-	entry.width = cache->width;
-	entry.height = cache->height;
-	entry.size = entry.width * entry.height;
-	if (entry.size > entry.data.size())
+	auto& textured = d_lists.textured[d_lists.last_textured];
+	textured.width = cache->width;
+	textured.height = cache->height;
+	textured.size = textured.width * textured.height;
+	if (textured.size > textured.data.size())
 	{
-		entry.data.resize(entry.size);
+		textured.data.resize(textured.size);
 	}
-	memcpy(entry.data.data(), cache->data, entry.size);
-	entry.last_vertex = -1;
-	entry.last_index = -1;
-	auto next_front = entry.last_vertex + 1;
+	memcpy(textured.data.data(), cache->data, textured.size);
+	auto next_front = (d_lists.last_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
 	for (auto i = 0; i < face->numedges; i++)
@@ -49,21 +47,57 @@ void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
 		auto z = vertex->position[2];
 		auto s = x * texinfo->vecs[0][0] + y * texinfo->vecs[0][1] + z * texinfo->vecs[0][2] + texinfo->vecs[0][3];
 		auto t = x * texinfo->vecs[1][0] + y * texinfo->vecs[1][1] + z * texinfo->vecs[1][2] + texinfo->vecs[1][3];
-		entry.last_vertex++;
-		if (entry.last_vertex >= entry.vertices.size())
+		s = (s - face->texturemins[0]) / face->extents[0];
+		t = (t - face->texturemins[1]) / face->extents[1];
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
 		{
-			entry.vertices.emplace_back();
-			entry.texcoords.emplace_back();
+			d_lists.vertices.emplace_back(-x);
 		}
-		auto& vert = entry.vertices[entry.last_vertex];
-		vert.x = -x;
-		vert.y = z;
-		vert.z = y;
-		auto& tex = entry.texcoords[entry.last_vertex];
-		tex.s = (s - face->texturemins[0]) / face->extents[0];
-		tex.t = (t - face->texturemins[1]) / face->extents[1];
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = -x;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(z);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = z;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(y);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = y;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(s);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = s;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(t);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = t;
+		}
 		edgeindex++;
 	}
+	textured.first_index = d_lists.last_index + 1;
+	textured.count = (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
 	{
@@ -85,32 +119,32 @@ void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
 			v2 = next_back;
 		}
 		use_back = !use_back;
-		entry.last_index++;
-		if (entry.last_index >= entry.indices.size())
+		d_lists.last_index++;
+		if (d_lists.last_index >= d_lists.indices.size())
 		{
-			entry.indices.emplace_back(v0);
+			d_lists.indices.emplace_back(v0);
 		}
 		else
 		{
-			entry.indices[entry.last_index] = v0;
+			d_lists.indices[d_lists.last_index] = v0;
 		}
-		entry.last_index++;
-		if (entry.last_index >= entry.indices.size())
+		d_lists.last_index++;
+		if (d_lists.last_index >= d_lists.indices.size())
 		{
-			entry.indices.emplace_back(v1);
-		}
-		else
-		{
-			entry.indices[entry.last_index] = v1;
-		}
-		entry.last_index++;
-		if (entry.last_index >= entry.indices.size())
-		{
-			entry.indices.emplace_back(v2);
+			d_lists.indices.emplace_back(v1);
 		}
 		else
 		{
-			entry.indices[entry.last_index] = v2;
+			d_lists.indices[d_lists.last_index] = v1;
+		}
+		d_lists.last_index++;
+		if (d_lists.last_index >= d_lists.indices.size())
+		{
+			d_lists.indices.emplace_back(v2);
+		}
+		else
+		{
+			d_lists.indices[d_lists.last_index] = v2;
 		}
 	}
 }
