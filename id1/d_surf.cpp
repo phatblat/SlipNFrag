@@ -95,6 +95,7 @@ void D_InitCaches (void *buffer, int size)
 	sc_base->size = sc_size;
 	
 	D_ClearCacheGuard ();
+	Mod_ClearCacheSurfaces();
 }
 
 

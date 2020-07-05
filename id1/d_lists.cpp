@@ -2,7 +2,7 @@
 #include "d_lists.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1 };
+dlists_t d_lists { -1, -1, -1 };
 
 qboolean d_uselists = false;
 
@@ -52,11 +52,11 @@ void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
 		d_lists.last_vertex++;
 		if (d_lists.last_vertex >= d_lists.vertices.size())
 		{
-			d_lists.vertices.emplace_back(-x);
+			d_lists.vertices.emplace_back(x);
 		}
 		else
 		{
-			d_lists.vertices[d_lists.last_vertex] = -x;
+			d_lists.vertices[d_lists.last_vertex] = x;
 		}
 		d_lists.last_vertex++;
 		if (d_lists.last_vertex >= d_lists.vertices.size())
@@ -70,11 +70,11 @@ void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
 		d_lists.last_vertex++;
 		if (d_lists.last_vertex >= d_lists.vertices.size())
 		{
-			d_lists.vertices.emplace_back(y);
+			d_lists.vertices.emplace_back(-y);
 		}
 		else
 		{
-			d_lists.vertices[d_lists.last_vertex] = y;
+			d_lists.vertices[d_lists.last_vertex] = -y;
 		}
 		d_lists.last_vertex++;
 		if (d_lists.last_vertex >= d_lists.vertices.size())

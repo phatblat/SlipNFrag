@@ -216,6 +216,25 @@ void Mod_ClearAll (void)
 }
 
 /*
+===================
+Mod_ClearCacheSurfaces
+===================
+*/
+void Mod_ClearCacheSurfaces()
+{
+	for (auto& list : mod_pool.surfaces)
+	{
+		for (auto& surface : list)
+		{
+			for (auto i = 0; i < MIPLEVELS; i++)
+			{
+				surface.cachespots[i] = nullptr;
+			}
+		}
+	}
+}
+
+/*
 ==================
 Mod_FindName
 

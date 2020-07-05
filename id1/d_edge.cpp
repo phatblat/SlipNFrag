@@ -282,18 +282,21 @@ void D_DrawSurfaces (void)
 				}
 
 				pface = (msurface_t*)s->data;
-				miplevel = D_MipLevelForScale (s->nearzi * scale_for_mip
-				* pface->texinfo->mipadjust);
-
-			// FIXME: make this passed in to D_CacheSurface
-				pcurrentcache = D_CacheSurface (pface, miplevel);
-
 				if (d_uselists)
 				{
+				// FIXME: make this passed in to D_CacheSurface
+					pcurrentcache = D_CacheSurface (pface, d_minmip);
+
 					D_AddFaceToLists (pface, pcurrentcache);
 				}
 				else
 				{
+					miplevel = D_MipLevelForScale (s->nearzi * scale_for_mip
+					* pface->texinfo->mipadjust);
+
+				// FIXME: make this passed in to D_CacheSurface
+					pcurrentcache = D_CacheSurface (pface, miplevel);
+
 					cacheblock = (pixel_t *)pcurrentcache->data;
 					cachewidth = pcurrentcache->width;
 

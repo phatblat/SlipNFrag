@@ -13,10 +13,10 @@ struct dtextured_t
 struct dlists_t
 {
 	int last_textured;
-	std::vector<dtextured_t> textured;
 	int last_vertex;
-	std::vector<float> vertices;
 	int last_index;
+	std::vector<dtextured_t> textured;
+	std::vector<float> vertices;
 	std::vector<int> indices;
 };
 
