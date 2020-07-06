@@ -287,7 +287,7 @@ void D_DrawSurfaces (void)
 				// FIXME: make this passed in to D_CacheSurface
 					pcurrentcache = D_CacheSurface (pface, d_minmip);
 
-					D_AddFaceToLists (pface, pcurrentcache);
+					D_AddFaceToLists (pface, pcurrentcache, currententity);
 				}
 				else
 				{

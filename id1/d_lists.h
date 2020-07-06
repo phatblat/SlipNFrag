@@ -24,4 +24,4 @@ extern dlists_t d_lists;
 
 extern qboolean d_uselists;
 
-void D_AddFaceToLists (msurface_t* face, struct surfcache_s* cache);
+void D_AddFaceToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity);

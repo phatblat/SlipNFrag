@@ -6,7 +6,7 @@ dlists_t d_lists { -1, -1, -1 };
 
 qboolean d_uselists = false;
 
-void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
+void D_AddFaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity)
 {
 	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
 	{
@@ -32,21 +32,24 @@ void D_AddFaceToLists (msurface_t* face, surfcache_t* cache)
 	auto edgeindex = face->firstedge;
 	for (auto i = 0; i < face->numedges; i++)
 	{
-		auto edge = currententity->model->surfedges[edgeindex];
+		auto edge = entity->model->surfedges[edgeindex];
 		mvertex_t* vertex;
 		if (edge >= 0)
 		{
-			vertex = &currententity->model->vertexes[currententity->model->edges[edge].v[0]];
+			vertex = &entity->model->vertexes[entity->model->edges[edge].v[0]];
 		}
 		else
 		{
-			vertex = &currententity->model->vertexes[currententity->model->edges[-edge].v[1]];
+			vertex = &entity->model->vertexes[entity->model->edges[-edge].v[1]];
 		}
 		auto x = vertex->position[0];
 		auto y = vertex->position[1];
 		auto z = vertex->position[2];
 		auto s = x * texinfo->vecs[0][0] + y * texinfo->vecs[0][1] + z * texinfo->vecs[0][2] + texinfo->vecs[0][3];
 		auto t = x * texinfo->vecs[1][0] + y * texinfo->vecs[1][1] + z * texinfo->vecs[1][2] + texinfo->vecs[1][3];
+		x += entity->origin[0];
+		y += entity->origin[1];
+		z += entity->origin[2];
 		s = (s - face->texturemins[0]) / face->extents[0];
 		t = (t - face->texturemins[1]) / face->extents[1];
 		d_lists.last_vertex++;
