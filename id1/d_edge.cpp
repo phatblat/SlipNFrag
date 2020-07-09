@@ -244,10 +244,16 @@ void D_DrawSurfaces (void)
 					R_RotateBmodel ();	// FIXME: don't mess with the frustum,
 										// make entity passed in
 				}
-
-				D_CalcGradients (pface);
-				Turbulent8 (s->spans);
-				D_DrawZSpans (s->spans);
+				if (d_uselists)
+				{
+					D_AddTurbulentToLists (pface, currententity);
+				}
+				else
+				{
+					D_CalcGradients (pface);
+					Turbulent8 (s->spans);
+					D_DrawZSpans (s->spans);
+				}
 
 				if (s->insubmodel)
 				{
@@ -287,7 +293,7 @@ void D_DrawSurfaces (void)
 				// FIXME: make this passed in to D_CacheSurface
 					pcurrentcache = D_CacheSurface (pface, d_minmip);
 
-					D_AddFaceToLists (pface, pcurrentcache, currententity);
+					D_AddTexturedToLists (pface, pcurrentcache, currententity);
 				}
 				else
 				{

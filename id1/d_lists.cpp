@@ -1,12 +1,161 @@
 #include "quakedef.h"
 #include "d_lists.h"
+#include "r_shared.h"
+#include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1 };
+dlists_t d_lists { -1, -1, -1, -1 };
 
 qboolean d_uselists = false;
 
-void D_AddFaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity)
+void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
+{
+	if (face->numedges < 3)
+	{
+		return;
+	}
+	auto texinfo = face->texinfo;
+	auto texture = texinfo->texture;
+	d_lists.last_turbulent++;
+	if (d_lists.last_turbulent >= d_lists.turbulent.size())
+	{
+		d_lists.turbulent.emplace_back();
+	}
+	auto& turbulent = d_lists.turbulent[d_lists.last_turbulent];
+	turbulent.width = texture->width;
+	turbulent.height = texture->height;
+	turbulent.size = turbulent.width * turbulent.height;
+	if (turbulent.size > turbulent.data.size())
+	{
+		turbulent.data.resize(turbulent.size);
+	}
+	memcpy(turbulent.data.data(), (byte*)texture + texture->offsets[0], turbulent.size);
+	auto next_front = (d_lists.last_vertex + 1) / 5;
+	auto next_back = next_front + face->numedges - 1;
+	auto edgeindex = face->firstedge;
+	for (auto i = 0; i < face->numedges; i++)
+	{
+		auto edge = entity->model->surfedges[edgeindex];
+		mvertex_t* vertex;
+		if (edge >= 0)
+		{
+			vertex = &entity->model->vertexes[entity->model->edges[edge].v[0]];
+		}
+		else
+		{
+			vertex = &entity->model->vertexes[entity->model->edges[-edge].v[1]];
+		}
+		auto x = vertex->position[0];
+		auto y = vertex->position[1];
+		auto z = vertex->position[2];
+		auto s = x * texinfo->vecs[0][0] + y * texinfo->vecs[0][1] + z * texinfo->vecs[0][2] + texinfo->vecs[0][3];
+		auto t = x * texinfo->vecs[1][0] + y * texinfo->vecs[1][1] + z * texinfo->vecs[1][2] + texinfo->vecs[1][3];
+		x += entity->origin[0];
+		y += entity->origin[1];
+		z += entity->origin[2];
+		s /= turbulent.width;
+		t /= turbulent.height;
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(x);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = x;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(z);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = z;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(-y);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = -y;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(s);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = s;
+		}
+		d_lists.last_vertex++;
+		if (d_lists.last_vertex >= d_lists.vertices.size())
+		{
+			d_lists.vertices.emplace_back(t);
+		}
+		else
+		{
+			d_lists.vertices[d_lists.last_vertex] = t;
+		}
+		edgeindex++;
+	}
+	turbulent.first_index = d_lists.last_index + 1;
+	turbulent.count = (face->numedges - 2) * 3;
+	qboolean use_back = false;
+	for (auto i = 0; i < face->numedges - 2; i++)
+	{
+		int v0;
+		int v1;
+		int v2;
+		if (use_back)
+		{
+			v0 = next_front;
+			v2 = next_back;
+			next_back--;
+			v1 = next_back;
+		}
+		else
+		{
+			v0 = next_front;
+			next_front++;
+			v1 = next_front;
+			v2 = next_back;
+		}
+		use_back = !use_back;
+		d_lists.last_index++;
+		if (d_lists.last_index >= d_lists.indices.size())
+		{
+			d_lists.indices.emplace_back(v0);
+		}
+		else
+		{
+			d_lists.indices[d_lists.last_index] = v0;
+		}
+		d_lists.last_index++;
+		if (d_lists.last_index >= d_lists.indices.size())
+		{
+			d_lists.indices.emplace_back(v1);
+		}
+		else
+		{
+			d_lists.indices[d_lists.last_index] = v1;
+		}
+		d_lists.last_index++;
+		if (d_lists.last_index >= d_lists.indices.size())
+		{
+			d_lists.indices.emplace_back(v2);
+		}
+		else
+		{
+			d_lists.indices[d_lists.last_index] = v2;
+		}
+	}
+}
+
+void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entity)
 {
 	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
 	{
