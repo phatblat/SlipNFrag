@@ -213,14 +213,21 @@ void D_DrawSurfaces (void)
 			}
 			else if (s->flags & SURF_DRAWBACKGROUND)
 			{
-			// set up a gradient for the background surface that places it
-			// effectively at infinity distance from the viewpoint
-				d_zistepu = 0;
-				d_zistepv = 0;
-				d_ziorigin = -0.9;
+				if (d_uselists)
+				{
+					d_lists.clear_color = (int)r_clearcolor.value & 0xFF;
+				}
+				else
+				{
+				// set up a gradient for the background surface that places it
+				// effectively at infinity distance from the viewpoint
+					d_zistepu = 0;
+					d_zistepv = 0;
+					d_ziorigin = -0.9;
 
-				D_DrawSolidSurface (s, (int)r_clearcolor.value & 0xFF);
-				D_DrawZSpans (s->spans);
+					D_DrawSolidSurface (s, (int)r_clearcolor.value & 0xFF);
+					D_DrawZSpans (s->spans);
+				}
 			}
 			else if (s->flags & SURF_DRAWTURB)
 			{

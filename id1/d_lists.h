@@ -1,4 +1,5 @@
 #include "r_shared.h"
+#include <unordered_set>
 
 struct dtextured_t
 {
@@ -16,6 +17,8 @@ struct dlists_t
 	int last_turbulent;
 	int last_vertex;
 	int last_index;
+	int clear_color;
+	std::unordered_set<void*> textured_index;
 	std::vector<dtextured_t> textured;
 	std::vector<dtextured_t> turbulent;
 	std::vector<float> vertices;

@@ -4,7 +4,7 @@
 #include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1, -1 };
+dlists_t d_lists { -1, -1, -1, -1, -1 };
 
 qboolean d_uselists = false;
 
@@ -157,10 +157,11 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 
 void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entity)
 {
-	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
+	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0 || d_lists.textured_index.find((void*)face) != d_lists.textured_index.end())
 	{
 		return;
 	}
+	d_lists.textured_index.insert((void*)face);
 	auto texinfo = face->texinfo;
 	d_lists.last_textured++;
 	if (d_lists.last_textured >= d_lists.textured.size())
