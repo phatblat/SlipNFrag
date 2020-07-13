@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // r_alias.c: routines for setting up to draw alias models
 
 #include "quakedef.h"
+#include "d_lists.h"
 #include "r_local.h"
 #include "d_local.h"	// FIXME: shouldn't be needed (is needed for patch
 						// right now, but that should move)
@@ -731,29 +732,36 @@ void R_AliasDrawModel (alight_t *plighting)
 	if (!currententity->colormap)
 		Sys_Error ("R_AliasDrawModel: !currententity->colormap");
 
-	r_affinetridesc.drawtype = (currententity->trivial_accept == 3);
-
-	if (r_affinetridesc.drawtype)
+	if (d_uselists)
 	{
-		D_PolysetUpdateTables ();		// FIXME: precalc...
+		D_AddAliasToLists (paliashdr, r_apverts, pskindesc);
 	}
 	else
 	{
+		r_affinetridesc.drawtype = (currententity->trivial_accept == 3);
+
+		if (r_affinetridesc.drawtype)
+		{
+			D_PolysetUpdateTables ();		// FIXME: precalc...
+		}
+		else
+		{
 #if	id386
-		D_Aff8Patch (currententity->colormap);
+			D_Aff8Patch (currententity->colormap);
 #endif
+		}
+
+		acolormap = currententity->colormap;
+
+		if (currententity != &cl.viewent)
+			ziscale = (float)0x8000 * (float)0x10000;
+		else
+			ziscale = (float)0x8000 * (float)0x10000 * 3.0;
+
+		if (currententity->trivial_accept)
+			R_AliasPrepareUnclippedPoints ();
+		else
+			R_AliasPreparePoints ();
 	}
-
-	acolormap = currententity->colormap;
-
-	if (currententity != &cl.viewent)
-		ziscale = (float)0x8000 * (float)0x10000;
-	else
-		ziscale = (float)0x8000 * (float)0x10000 * 3.0;
-
-	if (currententity->trivial_accept)
-		R_AliasPrepareUnclippedPoints ();
-	else
-		R_AliasPreparePoints ();
 }
 
