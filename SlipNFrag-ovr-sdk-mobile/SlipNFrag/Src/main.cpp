@@ -179,8 +179,6 @@ struct Texture
 	int height;
 	int layerCount;
 	VkPipelineStageFlags pipelineStages;
-	VkAccessFlags access;
-	VkImageLayout imageLayout;
 	VkImage image;
 	VkDeviceMemory memory;
 	VkImageView view;
@@ -1713,8 +1711,6 @@ void android_main(struct android_app *app)
 			texture.height = eyeTextureHeight;
 			texture.layerCount = isMultiview ? 2 : 1;
 			texture.pipelineStages = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			texture.access = VK_ACCESS_SHADER_READ_BIT;
-			texture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			texture.image = colorSwapChains[i].ColorTextures[j];
 			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
 			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
@@ -1757,7 +1753,6 @@ void android_main(struct android_app *app)
 				texture.width = colorSwapChains[i].FragmentDensityTextureSizes[j].width;
 				texture.height = colorSwapChains[i].FragmentDensityTextureSizes[j].height;
 				texture.layerCount = isMultiview ? 2 : 1;
-				texture.imageLayout = VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
 				texture.image = colorSwapChains[i].FragmentDensityTextures[j];
 				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
 				VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
@@ -1862,8 +1857,6 @@ void android_main(struct android_app *app)
 		VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
 		VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
 		texture.pipelineStages = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		texture.access = VK_ACCESS_SHADER_READ_BIT;
-		texture.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		VkImageViewCreateInfo imageViewCreateInfo { };
 		imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		imageViewCreateInfo.image = texture.image;
@@ -1887,9 +1880,9 @@ void android_main(struct android_app *app)
 		VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
 		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-		imageMemoryBarrier.srcAccessMask = texture.access;
+		imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		imageMemoryBarrier.oldLayout = texture.imageLayout;
+		imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 		imageMemoryBarrier.image = texture.image;
 		imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -1897,8 +1890,6 @@ void android_main(struct android_app *app)
 		imageMemoryBarrier.subresourceRange.layerCount = texture.layerCount;
 		VC(appState.Device.vkCmdPipelineBarrier(setupCommandBuffer, texture.pipelineStages, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
 		texture.pipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		texture.access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		texture.imageLayout = imageMemoryBarrier.newLayout;
 		VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
 		VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
 		VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
@@ -2905,7 +2896,6 @@ void android_main(struct android_app *app)
 					d_lists.last_vertex = -1;
 					d_lists.last_index = -1;
 					d_lists.clear_color = -1;
-					d_lists.textured_index.clear();
 					auto nodrift = cl.nodrift;
 					cl.nodrift = true;
 					Host_FrameRender();
@@ -3146,9 +3136,9 @@ void android_main(struct android_app *app)
 			auto& texture = framebuffer.colorTextures[framebuffer.currentBuffer];
 			VkImageMemoryBarrier imageMemoryBarrier { };
 			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			imageMemoryBarrier.srcAccessMask = texture.access;
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 			imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			imageMemoryBarrier.oldLayout = texture.imageLayout;
+			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			imageMemoryBarrier.image = texture.image;
 			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -3156,8 +3146,6 @@ void android_main(struct android_app *app)
 			imageMemoryBarrier.subresourceRange.layerCount = texture.layerCount;
 			VC(appState.Device.vkCmdPipelineBarrier(perView.commandBuffer, texture.pipelineStages, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
 			texture.pipelineStages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			texture.access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			texture.imageLayout = imageMemoryBarrier.newLayout;
 			Buffer* stagingBuffer;
 			if (perView.sceneMatricesStagingBuffers.oldMapped != nullptr)
 			{
@@ -4384,9 +4372,9 @@ void android_main(struct android_app *app)
 			auto& colorTexture = framebuffer.colorTextures[commandBuffer.current];
 			VkImageMemoryBarrier colorImageMemoryBarrier { };
 			colorImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-			colorImageMemoryBarrier.srcAccessMask = colorTexture.access;
+			colorImageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			colorImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-			colorImageMemoryBarrier.oldLayout = colorTexture.imageLayout;
+			colorImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			colorImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			colorImageMemoryBarrier.image = colorTexture.image;
 			colorImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -4394,8 +4382,6 @@ void android_main(struct android_app *app)
 			colorImageMemoryBarrier.subresourceRange.layerCount = colorTexture.layerCount;
 			VC(appState.Device.vkCmdPipelineBarrier(perView.commandBuffer, colorTexture.pipelineStages, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &colorImageMemoryBarrier));
 			colorTexture.pipelineStages = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			colorTexture.access = VK_ACCESS_SHADER_READ_BIT;
-			colorTexture.imageLayout = imageMemoryBarrier.newLayout;
 			VK(appState.Device.vkEndCommandBuffer(perView.commandBuffer));
 			VkSubmitInfo submitInfo { };
 			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
