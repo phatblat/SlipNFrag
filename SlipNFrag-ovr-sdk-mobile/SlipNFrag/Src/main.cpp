@@ -237,6 +237,8 @@ struct PerImage
 	CachedBuffers texturedIndices;
 	CachedBuffers times;
 	CachedBuffers instances;
+	CachedBuffers stagingBuffers;
+	CachedTextures textures;
 	PipelineResources* pipelineResources;
 	VkCommandBuffer commandBuffer;
 	VkFence fence;
@@ -313,13 +315,6 @@ struct AppState
 	bool UseFragmentDensity;
 	VkRenderPass RenderPass;
 	std::vector<View> Views;
-	CachedTextures CachedTextures;
-	CachedBuffers StagingBuffers;
-	std::vector<Texture*> Textured;
-	std::vector<Texture*> Turbulent;
-	std::vector<Texture*> Alias;
-	VkCommandBuffer TextureCommandBuffer;
-	VkSubmitInfo TextureSubmitInfo;
 	ovrMatrix4f ViewMatrices[VRAPI_FRAME_LAYER_EYE_MAX];
 	ovrMatrix4f ProjectionMatrices[VRAPI_FRAME_LAYER_EYE_MAX];
 	float Yaw;
@@ -1519,9 +1514,11 @@ void android_main(struct android_app *app)
 	commandBufferAllocateInfo.commandPool = appState.Context.commandPool;
 	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	commandBufferAllocateInfo.commandBufferCount = 1;
+	VkCommandBufferBeginInfo setupCommandBufferBeginInfo { };
+	setupCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	setupCommandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	VkCommandBufferBeginInfo commandBufferBeginInfo { };
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	VkCommandBuffer setupCommandBuffer;
 	VkSubmitInfo setupSubmitInfo { };
 	setupSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1710,7 +1707,7 @@ void android_main(struct android_app *app)
 			texture.layerCount = isMultiview ? 2 : 1;
 			texture.image = view.colorSwapChain.ColorTextures[i];
 			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
 			VkImageMemoryBarrier imageMemoryBarrier { };
 			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -1752,7 +1749,7 @@ void android_main(struct android_app *app)
 				texture.layerCount = isMultiview ? 2 : 1;
 				texture.image = view.colorSwapChain.FragmentDensityTextures[i];
 				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-				VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+				VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
 				imageMemoryBarrier.dstAccessMask = VK_ACCESS_FRAGMENT_DENSITY_MAP_READ_BIT_EXT;
 				imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
 				imageMemoryBarrier.image = view.colorSwapChain.FragmentDensityTextures[i];
@@ -1838,7 +1835,7 @@ void android_main(struct android_app *app)
 		VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture.memory));
 		VK(appState.Device.vkBindImageMemory(appState.Device.device, texture.image, texture.memory, 0));
 		VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
 		VkImageMemoryBarrier imageMemoryBarrier { };
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -1873,7 +1870,7 @@ void android_main(struct android_app *app)
 		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
 		VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture.sampler));
 		VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -1926,7 +1923,7 @@ void android_main(struct android_app *app)
 		imageViewCreateInfo.subresourceRange.layerCount = numLayers;
 		VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &view.framebuffer.depthImageView));
 		VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		imageMemoryBarrier.image = view.framebuffer.depthImage;
@@ -2360,10 +2357,6 @@ void android_main(struct android_app *app)
 			frameDesc.LayerCount = 2;
 			frameDesc.Layers = layers;
 			vrapi_SubmitFrame2(appState.Ovr, &frameDesc);
-			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &appState.TextureCommandBuffer));
-			appState.TextureSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			appState.TextureSubmitInfo.commandBufferCount = 1;
-			appState.TextureSubmitInfo.pCommandBuffers = &appState.TextureCommandBuffer;
 			appState.Console.Width = 960;
 			appState.Console.Height = 600;
 			appState.Console.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Console.Width, appState.Console.Height, 1, 1);
@@ -2507,7 +2500,7 @@ void android_main(struct android_app *app)
 			mappedMemoryRange.memory = appState.Screen.Buffer.memory;
 			VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
 			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
 			VkBufferImageCopy region { };
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			region.imageSubresource.layerCount = 1;
@@ -2898,805 +2891,6 @@ void android_main(struct android_app *app)
 					cl.nodrift = true;
 					Host_FrameRender();
 					cl.nodrift = nodrift;
-					VK(appState.Device.vkBeginCommandBuffer(appState.TextureCommandBuffer, &commandBufferBeginInfo));
-					for (Buffer **b = &appState.StagingBuffers.oldMapped; *b != nullptr; )
-					{
-						(*b)->unusedCount++;
-						if ((*b)->unusedCount >= MAX_UNUSED_COUNT)
-						{
-							Buffer *next = (*b)->next;
-							if ((*b)->mapped != nullptr)
-							{
-								VC(appState.Device.vkUnmapMemory(appState.Device.device, (*b)->memory));
-							}
-							VC(appState.Device.vkDestroyBuffer(appState.Device.device, (*b)->buffer, nullptr));
-							VC(appState.Device.vkFreeMemory(appState.Device.device, (*b)->memory, nullptr));
-							delete *b;
-							*b = next;
-						}
-						else
-						{
-							b = &(*b)->next;
-						}
-					}
-					for (Buffer *b = appState.StagingBuffers.mapped, *next = nullptr; b != nullptr; b = next)
-					{
-						next = b->next;
-						b->next = appState.StagingBuffers.oldMapped;
-						appState.StagingBuffers.oldMapped = b;
-					}
-					appState.StagingBuffers.mapped = nullptr;
-					for (Texture **t = &appState.CachedTextures.oldTextures; *t != nullptr; )
-					{
-						(*t)->unusedCount++;
-						if ((*t)->unusedCount >= MAX_UNUSED_COUNT)
-						{
-							Texture *next = (*t)->next;
-							VC(appState.Device.vkDestroyImageView(appState.Device.device, (*t)->view, nullptr));
-							VC(appState.Device.vkDestroyImage(appState.Device.device, (*t)->image, nullptr));
-							VC(appState.Device.vkFreeMemory(appState.Device.device, (*t)->memory, nullptr));
-							VC(appState.Device.vkDestroySampler(appState.Device.device, (*t)->sampler, nullptr));
-							delete *t;
-							*t = next;
-						}
-						else
-						{
-							t = &(*t)->next;
-						}
-					}
-					for (Texture *t = appState.CachedTextures.textures, *next = nullptr; t != nullptr; t = next)
-					{
-						next = t->next;
-						t->next = appState.CachedTextures.oldTextures;
-						appState.CachedTextures.oldTextures = t;
-					}
-					appState.CachedTextures.textures = nullptr;
-					if (d_lists.last_textured >= appState.Textured.size())
-					{
-						appState.Textured.resize(d_lists.last_textured + 1);
-					}
-					for (auto i = 0; i <= d_lists.last_textured; i++)
-					{
-						auto& textured = d_lists.textured[i];
-						auto mipCount = (int)(std::floor(std::log2(std::max(textured.width, textured.height)))) + 1;
-						Texture* texture = nullptr;
-						for (Texture **t = &appState.CachedTextures.oldTextures; *t != nullptr; t = &(*t)->next)
-						{
-							if ((*t)->width == textured.width && (*t)->height == textured.height)
-							{
-								texture = *t;
-								*t = (*t)->next;
-								break;
-							}
-						}
-						if (texture == nullptr)
-						{
-							texture = new Texture();
-							memset(texture, 0, sizeof(Texture));
-							texture->width = textured.width;
-							texture->height = textured.height;
-							texture->layerCount = 1;
-							VkImageCreateInfo imageCreateInfo { };
-							imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-							imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-							imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-							imageCreateInfo.extent.width = texture->width;
-							imageCreateInfo.extent.height = texture->height;
-							imageCreateInfo.extent.depth = 1;
-							imageCreateInfo.mipLevels = mipCount;
-							imageCreateInfo.arrayLayers = texture->layerCount;
-							imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-							imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-							imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-							imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-							VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &texture->image));
-							VkMemoryRequirements memoryRequirements;
-							VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, texture->image, &memoryRequirements));
-							VkMemoryAllocateInfo memoryAllocateInfo { };
-							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-							memoryAllocateInfo.allocationSize = memoryRequirements.size;
-							auto requiredProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-							auto typeFound = false;
-							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
-							{
-								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
-								{
-									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
-									if ((propertyFlags & requiredProperties) == requiredProperties)
-									{
-										typeFound = true;
-										memoryAllocateInfo.memoryTypeIndex = type;
-										break;
-									}
-								}
-							}
-							if (!typeFound)
-							{
-								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
-								vrapi_Shutdown();
-								exit(0);
-							}
-							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture->memory));
-							VK(appState.Device.vkBindImageMemory(appState.Device.device, texture->image, texture->memory, 0));
-							VkImageViewCreateInfo imageViewCreateInfo { };
-							imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-							imageViewCreateInfo.image = texture->image;
-							imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-							imageViewCreateInfo.format = imageCreateInfo.format;
-							imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							imageViewCreateInfo.subresourceRange.levelCount = mipCount;
-							imageViewCreateInfo.subresourceRange.layerCount = texture->layerCount;
-							VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture->view));
-							VkImageMemoryBarrier imageMemoryBarrier { };
-							imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-							imageMemoryBarrier.image = texture->image;
-							imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							imageMemoryBarrier.subresourceRange.levelCount = mipCount;
-							imageMemoryBarrier.subresourceRange.layerCount = 1;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-							VkSamplerCreateInfo samplerCreateInfo { };
-							samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-							samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
-							samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
-							samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-							samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.maxLod = mipCount;
-							samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-							VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture->sampler));
-						}
-						Buffer *stagingBuffer = nullptr;
-						auto size = textured.width * textured.height * 4;
-						for (Buffer **b = &appState.StagingBuffers.oldMapped; *b != nullptr; b = &(*b)->next)
-						{
-							if ((*b)->size >= size)
-							{
-								stagingBuffer = *b;
-								*b = (*b)->next;
-								break;
-							}
-						}
-						if (stagingBuffer == nullptr)
-						{
-							stagingBuffer = new Buffer();
-							memset(stagingBuffer, 0, sizeof(Buffer));
-							stagingBuffer->size = size;
-							VkBufferCreateInfo bufferCreateInfo { };
-							bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-							bufferCreateInfo.size = stagingBuffer->size;
-							bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-							bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-							VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &stagingBuffer->buffer));
-							stagingBuffer->flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-							VkMemoryRequirements memoryRequirements;
-							VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, stagingBuffer->buffer, &memoryRequirements));
-							VkMemoryAllocateInfo memoryAllocateInfo { };
-							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-							memoryAllocateInfo.allocationSize = memoryRequirements.size;
-							auto requiredProperties = stagingBuffer->flags;
-							auto typeFound = false;
-							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
-							{
-								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
-								{
-									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
-									if ((propertyFlags & requiredProperties) == requiredProperties)
-									{
-										typeFound = true;
-										memoryAllocateInfo.memoryTypeIndex = type;
-										break;
-									}
-								}
-							}
-							if (!typeFound)
-							{
-								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
-								vrapi_Shutdown();
-								exit(0);
-							}
-							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &stagingBuffer->memory));
-							VK(appState.Device.vkBindBufferMemory(appState.Device.device, stagingBuffer->buffer, stagingBuffer->memory, 0));
-						}
-						stagingBuffer->unusedCount = 0;
-						stagingBuffer->next = appState.StagingBuffers.mapped;
-						appState.StagingBuffers.mapped = stagingBuffer;
-						VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, size, 0, &stagingBuffer->mapped));
-						auto index = 0;
-						auto target = (unsigned char*)stagingBuffer->mapped;
-						for (auto y = 0; y < textured.height; y++)
-						{
-							for (auto x = 0; x < textured.width; x++)
-							{
-								auto entry = textured.data[index];
-								auto color = d_8to24table[entry];
-								*target++ = color & 255;
-								*target++ = (color >> 8) & 255;
-								*target++ = (color >> 16) & 255;
-								*target++ = color >> 24;
-								index++;
-							}
-						}
-						VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
-						VkMappedMemoryRange mappedMemoryRange { };
-						mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-						mappedMemoryRange.memory = stagingBuffer->memory;
-						VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
-						VkImageMemoryBarrier imageMemoryBarrier { };
-						imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-						imageMemoryBarrier.image = texture->image;
-						imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						imageMemoryBarrier.subresourceRange.levelCount = 1;
-						imageMemoryBarrier.subresourceRange.layerCount = 1;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						VkBufferImageCopy region { };
-						region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						region.imageSubresource.layerCount = 1;
-						region.imageExtent.width = texture->width;
-						region.imageExtent.height = texture->height;
-						region.imageExtent.depth = 1;
-						VC(appState.Device.vkCmdCopyBufferToImage(appState.TextureCommandBuffer, stagingBuffer->buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						auto width = textured.width;
-						auto height = textured.height;
-						for (auto k = 1; k < mipCount; k++)
-						{
-							imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-							imageMemoryBarrier.subresourceRange.baseMipLevel = k;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-							VkImageBlit blit { };
-							blit.srcOffsets[1].x = width;
-							blit.srcOffsets[1].y = height;
-							blit.srcOffsets[1].z = 1;
-							blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							blit.srcSubresource.mipLevel = k - 1;
-							blit.srcSubresource.layerCount = 1;
-							width /= 2;
-							if (width < 1)
-							{
-								width = 1;
-							}
-							height /= 2;
-							if (height < 1)
-							{
-								height = 1;
-							}
-							blit.dstOffsets[1].x = width;
-							blit.dstOffsets[1].y = height;
-							blit.dstOffsets[1].z = 1;
-							blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							blit.dstSubresource.mipLevel = k;
-							blit.dstSubresource.layerCount = 1;
-							VC(appState.Device.vkCmdBlitImage(appState.TextureCommandBuffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR));
-							imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						}
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
-						imageMemoryBarrier.subresourceRange.levelCount = mipCount;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						texture->unusedCount = 0;
-						texture->next = appState.CachedTextures.textures;
-						appState.CachedTextures.textures = texture;
-						appState.Textured[i] = texture;
-					}
-					if (d_lists.last_alias >= appState.Alias.size())
-					{
-						appState.Alias.resize(d_lists.last_alias + 1);
-					}
-					for (auto i = 0; i <= d_lists.last_alias; i++)
-					{
-						auto& alias = d_lists.alias[i];
-						auto mipCount = (int)(std::floor(std::log2(std::max(alias.width, alias.height)))) + 1;
-						Texture* texture = nullptr;
-						for (Texture **t = &appState.CachedTextures.oldTextures; *t != nullptr; t = &(*t)->next)
-						{
-							if ((*t)->width == alias.width && (*t)->height == alias.height)
-							{
-								texture = *t;
-								*t = (*t)->next;
-								break;
-							}
-						}
-						if (texture == nullptr)
-						{
-							texture = new Texture();
-							memset(texture, 0, sizeof(Texture));
-							texture->width = alias.width;
-							texture->height = alias.height;
-							texture->layerCount = 1;
-							VkImageCreateInfo imageCreateInfo { };
-							imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-							imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-							imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-							imageCreateInfo.extent.width = texture->width;
-							imageCreateInfo.extent.height = texture->height;
-							imageCreateInfo.extent.depth = 1;
-							imageCreateInfo.mipLevels = mipCount;
-							imageCreateInfo.arrayLayers = texture->layerCount;
-							imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-							imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-							imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-							imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-							VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &texture->image));
-							VkMemoryRequirements memoryRequirements;
-							VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, texture->image, &memoryRequirements));
-							VkMemoryAllocateInfo memoryAllocateInfo { };
-							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-							memoryAllocateInfo.allocationSize = memoryRequirements.size;
-							auto requiredProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-							auto typeFound = false;
-							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
-							{
-								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
-								{
-									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
-									if ((propertyFlags & requiredProperties) == requiredProperties)
-									{
-										typeFound = true;
-										memoryAllocateInfo.memoryTypeIndex = type;
-										break;
-									}
-								}
-							}
-							if (!typeFound)
-							{
-								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
-								vrapi_Shutdown();
-								exit(0);
-							}
-							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture->memory));
-							VK(appState.Device.vkBindImageMemory(appState.Device.device, texture->image, texture->memory, 0));
-							VkImageViewCreateInfo imageViewCreateInfo { };
-							imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-							imageViewCreateInfo.image = texture->image;
-							imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-							imageViewCreateInfo.format = imageCreateInfo.format;
-							imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							imageViewCreateInfo.subresourceRange.levelCount = mipCount;
-							imageViewCreateInfo.subresourceRange.layerCount = texture->layerCount;
-							VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture->view));
-							VkImageMemoryBarrier imageMemoryBarrier { };
-							imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-							imageMemoryBarrier.image = texture->image;
-							imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							imageMemoryBarrier.subresourceRange.levelCount = mipCount;
-							imageMemoryBarrier.subresourceRange.layerCount = 1;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-							VkSamplerCreateInfo samplerCreateInfo { };
-							samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-							samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
-							samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
-							samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-							samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.maxLod = mipCount;
-							samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-							VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture->sampler));
-						}
-						Buffer *stagingBuffer = nullptr;
-						auto size = alias.width * alias.height * 4;
-						for (Buffer **b = &appState.StagingBuffers.oldMapped; *b != nullptr; b = &(*b)->next)
-						{
-							if ((*b)->size >= size)
-							{
-								stagingBuffer = *b;
-								*b = (*b)->next;
-								break;
-							}
-						}
-						if (stagingBuffer == nullptr)
-						{
-							stagingBuffer = new Buffer();
-							memset(stagingBuffer, 0, sizeof(Buffer));
-							stagingBuffer->size = size;
-							VkBufferCreateInfo bufferCreateInfo { };
-							bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-							bufferCreateInfo.size = stagingBuffer->size;
-							bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-							bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-							VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &stagingBuffer->buffer));
-							stagingBuffer->flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-							VkMemoryRequirements memoryRequirements;
-							VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, stagingBuffer->buffer, &memoryRequirements));
-							VkMemoryAllocateInfo memoryAllocateInfo { };
-							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-							memoryAllocateInfo.allocationSize = memoryRequirements.size;
-							auto requiredProperties = stagingBuffer->flags;
-							auto typeFound = false;
-							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
-							{
-								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
-								{
-									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
-									if ((propertyFlags & requiredProperties) == requiredProperties)
-									{
-										typeFound = true;
-										memoryAllocateInfo.memoryTypeIndex = type;
-										break;
-									}
-								}
-							}
-							if (!typeFound)
-							{
-								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
-								vrapi_Shutdown();
-								exit(0);
-							}
-							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &stagingBuffer->memory));
-							VK(appState.Device.vkBindBufferMemory(appState.Device.device, stagingBuffer->buffer, stagingBuffer->memory, 0));
-						}
-						stagingBuffer->unusedCount = 0;
-						stagingBuffer->next = appState.StagingBuffers.mapped;
-						appState.StagingBuffers.mapped = stagingBuffer;
-						VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, size, 0, &stagingBuffer->mapped));
-						auto index = 0;
-						auto target = (unsigned char*)stagingBuffer->mapped;
-						for (auto y = 0; y < alias.height; y++)
-						{
-							for (auto x = 0; x < alias.width; x++)
-							{
-								auto entry = alias.data[index];
-								auto color = d_8to24table[entry];
-								*target++ = color & 255;
-								*target++ = (color >> 8) & 255;
-								*target++ = (color >> 16) & 255;
-								*target++ = color >> 24;
-								index++;
-							}
-						}
-						VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
-						VkMappedMemoryRange mappedMemoryRange { };
-						mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-						mappedMemoryRange.memory = stagingBuffer->memory;
-						VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
-						VkImageMemoryBarrier imageMemoryBarrier { };
-						imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-						imageMemoryBarrier.image = texture->image;
-						imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						imageMemoryBarrier.subresourceRange.levelCount = 1;
-						imageMemoryBarrier.subresourceRange.layerCount = 1;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						VkBufferImageCopy region { };
-						region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						region.imageSubresource.layerCount = 1;
-						region.imageExtent.width = texture->width;
-						region.imageExtent.height = texture->height;
-						region.imageExtent.depth = 1;
-						VC(appState.Device.vkCmdCopyBufferToImage(appState.TextureCommandBuffer, stagingBuffer->buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						auto width = alias.width;
-						auto height = alias.height;
-						for (auto k = 1; k < mipCount; k++)
-						{
-							imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-							imageMemoryBarrier.subresourceRange.baseMipLevel = k;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-							VkImageBlit blit { };
-							blit.srcOffsets[1].x = width;
-							blit.srcOffsets[1].y = height;
-							blit.srcOffsets[1].z = 1;
-							blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							blit.srcSubresource.mipLevel = k - 1;
-							blit.srcSubresource.layerCount = 1;
-							width /= 2;
-							if (width < 1)
-							{
-								width = 1;
-							}
-							height /= 2;
-							if (height < 1)
-							{
-								height = 1;
-							}
-							blit.dstOffsets[1].x = width;
-							blit.dstOffsets[1].y = height;
-							blit.dstOffsets[1].z = 1;
-							blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							blit.dstSubresource.mipLevel = k;
-							blit.dstSubresource.layerCount = 1;
-							VC(appState.Device.vkCmdBlitImage(appState.TextureCommandBuffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR));
-							imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						}
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
-						imageMemoryBarrier.subresourceRange.levelCount = mipCount;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						texture->unusedCount = 0;
-						texture->next = appState.CachedTextures.textures;
-						appState.CachedTextures.textures = texture;
-						appState.Alias[i] = texture;
-					}
-					if (d_lists.last_turbulent >= appState.Turbulent.size())
-					{
-						appState.Turbulent.resize(d_lists.last_turbulent + 1);
-					}
-					for (auto i = 0; i <= d_lists.last_turbulent; i++)
-					{
-						auto& turbulent = d_lists.turbulent[i];
-						auto mipCount = (int)(std::floor(std::log2(std::max(turbulent.width, turbulent.height)))) + 1;
-						Texture* texture = nullptr;
-						for (Texture **t = &appState.CachedTextures.oldTextures; *t != nullptr; t = &(*t)->next)
-						{
-							if ((*t)->width == turbulent.width && (*t)->height == turbulent.height)
-							{
-								texture = *t;
-								*t = (*t)->next;
-								break;
-							}
-						}
-						if (texture == nullptr)
-						{
-							texture = new Texture();
-							memset(texture, 0, sizeof(Texture));
-							texture->width = turbulent.width;
-							texture->height = turbulent.height;
-							texture->layerCount = 1;
-							VkImageCreateInfo imageCreateInfo { };
-							imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-							imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
-							imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-							imageCreateInfo.extent.width = texture->width;
-							imageCreateInfo.extent.height = texture->height;
-							imageCreateInfo.extent.depth = 1;
-							imageCreateInfo.mipLevels = mipCount;
-							imageCreateInfo.arrayLayers = texture->layerCount;
-							imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-							imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-							imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-							imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-							VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &texture->image));
-							VkMemoryRequirements memoryRequirements;
-							VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, texture->image, &memoryRequirements));
-							VkMemoryAllocateInfo memoryAllocateInfo { };
-							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-							memoryAllocateInfo.allocationSize = memoryRequirements.size;
-							auto requiredProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-							auto typeFound = false;
-							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
-							{
-								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
-								{
-									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
-									if ((propertyFlags & requiredProperties) == requiredProperties)
-									{
-										typeFound = true;
-										memoryAllocateInfo.memoryTypeIndex = type;
-										break;
-									}
-								}
-							}
-							if (!typeFound)
-							{
-								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
-								vrapi_Shutdown();
-								exit(0);
-							}
-							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture->memory));
-							VK(appState.Device.vkBindImageMemory(appState.Device.device, texture->image, texture->memory, 0));
-							VkImageViewCreateInfo imageViewCreateInfo { };
-							imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-							imageViewCreateInfo.image = texture->image;
-							imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-							imageViewCreateInfo.format = imageCreateInfo.format;
-							imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							imageViewCreateInfo.subresourceRange.levelCount = mipCount;
-							imageViewCreateInfo.subresourceRange.layerCount = texture->layerCount;
-							VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture->view));
-							VkImageMemoryBarrier imageMemoryBarrier { };
-							imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-							imageMemoryBarrier.image = texture->image;
-							imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							imageMemoryBarrier.subresourceRange.levelCount = mipCount;
-							imageMemoryBarrier.subresourceRange.layerCount = 1;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-							VkSamplerCreateInfo samplerCreateInfo { };
-							samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-							samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
-							samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
-							samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-							samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-							samplerCreateInfo.maxLod = mipCount;
-							samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-							VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture->sampler));
-						}
-						Buffer *stagingBuffer = nullptr;
-						auto size = turbulent.width * turbulent.height * 4;
-						for (Buffer **b = &appState.StagingBuffers.oldMapped; *b != nullptr; b = &(*b)->next)
-						{
-							if ((*b)->size >= size)
-							{
-								stagingBuffer = *b;
-								*b = (*b)->next;
-								break;
-							}
-						}
-						if (stagingBuffer == nullptr)
-						{
-							stagingBuffer = new Buffer();
-							memset(stagingBuffer, 0, sizeof(Buffer));
-							stagingBuffer->size = size;
-							VkBufferCreateInfo bufferCreateInfo { };
-							bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-							bufferCreateInfo.size = stagingBuffer->size;
-							bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-							bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-							VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &stagingBuffer->buffer));
-							stagingBuffer->flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-							VkMemoryRequirements memoryRequirements;
-							VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, stagingBuffer->buffer, &memoryRequirements));
-							VkMemoryAllocateInfo memoryAllocateInfo { };
-							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-							memoryAllocateInfo.allocationSize = memoryRequirements.size;
-							auto requiredProperties = stagingBuffer->flags;
-							auto typeFound = false;
-							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
-							{
-								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
-								{
-									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
-									if ((propertyFlags & requiredProperties) == requiredProperties)
-									{
-										typeFound = true;
-										memoryAllocateInfo.memoryTypeIndex = type;
-										break;
-									}
-								}
-							}
-							if (!typeFound)
-							{
-								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
-								vrapi_Shutdown();
-								exit(0);
-							}
-							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &stagingBuffer->memory));
-							VK(appState.Device.vkBindBufferMemory(appState.Device.device, stagingBuffer->buffer, stagingBuffer->memory, 0));
-						}
-						stagingBuffer->unusedCount = 0;
-						stagingBuffer->next = appState.StagingBuffers.mapped;
-						appState.StagingBuffers.mapped = stagingBuffer;
-						VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, size, 0, &stagingBuffer->mapped));
-						auto index = 0;
-						auto target = (unsigned char*)stagingBuffer->mapped;
-						for (auto y = 0; y < turbulent.height; y++)
-						{
-							for (auto x = 0; x < turbulent.width; x++)
-							{
-								auto entry = turbulent.data[index];
-								auto color = d_8to24table[entry];
-								*target++ = color & 255;
-								*target++ = (color >> 8) & 255;
-								*target++ = (color >> 16) & 255;
-								*target++ = color >> 24;
-								index++;
-							}
-						}
-						VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
-						VkMappedMemoryRange mappedMemoryRange { };
-						mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-						mappedMemoryRange.memory = stagingBuffer->memory;
-						VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
-						VkImageMemoryBarrier imageMemoryBarrier { };
-						imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-						imageMemoryBarrier.image = texture->image;
-						imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						imageMemoryBarrier.subresourceRange.levelCount = 1;
-						imageMemoryBarrier.subresourceRange.layerCount = 1;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						VkBufferImageCopy region { };
-						region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						region.imageSubresource.layerCount = 1;
-						region.imageExtent.width = texture->width;
-						region.imageExtent.height = texture->height;
-						region.imageExtent.depth = 1;
-						VC(appState.Device.vkCmdCopyBufferToImage(appState.TextureCommandBuffer, stagingBuffer->buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						auto width = turbulent.width;
-						auto height = turbulent.height;
-						for (auto k = 1; k < mipCount; k++)
-						{
-							imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-							imageMemoryBarrier.subresourceRange.baseMipLevel = k;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-							VkImageBlit blit { };
-							blit.srcOffsets[1].x = width;
-							blit.srcOffsets[1].y = height;
-							blit.srcOffsets[1].z = 1;
-							blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							blit.srcSubresource.mipLevel = k - 1;
-							blit.srcSubresource.layerCount = 1;
-							width /= 2;
-							if (width < 1)
-							{
-								width = 1;
-							}
-							height /= 2;
-							if (height < 1)
-							{
-								height = 1;
-							}
-							blit.dstOffsets[1].x = width;
-							blit.dstOffsets[1].y = height;
-							blit.dstOffsets[1].z = 1;
-							blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-							blit.dstSubresource.mipLevel = k;
-							blit.dstSubresource.layerCount = 1;
-							VC(appState.Device.vkCmdBlitImage(appState.TextureCommandBuffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR));
-							imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-							VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						}
-						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-						imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
-						imageMemoryBarrier.subresourceRange.levelCount = mipCount;
-						VC(appState.Device.vkCmdPipelineBarrier(appState.TextureCommandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-						texture->unusedCount = 0;
-						texture->next = appState.CachedTextures.textures;
-						appState.CachedTextures.textures = texture;
-						appState.Turbulent[i] = texture;
-					}
-					VK(appState.Device.vkEndCommandBuffer(appState.TextureCommandBuffer));
-					VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &appState.TextureSubmitInfo, VK_NULL_HANDLE));
 				}
 				else
 				{
@@ -3854,6 +3048,58 @@ void android_main(struct android_app *app)
 				perImage.instances.oldMapped = b;
 			}
 			perImage.instances.mapped = nullptr;
+			for (Buffer **b = &perImage.stagingBuffers.oldMapped; *b != nullptr; )
+			{
+				(*b)->unusedCount++;
+				if ((*b)->unusedCount >= MAX_UNUSED_COUNT)
+				{
+					Buffer *next = (*b)->next;
+					if ((*b)->mapped != nullptr)
+					{
+						VC(appState.Device.vkUnmapMemory(appState.Device.device, (*b)->memory));
+					}
+					VC(appState.Device.vkDestroyBuffer(appState.Device.device, (*b)->buffer, nullptr));
+					VC(appState.Device.vkFreeMemory(appState.Device.device, (*b)->memory, nullptr));
+					delete *b;
+					*b = next;
+				}
+				else
+				{
+					b = &(*b)->next;
+				}
+			}
+			for (Buffer *b = perImage.stagingBuffers.mapped, *next = nullptr; b != nullptr; b = next)
+			{
+				next = b->next;
+				b->next = perImage.stagingBuffers.oldMapped;
+				perImage.stagingBuffers.oldMapped = b;
+			}
+			perImage.stagingBuffers.mapped = nullptr;
+			for (Texture **t = &perImage.textures.oldTextures; *t != nullptr; )
+			{
+				(*t)->unusedCount++;
+				if ((*t)->unusedCount >= MAX_UNUSED_COUNT)
+				{
+					Texture *next = (*t)->next;
+					VC(appState.Device.vkDestroyImageView(appState.Device.device, (*t)->view, nullptr));
+					VC(appState.Device.vkDestroyImage(appState.Device.device, (*t)->image, nullptr));
+					VC(appState.Device.vkFreeMemory(appState.Device.device, (*t)->memory, nullptr));
+					VC(appState.Device.vkDestroySampler(appState.Device.device, (*t)->sampler, nullptr));
+					delete *t;
+					*t = next;
+				}
+				else
+				{
+					t = &(*t)->next;
+				}
+			}
+			for (Texture *t = perImage.textures.textures, *next = nullptr; t != nullptr; t = next)
+			{
+				next = t->next;
+				t->next = perImage.textures.oldTextures;
+				perImage.textures.oldTextures = t;
+			}
+			perImage.textures.textures = nullptr;
 			for (PipelineResources **r = &perImage.pipelineResources; *r != nullptr; )
 			{
 				(*r)->unusedCount++;
@@ -4266,10 +3512,247 @@ void android_main(struct android_app *app)
 					for (auto i = 0; i <= d_lists.last_textured; i++)
 					{
 						auto& textured = d_lists.textured[i];
+						auto mipCount = (int)(std::floor(std::log2(std::max(textured.width, textured.height)))) + 1;
+						Texture* texture = nullptr;
+						for (Texture **t = &perImage.textures.oldTextures; *t != nullptr; t = &(*t)->next)
+						{
+							if ((*t)->width == textured.width && (*t)->height == textured.height)
+							{
+								texture = *t;
+								*t = (*t)->next;
+								break;
+							}
+						}
+						if (texture == nullptr)
+						{
+							texture = new Texture();
+							memset(texture, 0, sizeof(Texture));
+							texture->width = textured.width;
+							texture->height = textured.height;
+							texture->layerCount = 1;
+							VkImageCreateInfo imageCreateInfo { };
+							imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+							imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+							imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+							imageCreateInfo.extent.width = texture->width;
+							imageCreateInfo.extent.height = texture->height;
+							imageCreateInfo.extent.depth = 1;
+							imageCreateInfo.mipLevels = mipCount;
+							imageCreateInfo.arrayLayers = texture->layerCount;
+							imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+							imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+							imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+							imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+							VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &texture->image));
+							VkMemoryRequirements memoryRequirements;
+							VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, texture->image, &memoryRequirements));
+							VkMemoryAllocateInfo memoryAllocateInfo { };
+							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+							memoryAllocateInfo.allocationSize = memoryRequirements.size;
+							auto requiredProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+							auto typeFound = false;
+							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
+							{
+								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
+								{
+									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
+									if ((propertyFlags & requiredProperties) == requiredProperties)
+									{
+										typeFound = true;
+										memoryAllocateInfo.memoryTypeIndex = type;
+										break;
+									}
+								}
+							}
+							if (!typeFound)
+							{
+								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
+								vrapi_Shutdown();
+								exit(0);
+							}
+							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture->memory));
+							VK(appState.Device.vkBindImageMemory(appState.Device.device, texture->image, texture->memory, 0));
+							VkImageViewCreateInfo imageViewCreateInfo { };
+							imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+							imageViewCreateInfo.image = texture->image;
+							imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+							imageViewCreateInfo.format = imageCreateInfo.format;
+							imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							imageViewCreateInfo.subresourceRange.levelCount = mipCount;
+							imageViewCreateInfo.subresourceRange.layerCount = texture->layerCount;
+							VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture->view));
+							VkImageMemoryBarrier imageMemoryBarrier { };
+							imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							imageMemoryBarrier.image = texture->image;
+							imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							imageMemoryBarrier.subresourceRange.levelCount = mipCount;
+							imageMemoryBarrier.subresourceRange.layerCount = 1;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+							VkSamplerCreateInfo samplerCreateInfo { };
+							samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+							samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+							samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+							samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+							samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.maxLod = mipCount;
+							samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+							VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture->sampler));
+						}
+						Buffer *stagingBuffer = nullptr;
+						size = textured.width * textured.height * 4;
+						for (Buffer **b = &perImage.stagingBuffers.oldMapped; *b != nullptr; b = &(*b)->next)
+						{
+							if ((*b)->size >= size)
+							{
+								stagingBuffer = *b;
+								*b = (*b)->next;
+								break;
+							}
+						}
+						if (stagingBuffer == nullptr)
+						{
+							stagingBuffer = new Buffer();
+							memset(stagingBuffer, 0, sizeof(Buffer));
+							stagingBuffer->size = size;
+							VkBufferCreateInfo bufferCreateInfo { };
+							bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+							bufferCreateInfo.size = stagingBuffer->size;
+							bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+							bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+							VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &stagingBuffer->buffer));
+							stagingBuffer->flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+							VkMemoryRequirements memoryRequirements;
+							VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, stagingBuffer->buffer, &memoryRequirements));
+							VkMemoryAllocateInfo memoryAllocateInfo { };
+							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+							memoryAllocateInfo.allocationSize = memoryRequirements.size;
+							auto requiredProperties = stagingBuffer->flags;
+							auto typeFound = false;
+							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
+							{
+								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
+								{
+									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
+									if ((propertyFlags & requiredProperties) == requiredProperties)
+									{
+										typeFound = true;
+										memoryAllocateInfo.memoryTypeIndex = type;
+										break;
+									}
+								}
+							}
+							if (!typeFound)
+							{
+								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
+								vrapi_Shutdown();
+								exit(0);
+							}
+							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &stagingBuffer->memory));
+							VK(appState.Device.vkBindBufferMemory(appState.Device.device, stagingBuffer->buffer, stagingBuffer->memory, 0));
+						}
+						stagingBuffer->unusedCount = 0;
+						stagingBuffer->next = perImage.stagingBuffers.mapped;
+						perImage.stagingBuffers.mapped = stagingBuffer;
+						VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, size, 0, &stagingBuffer->mapped));
+						auto index = 0;
+						auto target = (unsigned char*)stagingBuffer->mapped;
+						for (auto y = 0; y < textured.height; y++)
+						{
+							for (auto x = 0; x < textured.width; x++)
+							{
+								auto entry = textured.data[index];
+								auto color = d_8to24table[entry];
+								*target++ = color & 255;
+								*target++ = (color >> 8) & 255;
+								*target++ = (color >> 16) & 255;
+								*target++ = color >> 24;
+								index++;
+							}
+						}
+						VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
+						VkMappedMemoryRange mappedMemoryRange { };
+						mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+						mappedMemoryRange.memory = stagingBuffer->memory;
+						VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+						imageMemoryBarrier.image = texture->image;
+						imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+						imageMemoryBarrier.subresourceRange.levelCount = 1;
+						imageMemoryBarrier.subresourceRange.layerCount = 1;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						VkBufferImageCopy region { };
+						region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+						region.imageSubresource.layerCount = 1;
+						region.imageExtent.width = texture->width;
+						region.imageExtent.height = texture->height;
+						region.imageExtent.depth = 1;
+						VC(appState.Device.vkCmdCopyBufferToImage(perImage.commandBuffer, stagingBuffer->buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						auto width = textured.width;
+						auto height = textured.height;
+						for (auto k = 1; k < mipCount; k++)
+						{
+							imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+							imageMemoryBarrier.subresourceRange.baseMipLevel = k;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+							VkImageBlit blit { };
+							blit.srcOffsets[1].x = width;
+							blit.srcOffsets[1].y = height;
+							blit.srcOffsets[1].z = 1;
+							blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							blit.srcSubresource.mipLevel = k - 1;
+							blit.srcSubresource.layerCount = 1;
+							width /= 2;
+							if (width < 1)
+							{
+								width = 1;
+							}
+							height /= 2;
+							if (height < 1)
+							{
+								height = 1;
+							}
+							blit.dstOffsets[1].x = width;
+							blit.dstOffsets[1].y = height;
+							blit.dstOffsets[1].z = 1;
+							blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							blit.dstSubresource.mipLevel = k;
+							blit.dstSubresource.layerCount = 1;
+							VC(appState.Device.vkCmdBlitImage(perImage.commandBuffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR));
+							imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						}
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+						imageMemoryBarrier.subresourceRange.levelCount = mipCount;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						texture->unusedCount = 0;
+						texture->next = perImage.textures.textures;
+						perImage.textures.textures = texture;
 						VkDescriptorImageInfo textureInfo { };
 						textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						textureInfo.sampler = appState.Textured[i]->sampler;
-						textureInfo.imageView = appState.Textured[i]->view;
+						textureInfo.sampler = texture->sampler;
+						textureInfo.imageView = texture->view;
 						writes[0].dstBinding = 1;
 						writes[0].dstSet = resources->descriptorSet;
 						writes[0].descriptorCount = 1;
@@ -4282,10 +3765,247 @@ void android_main(struct android_app *app)
 					for (auto i = 0; i <= d_lists.last_alias; i++)
 					{
 						auto& alias = d_lists.alias[i];
+						auto mipCount = (int)(std::floor(std::log2(std::max(alias.width, alias.height)))) + 1;
+						Texture* texture = nullptr;
+						for (Texture **t = &perImage.textures.oldTextures; *t != nullptr; t = &(*t)->next)
+						{
+							if ((*t)->width == alias.width && (*t)->height == alias.height)
+							{
+								texture = *t;
+								*t = (*t)->next;
+								break;
+							}
+						}
+						if (texture == nullptr)
+						{
+							texture = new Texture();
+							memset(texture, 0, sizeof(Texture));
+							texture->width = alias.width;
+							texture->height = alias.height;
+							texture->layerCount = 1;
+							VkImageCreateInfo imageCreateInfo { };
+							imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+							imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+							imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+							imageCreateInfo.extent.width = texture->width;
+							imageCreateInfo.extent.height = texture->height;
+							imageCreateInfo.extent.depth = 1;
+							imageCreateInfo.mipLevels = mipCount;
+							imageCreateInfo.arrayLayers = texture->layerCount;
+							imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+							imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+							imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+							imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+							VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &texture->image));
+							VkMemoryRequirements memoryRequirements;
+							VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, texture->image, &memoryRequirements));
+							VkMemoryAllocateInfo memoryAllocateInfo { };
+							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+							memoryAllocateInfo.allocationSize = memoryRequirements.size;
+							auto requiredProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+							auto typeFound = false;
+							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
+							{
+								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
+								{
+									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
+									if ((propertyFlags & requiredProperties) == requiredProperties)
+									{
+										typeFound = true;
+										memoryAllocateInfo.memoryTypeIndex = type;
+										break;
+									}
+								}
+							}
+							if (!typeFound)
+							{
+								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
+								vrapi_Shutdown();
+								exit(0);
+							}
+							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture->memory));
+							VK(appState.Device.vkBindImageMemory(appState.Device.device, texture->image, texture->memory, 0));
+							VkImageViewCreateInfo imageViewCreateInfo { };
+							imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+							imageViewCreateInfo.image = texture->image;
+							imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+							imageViewCreateInfo.format = imageCreateInfo.format;
+							imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							imageViewCreateInfo.subresourceRange.levelCount = mipCount;
+							imageViewCreateInfo.subresourceRange.layerCount = texture->layerCount;
+							VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture->view));
+							VkImageMemoryBarrier imageMemoryBarrier { };
+							imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							imageMemoryBarrier.image = texture->image;
+							imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							imageMemoryBarrier.subresourceRange.levelCount = mipCount;
+							imageMemoryBarrier.subresourceRange.layerCount = 1;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+							VkSamplerCreateInfo samplerCreateInfo { };
+							samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+							samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+							samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+							samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+							samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.maxLod = mipCount;
+							samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+							VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture->sampler));
+						}
+						Buffer *stagingBuffer = nullptr;
+						size = alias.width * alias.height * 4;
+						for (Buffer **b = &perImage.stagingBuffers.oldMapped; *b != nullptr; b = &(*b)->next)
+						{
+							if ((*b)->size >= size)
+							{
+								stagingBuffer = *b;
+								*b = (*b)->next;
+								break;
+							}
+						}
+						if (stagingBuffer == nullptr)
+						{
+							stagingBuffer = new Buffer();
+							memset(stagingBuffer, 0, sizeof(Buffer));
+							stagingBuffer->size = size;
+							VkBufferCreateInfo bufferCreateInfo { };
+							bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+							bufferCreateInfo.size = stagingBuffer->size;
+							bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+							bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+							VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &stagingBuffer->buffer));
+							stagingBuffer->flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+							VkMemoryRequirements memoryRequirements;
+							VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, stagingBuffer->buffer, &memoryRequirements));
+							VkMemoryAllocateInfo memoryAllocateInfo { };
+							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+							memoryAllocateInfo.allocationSize = memoryRequirements.size;
+							auto requiredProperties = stagingBuffer->flags;
+							auto typeFound = false;
+							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
+							{
+								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
+								{
+									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
+									if ((propertyFlags & requiredProperties) == requiredProperties)
+									{
+										typeFound = true;
+										memoryAllocateInfo.memoryTypeIndex = type;
+										break;
+									}
+								}
+							}
+							if (!typeFound)
+							{
+								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
+								vrapi_Shutdown();
+								exit(0);
+							}
+							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &stagingBuffer->memory));
+							VK(appState.Device.vkBindBufferMemory(appState.Device.device, stagingBuffer->buffer, stagingBuffer->memory, 0));
+						}
+						stagingBuffer->unusedCount = 0;
+						stagingBuffer->next = perImage.stagingBuffers.mapped;
+						perImage.stagingBuffers.mapped = stagingBuffer;
+						VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, size, 0, &stagingBuffer->mapped));
+						auto index = 0;
+						auto target = (unsigned char*)stagingBuffer->mapped;
+						for (auto y = 0; y < alias.height; y++)
+						{
+							for (auto x = 0; x < alias.width; x++)
+							{
+								auto entry = alias.data[index];
+								auto color = d_8to24table[entry];
+								*target++ = color & 255;
+								*target++ = (color >> 8) & 255;
+								*target++ = (color >> 16) & 255;
+								*target++ = color >> 24;
+								index++;
+							}
+						}
+						VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
+						VkMappedMemoryRange mappedMemoryRange { };
+						mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+						mappedMemoryRange.memory = stagingBuffer->memory;
+						VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+						imageMemoryBarrier.image = texture->image;
+						imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+						imageMemoryBarrier.subresourceRange.levelCount = 1;
+						imageMemoryBarrier.subresourceRange.layerCount = 1;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						VkBufferImageCopy region { };
+						region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+						region.imageSubresource.layerCount = 1;
+						region.imageExtent.width = texture->width;
+						region.imageExtent.height = texture->height;
+						region.imageExtent.depth = 1;
+						VC(appState.Device.vkCmdCopyBufferToImage(perImage.commandBuffer, stagingBuffer->buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						auto width = alias.width;
+						auto height = alias.height;
+						for (auto k = 1; k < mipCount; k++)
+						{
+							imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+							imageMemoryBarrier.subresourceRange.baseMipLevel = k;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+							VkImageBlit blit { };
+							blit.srcOffsets[1].x = width;
+							blit.srcOffsets[1].y = height;
+							blit.srcOffsets[1].z = 1;
+							blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							blit.srcSubresource.mipLevel = k - 1;
+							blit.srcSubresource.layerCount = 1;
+							width /= 2;
+							if (width < 1)
+							{
+								width = 1;
+							}
+							height /= 2;
+							if (height < 1)
+							{
+								height = 1;
+							}
+							blit.dstOffsets[1].x = width;
+							blit.dstOffsets[1].y = height;
+							blit.dstOffsets[1].z = 1;
+							blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							blit.dstSubresource.mipLevel = k;
+							blit.dstSubresource.layerCount = 1;
+							VC(appState.Device.vkCmdBlitImage(perImage.commandBuffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR));
+							imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						}
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+						imageMemoryBarrier.subresourceRange.levelCount = mipCount;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						texture->unusedCount = 0;
+						texture->next = perImage.textures.textures;
+						perImage.textures.textures = texture;
 						VkDescriptorImageInfo textureInfo { };
 						textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						textureInfo.sampler = appState.Alias[i]->sampler;
-						textureInfo.imageView = appState.Alias[i]->view;
+						textureInfo.sampler = texture->sampler;
+						textureInfo.imageView = texture->view;
 						writes[0].dstBinding = 1;
 						writes[0].dstSet = resources->descriptorSet;
 						writes[0].descriptorCount = 1;
@@ -4382,10 +4102,247 @@ void android_main(struct android_app *app)
 					for (auto i = 0; i <= d_lists.last_turbulent; i++)
 					{
 						auto& turbulent = d_lists.turbulent[i];
+						auto mipCount = (int)(std::floor(std::log2(std::max(turbulent.width, turbulent.height)))) + 1;
+						Texture* texture = nullptr;
+						for (Texture **t = &perImage.textures.oldTextures; *t != nullptr; t = &(*t)->next)
+						{
+							if ((*t)->width == turbulent.width && (*t)->height == turbulent.height)
+							{
+								texture = *t;
+								*t = (*t)->next;
+								break;
+							}
+						}
+						if (texture == nullptr)
+						{
+							texture = new Texture();
+							memset(texture, 0, sizeof(Texture));
+							texture->width = turbulent.width;
+							texture->height = turbulent.height;
+							texture->layerCount = 1;
+							VkImageCreateInfo imageCreateInfo { };
+							imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+							imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+							imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+							imageCreateInfo.extent.width = texture->width;
+							imageCreateInfo.extent.height = texture->height;
+							imageCreateInfo.extent.depth = 1;
+							imageCreateInfo.mipLevels = mipCount;
+							imageCreateInfo.arrayLayers = texture->layerCount;
+							imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+							imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+							imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+							imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+							VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &texture->image));
+							VkMemoryRequirements memoryRequirements;
+							VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, texture->image, &memoryRequirements));
+							VkMemoryAllocateInfo memoryAllocateInfo { };
+							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+							memoryAllocateInfo.allocationSize = memoryRequirements.size;
+							auto requiredProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+							auto typeFound = false;
+							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
+							{
+								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
+								{
+									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
+									if ((propertyFlags & requiredProperties) == requiredProperties)
+									{
+										typeFound = true;
+										memoryAllocateInfo.memoryTypeIndex = type;
+										break;
+									}
+								}
+							}
+							if (!typeFound)
+							{
+								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
+								vrapi_Shutdown();
+								exit(0);
+							}
+							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture->memory));
+							VK(appState.Device.vkBindImageMemory(appState.Device.device, texture->image, texture->memory, 0));
+							VkImageViewCreateInfo imageViewCreateInfo { };
+							imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+							imageViewCreateInfo.image = texture->image;
+							imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+							imageViewCreateInfo.format = imageCreateInfo.format;
+							imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							imageViewCreateInfo.subresourceRange.levelCount = mipCount;
+							imageViewCreateInfo.subresourceRange.layerCount = texture->layerCount;
+							VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture->view));
+							VkImageMemoryBarrier imageMemoryBarrier { };
+							imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							imageMemoryBarrier.image = texture->image;
+							imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							imageMemoryBarrier.subresourceRange.levelCount = mipCount;
+							imageMemoryBarrier.subresourceRange.layerCount = 1;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+							VkSamplerCreateInfo samplerCreateInfo { };
+							samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+							samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+							samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+							samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+							samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+							samplerCreateInfo.maxLod = mipCount;
+							samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+							VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture->sampler));
+						}
+						Buffer *stagingBuffer = nullptr;
+						size = turbulent.width * turbulent.height * 4;
+						for (Buffer **b = &perImage.stagingBuffers.oldMapped; *b != nullptr; b = &(*b)->next)
+						{
+							if ((*b)->size >= size)
+							{
+								stagingBuffer = *b;
+								*b = (*b)->next;
+								break;
+							}
+						}
+						if (stagingBuffer == nullptr)
+						{
+							stagingBuffer = new Buffer();
+							memset(stagingBuffer, 0, sizeof(Buffer));
+							stagingBuffer->size = size;
+							VkBufferCreateInfo bufferCreateInfo { };
+							bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+							bufferCreateInfo.size = stagingBuffer->size;
+							bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+							bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+							VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &stagingBuffer->buffer));
+							stagingBuffer->flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+							VkMemoryRequirements memoryRequirements;
+							VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, stagingBuffer->buffer, &memoryRequirements));
+							VkMemoryAllocateInfo memoryAllocateInfo { };
+							memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+							memoryAllocateInfo.allocationSize = memoryRequirements.size;
+							auto requiredProperties = stagingBuffer->flags;
+							auto typeFound = false;
+							for (uint32_t type = 0; type < appState.Context.device->physicalDeviceMemoryProperties.memoryTypeCount; type++)
+							{
+								if ((memoryRequirements.memoryTypeBits & (1 << type)) != 0)
+								{
+									const VkFlags propertyFlags = appState.Context.device->physicalDeviceMemoryProperties.memoryTypes[type].propertyFlags;
+									if ((propertyFlags & requiredProperties) == requiredProperties)
+									{
+										typeFound = true;
+										memoryAllocateInfo.memoryTypeIndex = type;
+										break;
+									}
+								}
+							}
+							if (!typeFound)
+							{
+								__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Memory type %d with properties %d not found.", memoryRequirements.memoryTypeBits, requiredProperties);
+								vrapi_Shutdown();
+								exit(0);
+							}
+							VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &stagingBuffer->memory));
+							VK(appState.Device.vkBindBufferMemory(appState.Device.device, stagingBuffer->buffer, stagingBuffer->memory, 0));
+						}
+						stagingBuffer->unusedCount = 0;
+						stagingBuffer->next = perImage.stagingBuffers.mapped;
+						perImage.stagingBuffers.mapped = stagingBuffer;
+						VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, size, 0, &stagingBuffer->mapped));
+						auto index = 0;
+						auto target = (unsigned char*)stagingBuffer->mapped;
+						for (auto y = 0; y < turbulent.height; y++)
+						{
+							for (auto x = 0; x < turbulent.width; x++)
+							{
+								auto entry = turbulent.data[index];
+								auto color = d_8to24table[entry];
+								*target++ = color & 255;
+								*target++ = (color >> 8) & 255;
+								*target++ = (color >> 16) & 255;
+								*target++ = color >> 24;
+								index++;
+							}
+						}
+						VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
+						VkMappedMemoryRange mappedMemoryRange { };
+						mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+						mappedMemoryRange.memory = stagingBuffer->memory;
+						VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+						imageMemoryBarrier.image = texture->image;
+						imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+						imageMemoryBarrier.subresourceRange.levelCount = 1;
+						imageMemoryBarrier.subresourceRange.layerCount = 1;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						VkBufferImageCopy region { };
+						region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+						region.imageSubresource.layerCount = 1;
+						region.imageExtent.width = texture->width;
+						region.imageExtent.height = texture->height;
+						region.imageExtent.depth = 1;
+						VC(appState.Device.vkCmdCopyBufferToImage(perImage.commandBuffer, stagingBuffer->buffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						auto width = turbulent.width;
+						auto height = turbulent.height;
+						for (auto k = 1; k < mipCount; k++)
+						{
+							imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+							imageMemoryBarrier.subresourceRange.baseMipLevel = k;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+							VkImageBlit blit { };
+							blit.srcOffsets[1].x = width;
+							blit.srcOffsets[1].y = height;
+							blit.srcOffsets[1].z = 1;
+							blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							blit.srcSubresource.mipLevel = k - 1;
+							blit.srcSubresource.layerCount = 1;
+							width /= 2;
+							if (width < 1)
+							{
+								width = 1;
+							}
+							height /= 2;
+							if (height < 1)
+							{
+								height = 1;
+							}
+							blit.dstOffsets[1].x = width;
+							blit.dstOffsets[1].y = height;
+							blit.dstOffsets[1].z = 1;
+							blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+							blit.dstSubresource.mipLevel = k;
+							blit.dstSubresource.layerCount = 1;
+							VC(appState.Device.vkCmdBlitImage(perImage.commandBuffer, texture->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR));
+							imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+							imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+							imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+							imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+							VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						}
+						imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+						imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+						imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+						imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+						imageMemoryBarrier.subresourceRange.baseMipLevel = 0;
+						imageMemoryBarrier.subresourceRange.levelCount = mipCount;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+						texture->unusedCount = 0;
+						texture->next = perImage.textures.textures;
+						perImage.textures.textures = texture;
 						VkDescriptorImageInfo textureInfo { };
 						textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-						textureInfo.sampler = appState.Turbulent[i]->sampler;
-						textureInfo.imageView = appState.Turbulent[i]->view;
+						textureInfo.sampler = texture->sampler;
+						textureInfo.imageView = texture->view;
 						writes[0].dstBinding = 1;
 						writes[0].dstSet = resources->descriptorSet;
 						writes[0].descriptorCount = 1;
@@ -4771,59 +4728,58 @@ void android_main(struct android_app *app)
 				VC(appState.Device.vkFreeMemory(appState.Device.device, b->memory, nullptr));
 				delete b;
 			}
+			for (Buffer *b = perImage.stagingBuffers.mapped, *next = nullptr; b != nullptr; b = next)
+			{
+				next = b->next;
+				if (b->mapped != nullptr)
+				{
+					VC(appState.Device.vkUnmapMemory(appState.Device.device, b->memory));
+				}
+				VC(appState.Device.vkDestroyBuffer(appState.Device.device, b->buffer, nullptr));
+				VC(appState.Device.vkFreeMemory(appState.Device.device, b->memory, nullptr));
+				delete b;
+			}
+			for (Buffer *b = perImage.stagingBuffers.oldMapped, *next = nullptr; b != nullptr; b = next)
+			{
+				next = b->next;
+				if (b->mapped != nullptr)
+				{
+					VC(appState.Device.vkUnmapMemory(appState.Device.device, b->memory));
+				}
+				VC(appState.Device.vkDestroyBuffer(appState.Device.device, b->buffer, nullptr));
+				VC(appState.Device.vkFreeMemory(appState.Device.device, b->memory, nullptr));
+				delete b;
+			}
+			for (Texture *t = perImage.textures.textures, *next = nullptr; t != nullptr; t = next)
+			{
+				next = t->next;
+				if (t->memory != VK_NULL_HANDLE)
+				{
+					VC(appState.Device.vkDestroyImageView(appState.Device.device, t->view, nullptr));
+					VC(appState.Device.vkDestroyImage(appState.Device.device, t->image, nullptr));
+					VC(appState.Device.vkFreeMemory(appState.Device.device, t->memory, nullptr));
+				}
+				VC(appState.Device.vkDestroySampler(appState.Device.device, t->sampler, nullptr));
+				delete t;
+			}
+			for (Texture *t = perImage.textures.oldTextures, *next = nullptr; t != nullptr; t = next)
+			{
+				next = t->next;
+				if (t->memory != VK_NULL_HANDLE)
+				{
+					VC(appState.Device.vkDestroyImageView(appState.Device.device, t->view, nullptr));
+					VC(appState.Device.vkDestroyImage(appState.Device.device, t->image, nullptr));
+					VC(appState.Device.vkFreeMemory(appState.Device.device, t->memory, nullptr));
+				}
+				VC(appState.Device.vkDestroySampler(appState.Device.device, t->sampler, nullptr));
+				delete t;
+			}
 		}
-	}
-	for (Buffer *b = appState.StagingBuffers.mapped, *next = nullptr; b != nullptr; b = next)
-	{
-		next = b->next;
-		if (b->mapped != nullptr)
-		{
-			VC(appState.Device.vkUnmapMemory(appState.Device.device, b->memory));
-		}
-		VC(appState.Device.vkDestroyBuffer(appState.Device.device, b->buffer, nullptr));
-		VC(appState.Device.vkFreeMemory(appState.Device.device, b->memory, nullptr));
-		delete b;
-	}
-	for (Buffer *b = appState.StagingBuffers.oldMapped, *next = nullptr; b != nullptr; b = next)
-	{
-		next = b->next;
-		if (b->mapped != nullptr)
-		{
-			VC(appState.Device.vkUnmapMemory(appState.Device.device, b->memory));
-		}
-		VC(appState.Device.vkDestroyBuffer(appState.Device.device, b->buffer, nullptr));
-		VC(appState.Device.vkFreeMemory(appState.Device.device, b->memory, nullptr));
-		delete b;
-	}
-	for (Texture *t = appState.CachedTextures.textures, *next = nullptr; t != nullptr; t = next)
-	{
-		next = t->next;
-		if (t->memory != VK_NULL_HANDLE)
-		{
-			VC(appState.Device.vkDestroyImageView(appState.Device.device, t->view, nullptr));
-			VC(appState.Device.vkDestroyImage(appState.Device.device, t->image, nullptr));
-			VC(appState.Device.vkFreeMemory(appState.Device.device, t->memory, nullptr));
-		}
-		VC(appState.Device.vkDestroySampler(appState.Device.device, t->sampler, nullptr));
-		delete t;
-	}
-	for (Texture *t = appState.CachedTextures.oldTextures, *next = nullptr; t != nullptr; t = next)
-	{
-		next = t->next;
-		if (t->memory != VK_NULL_HANDLE)
-		{
-			VC(appState.Device.vkDestroyImageView(appState.Device.device, t->view, nullptr));
-			VC(appState.Device.vkDestroyImage(appState.Device.device, t->image, nullptr));
-			VC(appState.Device.vkFreeMemory(appState.Device.device, t->memory, nullptr));
-		}
-		VC(appState.Device.vkDestroySampler(appState.Device.device, t->sampler, nullptr));
-		delete t;
 	}
 	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.Screen.CommandBuffer));
 	vrapi_DestroyTextureSwapChain(appState.Screen.SwapChain);
 	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.Console.CommandBuffer));
 	vrapi_DestroyTextureSwapChain(appState.Console.SwapChain);
-	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.TextureCommandBuffer));
 	VC(appState.Device.vkDestroyRenderPass(appState.Device.device, appState.RenderPass, nullptr));
 	VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
 	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.turbulent.pipeline, nullptr));
