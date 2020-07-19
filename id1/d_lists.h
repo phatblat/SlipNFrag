@@ -19,6 +19,7 @@ struct dlists_t
 	int last_vertex;
 	int last_index;
 	int clear_color;
+	int texture_data_size;
 	std::vector<dtexture_t> textured;
 	std::vector<dtexture_t> turbulent;
 	std::vector<dtexture_t> alias;
