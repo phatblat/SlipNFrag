@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "r_local.h"
+#include "d_lists.h"
 
 #define MAX_PARTICLES			2048	// default max # of particles at one
 										//  time
@@ -814,13 +815,23 @@ void R_DrawParticles (void)
     
 	D_StartParticles ();
 
-	VectorScale (vright, xscaleshrink, r_pright);
-	VectorScale (vup, yscaleshrink, r_pup);
-	VectorCopy (vpn, r_ppn);
+    if (d_uselists)
+    {
+        for (p=active_particles ; p ; p=p->next)
+        {
+            D_AddParticleToLists(p);
+        }
+    }
+    else
+    {
+        VectorScale (vright, xscaleshrink, r_pright);
+        VectorScale (vup, yscaleshrink, r_pup);
+        VectorCopy (vpn, r_ppn);
 
-	for (p=active_particles ; p ; p=p->next)
-	{
-		D_DrawParticle (p);
+		for (p=active_particles ; p ; p=p->next)
+		{
+			D_DrawParticle (p);
+		}
 	}
 
 	D_EndParticles ();

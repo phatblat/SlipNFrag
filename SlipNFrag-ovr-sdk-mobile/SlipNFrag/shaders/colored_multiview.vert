@@ -11,17 +11,11 @@ layout(binding = 0) uniform SceneMatrices
 };
 
 layout(location = 0) in vec3 vertexPosition;
-layout(location = 1) in vec2 vertexTexCoords;
-layout(location = 2) in mat4 vertexTransform;
-layout(location = 0) out mediump vec2 fragmentTexCoords;
+layout(location = 1) in mat4 vertexTransform;
 
-out gl_PerVertex
-{
-	vec4 gl_Position;
-};
+out gl_PerVertex { vec4 gl_Position; };
 
 void main(void)
 {
 	gl_Position = ProjectionMatrix[gl_ViewID_OVR] * (ViewMatrix[gl_ViewID_OVR] * (vertexTransform * vec4(vertexPosition, 1.0)));
-	fragmentTexCoords = vertexTexCoords;
 }
