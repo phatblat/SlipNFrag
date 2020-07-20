@@ -14,6 +14,7 @@ std::vector<FILE*> sys_handles;
 std::string sys_errormessage;
 
 int sys_nogamedata;
+int sys_quitcalled;
 
 int findhandle()
 {
@@ -179,7 +180,7 @@ void Sys_Printf(const char* fmt, ...)
 void Sys_Quit()
 {
     Host_Shutdown();
-    exit(0);
+    sys_quitcalled = 1;
 }
 
 double Sys_FloatTime()
