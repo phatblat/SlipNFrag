@@ -4,9 +4,15 @@
 #include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1, 0 };
+dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0 };
 
 qboolean d_uselists = false;
+
+extern int r_ambientlight;
+extern float r_shadelight;
+#define NUMVERTEXNORMALS 162
+extern float r_avertexnormals[NUMVERTEXNORMALS][3];
+extern vec3_t r_plightvec;
 
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 {
@@ -303,7 +309,7 @@ void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entit
 	}
 }
 
-void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc)
+void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap)
 {
 	auto mdl = (mdl_t *)((byte *)aliashdr + aliashdr->model);
 	if (mdl->numtris <= 0)
@@ -324,7 +330,12 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		alias.data.resize(alias.size);
 	}
 	memcpy(alias.data.data(), (byte *)aliashdr + skindesc->skin, alias.size);
-	d_lists.texture_data_size += alias.size;
+	if (alias.colormap.size() < 16384)
+	{
+		alias.colormap.resize(16384);
+	}
+	memcpy(alias.colormap.data(), colormap, 16384);
+	d_lists.texture_data_size += alias.size + 16384;
 	vec3_t angles;
 	angles[ROLL] = currententity->angles[ROLL];
 	angles[PITCH] = -currententity->angles[PITCH];
@@ -353,7 +364,7 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 	auto vertex = vertices;
 	auto texcoordsbase = (stvert_t *)((byte *)aliashdr + aliashdr->stverts);
 	auto texcoords = texcoordsbase;
-	auto basevert = (d_lists.last_textured_vertex + 1) / 5;
+	auto basevert = (d_lists.last_colormapped_vertex + 1) / 6;
 	for (auto i = 0; i < mdl->numverts;  i++)
 	{
 		vec3_t pos { (float)vertex->v[0], (float)vertex->v[1], (float)vertex->v[2] };
@@ -368,100 +379,136 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		auto t = (float)(texcoords->t >> 16);
 		s /= alias.width;
 		t /= alias.height;
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+
+		// lighting
+		auto plightnormal = r_avertexnormals[vertex->lightnormalindex];
+		auto lightcos = DotProduct (plightnormal, r_plightvec);
+		auto temp = r_ambientlight;
+
+		if (lightcos < 0)
 		{
-			d_lists.textured_vertices.emplace_back(x);
+			temp += (int)(r_shadelight * lightcos);
+
+			// clamp; because we limited the minimum ambient and shading light, we
+			// don't have to clamp low light, just bright
+			if (temp < 0)
+				temp = 0;
+		}
+
+		float light = temp / 256;
+
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
+		{
+			d_lists.colormapped_vertices.emplace_back(x);
 		}
 		else
 		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = x;
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = x;
 		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
 		{
-			d_lists.textured_vertices.emplace_back(z);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(-y);
+			d_lists.colormapped_vertices.emplace_back(z);
 		}
 		else
 		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = z;
 		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
 		{
-			d_lists.textured_vertices.emplace_back(s);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(t);
+			d_lists.colormapped_vertices.emplace_back(-y);
 		}
 		else
 		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = -y;
 		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
 		{
-			d_lists.textured_vertices.emplace_back(x);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = x;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(z);
+			d_lists.colormapped_vertices.emplace_back(s);
 		}
 		else
 		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = s;
 		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
 		{
-			d_lists.textured_vertices.emplace_back(-y);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(s);
+			d_lists.colormapped_vertices.emplace_back(t);
 		}
 		else
 		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = s + 0.5;
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = t;
 		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
 		{
-			d_lists.textured_vertices.emplace_back(t);
+			d_lists.colormapped_vertices.emplace_back(light);
 		}
 		else
 		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = light;
+		}
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
+		{
+			d_lists.colormapped_vertices.emplace_back(x);
+		}
+		else
+		{
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = x;
+		}
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
+		{
+			d_lists.colormapped_vertices.emplace_back(z);
+		}
+		else
+		{
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = z;
+		}
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
+		{
+			d_lists.colormapped_vertices.emplace_back(-y);
+		}
+		else
+		{
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = -y;
+		}
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
+		{
+			d_lists.colormapped_vertices.emplace_back(s);
+		}
+		else
+		{
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = s + 0.5;
+		}
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
+		{
+			d_lists.colormapped_vertices.emplace_back(t);
+		}
+		else
+		{
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = t;
+		}
+		d_lists.last_colormapped_vertex++;
+		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
+		{
+			d_lists.colormapped_vertices.emplace_back(light);
+		}
+		else
+		{
+			d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = light;
 		}
 		vertex++;
 		texcoords++;
 	}
-	alias.first_index = d_lists.last_textured_index + 1;
+	alias.first_index = d_lists.last_colormapped_index + 1;
 	alias.count = mdl->numtris * 3;
 	auto triangle = (mtriangle_t *)((byte *)aliashdr + aliashdr->triangles);
 	for (auto i = 0; i < mdl->numtris; i++)
@@ -475,32 +522,32 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		v0 = basevert + v0 * 2 + (v0back ? 1 : 0);
 		v1 = basevert + v1 * 2 + (v1back ? 1 : 0);
 		v2 = basevert + v2 * 2 + (v2back ? 1 : 0);
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		d_lists.last_colormapped_index++;
+		if (d_lists.last_colormapped_index >= d_lists.colormapped_indices.size())
 		{
-			d_lists.textured_indices.emplace_back(v0);
+			d_lists.colormapped_indices.emplace_back(v0);
 		}
 		else
 		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v0;
+			d_lists.colormapped_indices[d_lists.last_colormapped_index] = v0;
 		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		d_lists.last_colormapped_index++;
+		if (d_lists.last_colormapped_index >= d_lists.colormapped_indices.size())
 		{
-			d_lists.textured_indices.emplace_back(v1);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v1;
-		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v2);
+			d_lists.colormapped_indices.emplace_back(v1);
 		}
 		else
 		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v2;
+			d_lists.colormapped_indices[d_lists.last_colormapped_index] = v1;
+		}
+		d_lists.last_colormapped_index++;
+		if (d_lists.last_colormapped_index >= d_lists.colormapped_indices.size())
+		{
+			d_lists.colormapped_indices.emplace_back(v2);
+		}
+		else
+		{
+			d_lists.colormapped_indices[d_lists.last_colormapped_index] = v2;
 		}
 		triangle++;
 	}
