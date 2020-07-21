@@ -508,13 +508,27 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 
 void D_AddParticleToLists (particle_t* particle)
 {
-	d_lists.last_particle++;
-	if (d_lists.last_particle >= d_lists.particles.size())
+	dcolor_t* color;
+	if (d_lists.last_particle >= 0 && d_lists.particles[d_lists.last_particle].color == particle->color)
 	{
-		d_lists.particles.emplace_back();
+		color = d_lists.particles.data() + d_lists.last_particle;
 	}
-	auto& particle_in_list = d_lists.particles[d_lists.last_particle];
-	particle_in_list.color = particle->color;
+	else
+	{
+		d_lists.last_particle++;
+		if (d_lists.last_particle >= d_lists.particles.size())
+		{
+			d_lists.particles.emplace_back();
+			color = d_lists.particles.data() + d_lists.last_particle;
+		}
+		else
+		{
+			color = d_lists.particles.data() + d_lists.last_particle;
+			color->count = 0;
+		}
+		color->first_index = d_lists.last_colored_index + 1;
+		color->color = particle->color;
+	}
 	auto x = particle->org[0] - vright[0] * 0.5 + vup[0] * 0.5;
 	auto y = particle->org[1] - vright[1] * 0.5 + vup[1] * 0.5;
 	auto z = particle->org[2] - vright[2] * 0.5 + vup[2] * 0.5;
@@ -636,8 +650,7 @@ void D_AddParticleToLists (particle_t* particle)
 	{
 		d_lists.colored_vertices[d_lists.last_colored_vertex] = -y;
 	}
-	particle_in_list.first_index = d_lists.last_colored_index + 1;
-	particle_in_list.count = 6;
+	color->count += 6;
 	auto v0 = first_vertex;
 	auto v1 = first_vertex + 1;
 	auto v2 = first_vertex + 2;

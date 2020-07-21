@@ -2127,13 +2127,35 @@ void android_main(struct android_app *app)
 						{
 							Cmd_ExecuteString("impulse 10", src_command);
 						}
-						if (leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_B))
+						if (m_state == m_quit)
 						{
-							Cmd_ExecuteString("+jump", src_command);
+							if (rightButtonIsDown(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("+jump", src_command);
+							}
+							if (rightButtonIsUp(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("-jump", src_command);
+							}
+							if (leftButtonIsDown(appState, ovrButton_Y))
+							{
+								Key_Event('y', true);
+							}
+							if (leftButtonIsUp(appState, ovrButton_Y))
+							{
+								Key_Event('y', false);
+							}
 						}
-						if (leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_B))
+						else
 						{
-							Cmd_ExecuteString("-jump", src_command);
+							if (leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("+jump", src_command);
+							}
+							if (leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("-jump", src_command);
+							}
 						}
 						if (leftButtonIsDown(appState, ovrButton_X) || rightButtonIsDown(appState, ovrButton_A))
 						{
@@ -2194,16 +2216,24 @@ void android_main(struct android_app *app)
 						{
 							Key_Event(K_ENTER, false);
 						}
-						if (leftButtonIsDown(appState, ovrButton_GripTrigger) || leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_B))
+						if (leftButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_B))
 						{
 							Key_Event(K_ESCAPE, true);
 						}
-						if (leftButtonIsUp(appState, ovrButton_GripTrigger) || leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_B))
+						if (leftButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_B))
 						{
 							Key_Event(K_ESCAPE, false);
 						}
 						if (m_state == m_quit)
 						{
+							if (leftButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_B))
+							{
+								Key_Event(K_ESCAPE, true);
+							}
+							if (leftButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_B))
+							{
+								Key_Event(K_ESCAPE, false);
+							}
 							if (leftButtonIsDown(appState, ovrButton_Y))
 							{
 								Key_Event('y', true);
@@ -2211,6 +2241,17 @@ void android_main(struct android_app *app)
 							if (leftButtonIsUp(appState, ovrButton_Y))
 							{
 								Key_Event('y', false);
+							}
+						}
+						else
+						{
+							if (leftButtonIsDown(appState, ovrButton_GripTrigger) || leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_GripTrigger) || rightButtonIsDown(appState, ovrButton_B))
+							{
+								Key_Event(K_ESCAPE, true);
+							}
+							if (leftButtonIsUp(appState, ovrButton_GripTrigger) || leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_GripTrigger) || rightButtonIsUp(appState, ovrButton_B))
+							{
+								Key_Event(K_ESCAPE, false);
 							}
 						}
 					}
@@ -2256,13 +2297,35 @@ void android_main(struct android_app *app)
 						{
 							Cmd_ExecuteString("impulse 10", src_command);
 						}
-						if (leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_B))
+						if (m_state == m_quit)
 						{
-							Cmd_ExecuteString("+jump", src_command);
+							if (rightButtonIsDown(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("+jump", src_command);
+							}
+							if (rightButtonIsUp(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("-jump", src_command);
+							}
+							if (leftButtonIsDown(appState, ovrButton_Y))
+							{
+								Key_Event('y', true);
+							}
+							if (leftButtonIsUp(appState, ovrButton_Y))
+							{
+								Key_Event('y', false);
+							}
 						}
-						if (leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_B))
+						else
 						{
-							Cmd_ExecuteString("-jump", src_command);
+							if (leftButtonIsDown(appState, ovrButton_Y) || rightButtonIsDown(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("+jump", src_command);
+							}
+							if (leftButtonIsUp(appState, ovrButton_Y) || rightButtonIsUp(appState, ovrButton_B))
+							{
+								Cmd_ExecuteString("-jump", src_command);
+							}
 						}
 						if (leftButtonIsDown(appState, ovrButton_X) || rightButtonIsDown(appState, ovrButton_A))
 						{
@@ -4364,7 +4427,7 @@ void android_main(struct android_app *app)
 					auto mapped = (float*)uniforms->mapped;
 					(*mapped) = cl.time;
 					mapped++;
-					for (auto i = 0; i < d_lists.last_particle; i++)
+					for (auto i = 0; i <= d_lists.last_particle; i++)
 					{
 						(*mapped) = d_lists.particles[i].color;
 						mapped++;
