@@ -18,6 +18,7 @@ struct dcolormappedtexture_t
 	int size;
 	std::vector<unsigned char> data;
 	std::vector<unsigned char> colormap;
+	int is_host_colormap;
 	int first_index;
 	int count;
 };

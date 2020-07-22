@@ -330,12 +330,21 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		alias.data.resize(alias.size);
 	}
 	memcpy(alias.data.data(), (byte *)aliashdr + skindesc->skin, alias.size);
-	if (alias.colormap.size() < 16384)
+	d_lists.texture_data_size += alias.size;
+	if (colormap == host_colormap)
 	{
-		alias.colormap.resize(16384);
+		alias.is_host_colormap = 1;
 	}
-	memcpy(alias.colormap.data(), colormap, 16384);
-	d_lists.texture_data_size += alias.size + 16384;
+	else
+	{
+		alias.is_host_colormap = 0;
+		if (alias.colormap.size() < 16384)
+		{
+			alias.colormap.resize(16384);
+		}
+		memcpy(alias.colormap.data(), colormap, 16384);
+		d_lists.texture_data_size += 16384;
+	}
 	vec3_t angles;
 	angles[ROLL] = currententity->angles[ROLL];
 	angles[PITCH] = -currententity->angles[PITCH];

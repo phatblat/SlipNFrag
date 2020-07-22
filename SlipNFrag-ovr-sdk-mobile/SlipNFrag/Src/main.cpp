@@ -184,12 +184,21 @@ struct Texture
 	VkSampler sampler;
 };
 
+struct PipelineDescriptorResources
+{
+	bool created;
+	VkDescriptorPool descriptorPool;
+	VkDescriptorSet descriptorSet;
+};
+
 struct PipelineResources
 {
 	PipelineResources *next;
 	int unusedCount;
-	VkDescriptorPool descriptorPool;
-	VkDescriptorSet descriptorSet;
+	PipelineDescriptorResources textured;
+	PipelineDescriptorResources turbulent;
+	PipelineDescriptorResources colormapped;
+	PipelineDescriptorResources colored;
 };
 
 struct CachedBuffers
@@ -231,8 +240,8 @@ struct Scene
 	VkShaderModule coloredVertex;
 	VkShaderModule coloredFragment;
 	Pipeline textured;
-	Pipeline colormapped;
 	Pipeline turbulent;
+	Pipeline colormapped;
 	Pipeline colored;
 	PipelineAttributes texturedAttributes;
 	PipelineAttributes colormappedAttributes;
@@ -1891,11 +1900,9 @@ void android_main(struct android_app *app)
 	commandBufferAllocateInfo.commandPool = appState.Context.commandPool;
 	commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	commandBufferAllocateInfo.commandBufferCount = 1;
-	VkCommandBufferBeginInfo setupCommandBufferBeginInfo { };
-	setupCommandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	setupCommandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	VkCommandBufferBeginInfo commandBufferBeginInfo { };
 	commandBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	commandBufferBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	VkCommandBuffer setupCommandBuffer;
 	VkSubmitInfo setupSubmitInfo { };
 	setupSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -2084,7 +2091,7 @@ void android_main(struct android_app *app)
 			texture.layerCount = isMultiview ? 2 : 1;
 			texture.image = view.colorSwapChain.ColorTextures[i];
 			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
 			VkImageMemoryBarrier imageMemoryBarrier { };
 			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 			imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -2126,7 +2133,7 @@ void android_main(struct android_app *app)
 				texture.layerCount = isMultiview ? 2 : 1;
 				texture.image = view.colorSwapChain.FragmentDensityTextures[i];
 				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-				VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
+				VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
 				imageMemoryBarrier.dstAccessMask = VK_ACCESS_FRAGMENT_DENSITY_MAP_READ_BIT_EXT;
 				imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT;
 				imageMemoryBarrier.image = view.colorSwapChain.FragmentDensityTextures[i];
@@ -2190,7 +2197,7 @@ void android_main(struct android_app *app)
 		VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture.memory));
 		VK(appState.Device.vkBindImageMemory(appState.Device.device, texture.image, texture.memory, 0));
 		VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
+		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
 		VkImageMemoryBarrier imageMemoryBarrier { };
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -2225,7 +2232,7 @@ void android_main(struct android_app *app)
 		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
 		VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture.sampler));
 		VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
+		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
 		imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 		imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -2258,7 +2265,7 @@ void android_main(struct android_app *app)
 		imageViewCreateInfo.subresourceRange.layerCount = numLayers;
 		VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &view.framebuffer.depthImageView));
 		VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
+		VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
 		imageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		imageMemoryBarrier.image = view.framebuffer.depthImage;
@@ -2878,7 +2885,7 @@ void android_main(struct android_app *app)
 			mappedMemoryRange.memory = appState.Screen.Buffer.memory;
 			VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
 			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &setupCommandBufferBeginInfo));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
 			VkBufferImageCopy region { };
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			region.imageSubresource.layerCount = 1;
@@ -3409,8 +3416,26 @@ void android_main(struct android_app *app)
 				if ((*r)->unusedCount >= MAX_UNUSED_COUNT)
 				{
 					PipelineResources *next = (*r)->next;
-					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->descriptorPool, 1, &(*r)->descriptorSet));
-					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, (*r)->descriptorPool, nullptr));
+					if ((*r)->colored.created)
+					{
+						VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->colored.descriptorPool, 1, &(*r)->colored.descriptorSet));
+						VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, (*r)->colored.descriptorPool, nullptr));
+					}
+					if ((*r)->colormapped.created)
+					{
+						VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->colormapped.descriptorPool, 1, &(*r)->colormapped.descriptorSet));
+						VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, (*r)->colormapped.descriptorPool, nullptr));
+					}
+					if ((*r)->turbulent.created)
+					{
+						VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->turbulent.descriptorPool, 1, &(*r)->turbulent.descriptorSet));
+						VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, (*r)->turbulent.descriptorPool, nullptr));
+					}
+					if ((*r)->textured.created)
+					{
+						VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->textured.descriptorPool, 1, &(*r)->textured.descriptorSet));
+						VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, (*r)->textured.descriptorPool, nullptr));
+					}
 					delete *r;
 					*r = next;
 				}
@@ -3640,26 +3665,27 @@ void android_main(struct android_app *app)
 					poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 					poolSizes[0].descriptorCount = 1;
 					poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-					poolSizes[1].descriptorCount = 1;
+					poolSizes[1].descriptorCount = 2;
 					VkDescriptorPoolCreateInfo descriptorPoolCreateInfo { };
 					descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 					descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 					descriptorPoolCreateInfo.maxSets = 1;
 					descriptorPoolCreateInfo.poolSizeCount = 2;
 					descriptorPoolCreateInfo.pPoolSizes = poolSizes;
-					VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->descriptorPool));
+					VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->textured.descriptorPool));
 					VkDescriptorSetAllocateInfo descriptorSetAllocateInfo { };
 					descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-					descriptorSetAllocateInfo.descriptorPool = resources->descriptorPool;
+					descriptorSetAllocateInfo.descriptorPool = resources->textured.descriptorPool;
 					descriptorSetAllocateInfo.descriptorSetCount = 1;
 					descriptorSetAllocateInfo.pSetLayouts = &appState.Scene.textured.descriptorSetLayout;
-					VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->descriptorSet));
+					VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->textured.descriptorSet));
+					resources->textured.created = true;
 					VkDescriptorBufferInfo bufferInfo[2] { };
 					bufferInfo[0].buffer = appState.Scene.matrices.buffer;
 					bufferInfo[0].range = appState.Scene.matrices.size;
 					VkWriteDescriptorSet writes[3] { };
 					writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-					writes[0].dstSet = resources->descriptorSet;
+					writes[0].dstSet = resources->textured.descriptorSet;
 					writes[0].descriptorCount = 1;
 					writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 					writes[0].pBufferInfo = bufferInfo;
@@ -3669,7 +3695,7 @@ void android_main(struct android_app *app)
 					resources->next = perImage.pipelineResources;
 					perImage.pipelineResources = resources;
 					Buffer* stagingBuffer = nullptr;
-					auto stagingBufferSize = 1024 + d_lists.texture_data_size;
+					auto stagingBufferSize = 1024 + 16384 + d_lists.texture_data_size;
 					for (Buffer **b = &perImage.stagingBuffers.oldMapped; *b != nullptr; b = &(*b)->next)
 					{
 						if ((*b)->size >= stagingBufferSize && (*b)->size < stagingBufferSize * 2)
@@ -3689,6 +3715,8 @@ void android_main(struct android_app *app)
 					VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, stagingBufferSize, 0, &stagingBuffer->mapped));
 					memcpy(stagingBuffer->mapped, d_8to24table, 1024);
 					auto offset = 1024;
+					memcpy(((unsigned char*)stagingBuffer->mapped) + offset, host_colormap, 16384);
+					offset += 16384;
 					if (d_lists.last_textured >= perImage.texturedOffsets.size())
 					{
 						perImage.texturedOffsets.resize(d_lists.last_textured + 1);
@@ -3711,9 +3739,12 @@ void android_main(struct android_app *app)
 						perImage.aliasOffsets[i] = offset;
 						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, alias.data.data(), alias.size);
 						offset += alias.size;
-						perImage.aliasColormapOffsets[i] = offset;
-						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, alias.colormap.data(), 16384);
-						offset += 16384;
+						if (alias.is_host_colormap == 0)
+						{
+							perImage.aliasColormapOffsets[i] = offset;
+							memcpy(((unsigned char*)stagingBuffer->mapped) + offset, alias.colormap.data(), 16384);
+							offset += 16384;
+						}
 					}
 					if (d_lists.last_turbulent >= perImage.turbulentOffsets.size())
 					{
@@ -3775,17 +3806,17 @@ void android_main(struct android_app *app)
 						textureInfo[1].sampler = palette->sampler;
 						textureInfo[1].imageView = palette->view;
 						writes[0].dstBinding = 1;
-						writes[0].dstSet = resources->descriptorSet;
+						writes[0].dstSet = resources->textured.descriptorSet;
 						writes[0].descriptorCount = 1;
 						writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 						writes[0].pImageInfo = textureInfo;
 						writes[1].dstBinding = 2;
-						writes[1].dstSet = resources->descriptorSet;
+						writes[1].dstSet = resources->textured.descriptorSet;
 						writes[1].descriptorCount = 1;
 						writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 						writes[1].pImageInfo = textureInfo + 1;
 						VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
-						VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.textured.pipelineLayout, 0, 1, &resources->descriptorSet, 0, nullptr));
+						VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.textured.pipelineLayout, 0, 1, &resources->textured.descriptorSet, 0, nullptr));
 						VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, textured.count, 1, textured.first_index, 0, 0));
 					}
 					Buffer* uniforms = nullptr;
@@ -3823,29 +3854,27 @@ void android_main(struct android_app *app)
 					bufferMemoryBarrier.size = uniforms->size;
 					VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 					VC(appState.Device.vkCmdBindPipeline(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.turbulent.pipeline));
-					resources = new PipelineResources();
-					memset(resources, 0, sizeof(PipelineResources));
-					VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->descriptorPool));
-					descriptorSetAllocateInfo.descriptorPool = resources->descriptorPool;
+					poolSizes[0].descriptorCount = 2;
+					VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->turbulent.descriptorPool));
+					descriptorSetAllocateInfo.descriptorPool = resources->turbulent.descriptorPool;
 					descriptorSetAllocateInfo.pSetLayouts = &appState.Scene.turbulent.descriptorSetLayout;
-					VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->descriptorSet));
+					VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->turbulent.descriptorSet));
+					resources->turbulent.created = true;
 					bufferInfo[0].buffer = appState.Scene.matrices.buffer;
 					bufferInfo[0].range = appState.Scene.matrices.size;
 					bufferInfo[1].buffer = uniforms->buffer;
 					bufferInfo[1].range = uniforms->size;
 					writes[0].dstBinding = 0;
-					writes[0].dstSet = resources->descriptorSet;
+					writes[0].dstSet = resources->turbulent.descriptorSet;
 					writes[0].descriptorCount = 1;
 					writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 					writes[0].pBufferInfo = bufferInfo;
 					writes[1].dstBinding = 3;
-					writes[1].dstSet = resources->descriptorSet;
+					writes[1].dstSet = resources->turbulent.descriptorSet;
 					writes[1].descriptorCount = 1;
 					writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 					writes[1].pBufferInfo = bufferInfo + 1;
 					VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
-					resources->next = perImage.pipelineResources;
-					perImage.pipelineResources = resources;
 					for (auto i = 0; i <= d_lists.last_turbulent; i++)
 					{
 						auto& turbulent = d_lists.turbulent[i];
@@ -3876,21 +3905,35 @@ void android_main(struct android_app *app)
 						textureInfo[1].sampler = palette->sampler;
 						textureInfo[1].imageView = palette->view;
 						writes[0].dstBinding = 1;
-						writes[0].dstSet = resources->descriptorSet;
+						writes[0].dstSet = resources->turbulent.descriptorSet;
 						writes[0].descriptorCount = 1;
 						writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 						writes[0].pImageInfo = textureInfo;
 						writes[1].dstBinding = 2;
-						writes[1].dstSet = resources->descriptorSet;
+						writes[1].dstSet = resources->turbulent.descriptorSet;
 						writes[1].descriptorCount = 1;
 						writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 						writes[1].pImageInfo = textureInfo + 1;
 						VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
-						VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.turbulent.pipelineLayout, 0, 1, &resources->descriptorSet, 0, nullptr));
+						VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.turbulent.pipelineLayout, 0, 1, &resources->turbulent.descriptorSet, 0, nullptr));
 						VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, turbulent.count, 1, turbulent.first_index, 0, 0));
 					}
 					if (colormappedSize > 0)
 					{
+						Texture* host_colormap_texture = nullptr;
+						if (perImage.colormaps.oldTextures != nullptr)
+						{
+							host_colormap_texture = perImage.colormaps.oldTextures;
+							perImage.colormaps.oldTextures = host_colormap_texture->next;
+						}
+						else
+						{
+							createTexture(appState, perImage.commandBuffer, 256, 64, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, host_colormap_texture);
+						}
+						fillTexture(appState, host_colormap_texture, stagingBuffer, 1024, perImage.commandBuffer);
+						host_colormap_texture->unusedCount = 0;
+						host_colormap_texture->next = perImage.colormaps.textures;
+						perImage.colormaps.textures = host_colormap_texture;
 						Buffer *colormappedVertices = nullptr;
 						for (Buffer **b = &perImage.colormappedVertices.oldMapped; *b != nullptr; b = &(*b)->next)
 						{
@@ -3950,22 +3993,21 @@ void android_main(struct android_app *app)
 						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 3, 1, &instance->buffer, &noOffset));
 						VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, colormappedIndices->buffer, 0, VK_INDEX_TYPE_UINT32));
 						VC(appState.Device.vkCmdBindPipeline(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.colormapped.pipeline));
-						resources = new PipelineResources();
-						memset(resources, 0, sizeof(PipelineResources));
-						VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->descriptorPool));
-						descriptorSetAllocateInfo.descriptorPool = resources->descriptorPool;
+						poolSizes[0].descriptorCount = 1;
+						poolSizes[1].descriptorCount = 3;
+						VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->colormapped.descriptorPool));
+						descriptorSetAllocateInfo.descriptorPool = resources->colormapped.descriptorPool;
 						descriptorSetAllocateInfo.pSetLayouts = &appState.Scene.colormapped.descriptorSetLayout;
-						VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->descriptorSet));
+						VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->colormapped.descriptorSet));
+						resources->colormapped.created = true;
 						bufferInfo[0].buffer = appState.Scene.matrices.buffer;
 						bufferInfo[0].range = appState.Scene.matrices.size;
 						writes[0].dstBinding = 0;
-						writes[0].dstSet = resources->descriptorSet;
+						writes[0].dstSet = resources->colormapped.descriptorSet;
 						writes[0].descriptorCount = 1;
 						writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 						writes[0].pBufferInfo = bufferInfo;
 						VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 1, writes, 0, nullptr));
-						resources->next = perImage.pipelineResources;
-						perImage.pipelineResources = resources;
 						for (auto i = 0; i <= d_lists.last_alias; i++)
 						{
 							auto &alias = d_lists.alias[i];
@@ -3988,20 +4030,27 @@ void android_main(struct android_app *app)
 							texture->unusedCount = 0;
 							texture->next = perImage.textures.textures;
 							perImage.textures.textures = texture;
-							Texture *colormap = nullptr;
-							if (perImage.colormaps.oldTextures != nullptr)
+							Texture *colormap;
+							if (alias.is_host_colormap == 0)
 							{
-								colormap = perImage.colormaps.oldTextures;
-								perImage.colormaps.oldTextures = colormap->next;
+								if (perImage.colormaps.oldTextures != nullptr)
+								{
+									colormap = perImage.colormaps.oldTextures;
+									perImage.colormaps.oldTextures = colormap->next;
+								}
+								else
+								{
+									createTexture(appState, perImage.commandBuffer, 256, 64, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, colormap);
+								}
+								fillTexture(appState, colormap, stagingBuffer, perImage.aliasColormapOffsets[i], perImage.commandBuffer);
+								colormap->unusedCount = 0;
+								colormap->next = perImage.colormaps.textures;
+								perImage.colormaps.textures = colormap;
 							}
 							else
 							{
-								createTexture(appState, perImage.commandBuffer, 256, 64, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, colormap);
+								colormap = host_colormap_texture;
 							}
-							fillTexture(appState, colormap, stagingBuffer, perImage.aliasColormapOffsets[i], perImage.commandBuffer);
-							colormap->unusedCount = 0;
-							colormap->next = perImage.colormaps.textures;
-							perImage.colormaps.textures = colormap;
 							VkDescriptorImageInfo textureInfo[3] { };
 							textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 							textureInfo[0].sampler = texture->sampler;
@@ -4013,22 +4062,22 @@ void android_main(struct android_app *app)
 							textureInfo[2].sampler = palette->sampler;
 							textureInfo[2].imageView = palette->view;
 							writes[0].dstBinding = 1;
-							writes[0].dstSet = resources->descriptorSet;
+							writes[0].dstSet = resources->colormapped.descriptorSet;
 							writes[0].descriptorCount = 1;
 							writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 							writes[0].pImageInfo = textureInfo;
 							writes[1].dstBinding = 2;
-							writes[1].dstSet = resources->descriptorSet;
+							writes[1].dstSet = resources->colormapped.descriptorSet;
 							writes[1].descriptorCount = 1;
 							writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 							writes[1].pImageInfo = textureInfo + 1;
 							writes[2].dstBinding = 3;
-							writes[2].dstSet = resources->descriptorSet;
+							writes[2].dstSet = resources->colormapped.descriptorSet;
 							writes[2].descriptorCount = 1;
 							writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 							writes[2].pImageInfo = textureInfo + 2;
 							VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 3, writes, 0, nullptr));
-							VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.colormapped.pipelineLayout, 0, 1, &resources->descriptorSet, 0, nullptr));
+							VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.colormapped.pipelineLayout, 0, 1, &resources->colormapped.descriptorSet, 0, nullptr));
 							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, alias.count, 1, alias.first_index, 0, 0));
 						}
 					}
@@ -4091,22 +4140,21 @@ void android_main(struct android_app *app)
 						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 1, 1, &instance->buffer, &noOffset));
 						VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, coloredIndices->buffer, 0, VK_INDEX_TYPE_UINT32));
 						VC(appState.Device.vkCmdBindPipeline(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.colored.pipeline));
-						resources = new PipelineResources();
-						memset(resources, 0, sizeof(PipelineResources));
-						VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->descriptorPool));
-						descriptorSetAllocateInfo.descriptorPool = resources->descriptorPool;
+						poolSizes[0].descriptorCount = 2;
+						poolSizes[1].descriptorCount = 1;
+						VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->colored.descriptorPool));
+						descriptorSetAllocateInfo.descriptorPool = resources->colored.descriptorPool;
 						descriptorSetAllocateInfo.pSetLayouts = &appState.Scene.colored.descriptorSetLayout;
-						VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->descriptorSet));
+						VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->colored.descriptorSet));
+						resources->colored.created = true;
 						bufferInfo[0].buffer = appState.Scene.matrices.buffer;
 						bufferInfo[0].range = appState.Scene.matrices.size;
 						writes[0].dstBinding = 0;
-						writes[0].dstSet = resources->descriptorSet;
+						writes[0].dstSet = resources->colored.descriptorSet;
 						writes[0].descriptorCount = 1;
 						writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 						writes[0].pBufferInfo = bufferInfo;
 						VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 1, writes, 0, nullptr));
-						resources->next = perImage.pipelineResources;
-						perImage.pipelineResources = resources;
 						for (auto i = 0; i <= d_lists.last_particle; i++)
 						{
 							auto& particle = d_lists.particles[i];
@@ -4118,17 +4166,17 @@ void android_main(struct android_app *app)
 							bufferInfo[1].offset = (1 + i) * sizeof(float);
 							bufferInfo[1].range = uniforms->size;
 							writes[0].dstBinding = 1;
-							writes[0].dstSet = resources->descriptorSet;
+							writes[0].dstSet = resources->colored.descriptorSet;
 							writes[0].descriptorCount = 1;
 							writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 							writes[0].pBufferInfo = bufferInfo + 1;
 							writes[1].dstBinding = 2;
-							writes[1].dstSet = resources->descriptorSet;
+							writes[1].dstSet = resources->colored.descriptorSet;
 							writes[1].descriptorCount = 1;
 							writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 							writes[1].pImageInfo = &textureInfo;
 							VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
-							VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.colored.pipelineLayout, 0, 1, &resources->descriptorSet, 0, nullptr));
+							VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.colored.pipelineLayout, 0, 1, &resources->colored.descriptorSet, 0, nullptr));
 							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, particle.count, 1, particle.first_index, 0, 0));
 						}
 					}
@@ -4416,8 +4464,26 @@ void android_main(struct android_app *app)
 			for (PipelineResources *pipelineResources = perImage.pipelineResources, *next = nullptr; pipelineResources != nullptr; pipelineResources = next)
 			{
 				next = pipelineResources->next;
-				VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->descriptorPool, 1, &pipelineResources->descriptorSet));
-				VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->descriptorPool, nullptr));
+				if (pipelineResources->textured.created)
+				{
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->textured.descriptorPool, 1, &pipelineResources->textured.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->textured.descriptorPool, nullptr));
+				}
+				if (pipelineResources->turbulent.created)
+				{
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->turbulent.descriptorPool, 1, &pipelineResources->turbulent.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->turbulent.descriptorPool, nullptr));
+				}
+				if (pipelineResources->colormapped.created)
+				{
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->colormapped.descriptorPool, 1, &pipelineResources->colormapped.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->colormapped.descriptorPool, nullptr));
+				}
+				if (pipelineResources->colored.created)
+				{
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->colored.descriptorPool, 1, &pipelineResources->colored.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->colored.descriptorPool, nullptr));
+				}
 				delete pipelineResources;
 			}
 			deleteCachedTextures(appState, perImage.colormaps);
