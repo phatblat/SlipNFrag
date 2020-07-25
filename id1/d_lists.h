@@ -36,6 +36,7 @@ struct dlists_t
 	int last_turbulent;
 	int last_alias;
 	int last_particle;
+	int last_sky;
 	int last_textured_vertex;
 	int last_textured_index;
 	int last_colormapped_vertex;
@@ -48,6 +49,7 @@ struct dlists_t
 	std::vector<dtexture_t> turbulent;
 	std::vector<dcolormappedtexture_t> alias;
 	std::vector<dcolor_t> particles;
+	std::vector<dtexture_t> sky;
 	std::vector<float> textured_vertices;
 	std::vector<uint32_t> textured_indices;
 	std::vector<float> colormapped_vertices;
@@ -60,7 +62,8 @@ extern dlists_t d_lists;
 
 extern qboolean d_uselists;
 
-void D_AddTurbulentToLists (msurface_t* face, entity_t* entity);
 void D_AddTexturedToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity);
+void D_AddTurbulentToLists (msurface_t* face, entity_t* entity);
 void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap);
 void D_AddParticleToLists (particle_t* particle);
+void D_AddSkyToLists (msurface_t* face, entity_t* entity);

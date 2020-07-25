@@ -4,7 +4,7 @@
 #include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0 };
+dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0 };
 
 qboolean d_uselists = false;
 
@@ -13,6 +13,153 @@ extern float r_shadelight;
 #define NUMVERTEXNORMALS 162
 extern float r_avertexnormals[NUMVERTEXNORMALS][3];
 extern vec3_t r_plightvec;
+
+void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entity)
+{
+	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
+	{
+		return;
+	}
+	auto texinfo = face->texinfo;
+	d_lists.last_textured++;
+	if (d_lists.last_textured >= d_lists.textured.size())
+	{
+		d_lists.textured.emplace_back();
+	}
+	auto& textured = d_lists.textured[d_lists.last_textured];
+	textured.width = cache->width;
+	textured.height = cache->height;
+	textured.size = textured.width * textured.height;
+	if (textured.size > textured.data.size())
+	{
+		textured.data.resize(textured.size);
+	}
+	memcpy(textured.data.data(), cache->data, textured.size);
+	d_lists.texture_data_size += textured.size;
+	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
+	auto next_back = next_front + face->numedges - 1;
+	auto edgeindex = face->firstedge;
+	for (auto i = 0; i < face->numedges; i++)
+	{
+		auto edge = entity->model->surfedges[edgeindex];
+		mvertex_t* vertex;
+		if (edge >= 0)
+		{
+			vertex = &entity->model->vertexes[entity->model->edges[edge].v[0]];
+		}
+		else
+		{
+			vertex = &entity->model->vertexes[entity->model->edges[-edge].v[1]];
+		}
+		auto x = vertex->position[0];
+		auto y = vertex->position[1];
+		auto z = vertex->position[2];
+		auto s = x * texinfo->vecs[0][0] + y * texinfo->vecs[0][1] + z * texinfo->vecs[0][2] + texinfo->vecs[0][3];
+		auto t = x * texinfo->vecs[1][0] + y * texinfo->vecs[1][1] + z * texinfo->vecs[1][2] + texinfo->vecs[1][3];
+		x += entity->origin[0];
+		y += entity->origin[1];
+		z += entity->origin[2];
+		s = (s - face->texturemins[0]) / face->extents[0];
+		t = (t - face->texturemins[1]) / face->extents[1];
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(x);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = x;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(z);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(-y);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(s);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(t);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		}
+		edgeindex++;
+	}
+	textured.first_index = d_lists.last_textured_index + 1;
+	textured.count = (face->numedges - 2) * 3;
+	qboolean use_back = false;
+	for (auto i = 0; i < face->numedges - 2; i++)
+	{
+		int v0;
+		int v1;
+		int v2;
+		if (use_back)
+		{
+			v0 = next_front;
+			v2 = next_back;
+			next_back--;
+			v1 = next_back;
+		}
+		else
+		{
+			v0 = next_front;
+			next_front++;
+			v1 = next_front;
+			v2 = next_back;
+		}
+		use_back = !use_back;
+		d_lists.last_textured_index++;
+		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		{
+			d_lists.textured_indices.emplace_back(v0);
+		}
+		else
+		{
+			d_lists.textured_indices[d_lists.last_textured_index] = v0;
+		}
+		d_lists.last_textured_index++;
+		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		{
+			d_lists.textured_indices.emplace_back(v1);
+		}
+		else
+		{
+			d_lists.textured_indices[d_lists.last_textured_index] = v1;
+		}
+		d_lists.last_textured_index++;
+		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		{
+			d_lists.textured_indices.emplace_back(v2);
+		}
+		else
+		{
+			d_lists.textured_indices[d_lists.last_textured_index] = v2;
+		}
+	}
+}
 
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 {
@@ -111,153 +258,6 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 	}
 	turbulent.first_index = d_lists.last_textured_index + 1;
 	turbulent.count = (face->numedges - 2) * 3;
-	qboolean use_back = false;
-	for (auto i = 0; i < face->numedges - 2; i++)
-	{
-		int v0;
-		int v1;
-		int v2;
-		if (use_back)
-		{
-			v0 = next_front;
-			v2 = next_back;
-			next_back--;
-			v1 = next_back;
-		}
-		else
-		{
-			v0 = next_front;
-			next_front++;
-			v1 = next_front;
-			v2 = next_back;
-		}
-		use_back = !use_back;
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v0);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v0;
-		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v1);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v1;
-		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v2);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v2;
-		}
-	}
-}
-
-void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entity)
-{
-	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
-	{
-		return;
-	}
-	auto texinfo = face->texinfo;
-	d_lists.last_textured++;
-	if (d_lists.last_textured >= d_lists.textured.size())
-	{
-		d_lists.textured.emplace_back();
-	}
-	auto& textured = d_lists.textured[d_lists.last_textured];
-	textured.width = cache->width;
-	textured.height = cache->height;
-	textured.size = textured.width * textured.height;
-	if (textured.size > textured.data.size())
-	{
-		textured.data.resize(textured.size);
-	}
-	memcpy(textured.data.data(), cache->data, textured.size);
-	d_lists.texture_data_size += textured.size;
-	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
-	auto next_back = next_front + face->numedges - 1;
-	auto edgeindex = face->firstedge;
-	for (auto i = 0; i < face->numedges; i++)
-	{
-		auto edge = entity->model->surfedges[edgeindex];
-		mvertex_t* vertex;
-		if (edge >= 0)
-		{
-			vertex = &entity->model->vertexes[entity->model->edges[edge].v[0]];
-		}
-		else
-		{
-			vertex = &entity->model->vertexes[entity->model->edges[-edge].v[1]];
-		}
-		auto x = vertex->position[0];
-		auto y = vertex->position[1];
-		auto z = vertex->position[2];
-		auto s = x * texinfo->vecs[0][0] + y * texinfo->vecs[0][1] + z * texinfo->vecs[0][2] + texinfo->vecs[0][3];
-		auto t = x * texinfo->vecs[1][0] + y * texinfo->vecs[1][1] + z * texinfo->vecs[1][2] + texinfo->vecs[1][3];
-		x += entity->origin[0];
-		y += entity->origin[1];
-		z += entity->origin[2];
-		s = (s - face->texturemins[0]) / face->extents[0];
-		t = (t - face->texturemins[1]) / face->extents[1];
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(x);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = x;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(z);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(-y);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(s);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		}
-		d_lists.last_textured_vertex++;
-		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
-		{
-			d_lists.textured_vertices.emplace_back(t);
-		}
-		else
-		{
-			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
-		}
-		edgeindex++;
-	}
-	textured.first_index = d_lists.last_textured_index + 1;
-	textured.count = (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
 	{
@@ -766,5 +766,175 @@ void D_AddParticleToLists (particle_t* particle)
 	else
 	{
 		d_lists.colored_indices[d_lists.last_colored_index] = v2;
+	}
+}
+
+void D_AddSkyToLists (msurface_t* face, entity_t* entity)
+{
+	if (face->numedges < 3)
+	{
+		return;
+	}
+	auto texinfo = face->texinfo;
+	d_lists.last_sky++;
+	if (d_lists.last_sky >= d_lists.sky.size())
+	{
+		d_lists.sky.emplace_back();
+	}
+	auto& sky = d_lists.sky[d_lists.last_sky];
+	sky.width = 128;
+	sky.height = 128;
+	sky.size = sky.width * sky.height;
+	if (sky.size > sky.data.size())
+	{
+		sky.data.resize(sky.size);
+	}
+	auto source = r_skysource;
+	auto target = sky.data.data();
+	for (auto i = 0; i < sky.height; i++)
+	{
+		memcpy(target, source, sky.width);
+		source += sky.width;
+		source += sky.width;
+		target += sky.width;
+	}
+	d_lists.texture_data_size += sky.size;
+	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
+	auto next_back = next_front + face->numedges - 1;
+	auto edgeindex = face->firstedge;
+
+	float speedscale = realtime*8;
+	speedscale -= (int)speedscale & ~127;
+
+	for (auto i = 0; i < face->numedges; i++)
+	{
+		auto edge = entity->model->surfedges[edgeindex];
+		mvertex_t* vertex;
+		if (edge >= 0)
+		{
+			vertex = &entity->model->vertexes[entity->model->edges[edge].v[0]];
+		}
+		else
+		{
+			vertex = &entity->model->vertexes[entity->model->edges[-edge].v[1]];
+		}
+		auto x = vertex->position[0];
+		auto y = vertex->position[1];
+		auto z = vertex->position[2];
+		x += entity->origin[0];
+		y += entity->origin[1];
+		z += entity->origin[2];
+
+		vec3_t dir;
+		VectorSubtract (vertex->position, r_origin, dir);
+		dir[2] *= 3;	// flatten the sphere
+
+		auto length = dir[0]*dir[0] + dir[1]*dir[1] + dir[2]*dir[2];
+		length = sqrt (length);
+		length = 6*63/length;
+
+		dir[0] *= length;
+		dir[1] *= length;
+
+		auto s = (speedscale + dir[0]) * (1.0/128);
+		auto t = (speedscale + dir[1]) * (1.0/128);
+
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(x);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = x;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(z);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(-y);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(s);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(t);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		}
+		edgeindex++;
+	}
+	sky.first_index = d_lists.last_textured_index + 1;
+	sky.count = (face->numedges - 2) * 3;
+	qboolean use_back = false;
+	for (auto i = 0; i < face->numedges - 2; i++)
+	{
+		int v0;
+		int v1;
+		int v2;
+		if (use_back)
+		{
+			v0 = next_front;
+			v2 = next_back;
+			next_back--;
+			v1 = next_back;
+		}
+		else
+		{
+			v0 = next_front;
+			next_front++;
+			v1 = next_front;
+			v2 = next_back;
+		}
+		use_back = !use_back;
+		d_lists.last_textured_index++;
+		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		{
+			d_lists.textured_indices.emplace_back(v0);
+		}
+		else
+		{
+			d_lists.textured_indices[d_lists.last_textured_index] = v0;
+		}
+		d_lists.last_textured_index++;
+		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		{
+			d_lists.textured_indices.emplace_back(v1);
+		}
+		else
+		{
+			d_lists.textured_indices[d_lists.last_textured_index] = v1;
+		}
+		d_lists.last_textured_index++;
+		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		{
+			d_lists.textured_indices.emplace_back(v2);
+		}
+		else
+		{
+			d_lists.textured_indices[d_lists.last_textured_index] = v2;
+		}
 	}
 }

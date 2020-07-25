@@ -206,6 +206,7 @@ struct PipelineResources
 	PipelineDescriptorResources turbulent;
 	PipelineDescriptorResources colormapped;
 	PipelineDescriptorResources colored;
+	PipelineDescriptorResources sky;
 };
 
 struct CachedBuffers
@@ -246,13 +247,17 @@ struct Scene
 	VkShaderModule colormappedFragment;
 	VkShaderModule coloredVertex;
 	VkShaderModule coloredFragment;
+	VkShaderModule skyVertex;
+	VkShaderModule skyFragment;
 	Pipeline textured;
 	Pipeline turbulent;
 	Pipeline colormapped;
 	Pipeline colored;
+	Pipeline sky;
 	PipelineAttributes texturedAttributes;
 	PipelineAttributes colormappedAttributes;
 	PipelineAttributes coloredAttributes;
+	PipelineAttributes skyAttributes;
 	Buffer matrices;
 	int numBuffers;
 };
@@ -277,6 +282,7 @@ struct PerImage
 	std::vector<int> turbulentOffsets;
 	std::vector<int> aliasOffsets;
 	std::vector<int> aliasColormapOffsets;
+	std::vector<int> skyOffsets;
 	VkCommandBuffer commandBuffer;
 	VkFence fence;
 	bool submitted;
@@ -376,7 +382,7 @@ static const int GPU_LEVEL = 3;
 
 extern m_state_t m_state;
 
-PermissionsGrantStatus PermissionsGrantStatus;
+PermissionsGrantStatus PermissionsGrantStatus = PermissionsPending;
 
 extern "C" void Java_com_heribertodelgado_slipnfrag_MainActivity_notifyPermissionsGrantStatus(JNIEnv* jni, jclass clazz, int permissionsGranted)
 {
@@ -2934,6 +2940,8 @@ void android_main(struct android_app *app)
 			createShaderModule(appState, app, "shaders/colormapped.frag.spv", &appState.Scene.colormappedFragment);
 			createShaderModule(appState, app, (isMultiview ? "shaders/colored_multiview.vert.spv" : "shaders/colored.vert.spv"), &appState.Scene.coloredVertex);
 			createShaderModule(appState, app, "shaders/colored.frag.spv", &appState.Scene.coloredFragment);
+			createShaderModule(appState, app, (isMultiview ? "shaders/sky_multiview.vert.spv" : "shaders/sky.vert.spv"), &appState.Scene.skyVertex);
+			createShaderModule(appState, app, "shaders/sky.frag.spv", &appState.Scene.skyFragment);
 			VkPipelineTessellationStateCreateInfo tessellationStateCreateInfo { };
 			tessellationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
 			VkPipelineViewportStateCreateInfo viewportStateCreateInfo { };
@@ -2943,8 +2951,8 @@ void android_main(struct android_app *app)
 			VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo { };
 			rasterizationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 			rasterizationStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-			rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
-			rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+			rasterizationStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+			rasterizationStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 			rasterizationStateCreateInfo.lineWidth = 1.0f;
 			VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo { };
 			multisampleStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
@@ -3094,6 +3102,43 @@ void android_main(struct android_app *app)
 			appState.Scene.coloredAttributes.vertexInputState.pVertexAttributeDescriptions = appState.Scene.coloredAttributes.vertexAttributes.data();
 			appState.Scene.coloredAttributes.inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 			appState.Scene.coloredAttributes.inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			appState.Scene.skyAttributes.vertexAttributes.resize(6);
+			appState.Scene.skyAttributes.vertexBindings.resize(3);
+			appState.Scene.skyAttributes.vertexAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+			appState.Scene.skyAttributes.vertexBindings[0].stride = 5 * sizeof(float);
+			appState.Scene.skyAttributes.vertexBindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			appState.Scene.skyAttributes.vertexAttributes[1].location = 1;
+			appState.Scene.skyAttributes.vertexAttributes[1].binding = 1;
+			appState.Scene.skyAttributes.vertexAttributes[1].format = VK_FORMAT_R32G32_SFLOAT;
+			appState.Scene.skyAttributes.vertexAttributes[1].offset = 3 * sizeof(float);
+			appState.Scene.skyAttributes.vertexBindings[1].binding = 1;
+			appState.Scene.skyAttributes.vertexBindings[1].stride = 5 * sizeof(float);
+			appState.Scene.skyAttributes.vertexBindings[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			appState.Scene.skyAttributes.vertexAttributes[2].location = 2;
+			appState.Scene.skyAttributes.vertexAttributes[2].binding = 2;
+			appState.Scene.skyAttributes.vertexAttributes[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.skyAttributes.vertexAttributes[3].location = 3;
+			appState.Scene.skyAttributes.vertexAttributes[3].binding = 2;
+			appState.Scene.skyAttributes.vertexAttributes[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.skyAttributes.vertexAttributes[3].offset = 4 * sizeof(float);
+			appState.Scene.skyAttributes.vertexAttributes[4].location = 4;
+			appState.Scene.skyAttributes.vertexAttributes[4].binding = 2;
+			appState.Scene.skyAttributes.vertexAttributes[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.skyAttributes.vertexAttributes[4].offset = 8 * sizeof(float);
+			appState.Scene.skyAttributes.vertexAttributes[5].location = 5;
+			appState.Scene.skyAttributes.vertexAttributes[5].binding = 2;
+			appState.Scene.skyAttributes.vertexAttributes[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+			appState.Scene.skyAttributes.vertexAttributes[5].offset = 12 * sizeof(float);
+			appState.Scene.skyAttributes.vertexBindings[2].binding = 2;
+			appState.Scene.skyAttributes.vertexBindings[2].stride = 16 * sizeof(float);
+			appState.Scene.skyAttributes.vertexBindings[2].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+			appState.Scene.skyAttributes.vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+			appState.Scene.skyAttributes.vertexInputState.vertexBindingDescriptionCount = appState.Scene.skyAttributes.vertexBindings.size();
+			appState.Scene.skyAttributes.vertexInputState.pVertexBindingDescriptions = appState.Scene.skyAttributes.vertexBindings.data();
+			appState.Scene.skyAttributes.vertexInputState.vertexAttributeDescriptionCount = appState.Scene.skyAttributes.vertexAttributes.size();
+			appState.Scene.skyAttributes.vertexInputState.pVertexAttributeDescriptions = appState.Scene.skyAttributes.vertexAttributes.data();
+			appState.Scene.skyAttributes.inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+			appState.Scene.skyAttributes.inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 			appState.Scene.textured.stages.resize(2);
 			appState.Scene.textured.stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			appState.Scene.textured.stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -3195,7 +3240,6 @@ void android_main(struct android_app *app)
 			graphicsPipelineCreateInfo.pVertexInputState = &appState.Scene.colormappedAttributes.vertexInputState;
 			graphicsPipelineCreateInfo.pInputAssemblyState = &appState.Scene.colormappedAttributes.inputAssemblyState;
 			graphicsPipelineCreateInfo.layout = appState.Scene.colormapped.pipelineLayout;
-			graphicsPipelineCreateInfo.renderPass = appState.RenderPass;
 			VK(appState.Device.vkCreateGraphicsPipelines(appState.Device.device, appState.Context.pipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &appState.Scene.colormapped.pipeline));
 			appState.Scene.colored.stages.resize(2);
 			appState.Scene.colored.stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -3226,8 +3270,38 @@ void android_main(struct android_app *app)
 			graphicsPipelineCreateInfo.pVertexInputState = &appState.Scene.coloredAttributes.vertexInputState;
 			graphicsPipelineCreateInfo.pInputAssemblyState = &appState.Scene.coloredAttributes.inputAssemblyState;
 			graphicsPipelineCreateInfo.layout = appState.Scene.colored.pipelineLayout;
-			graphicsPipelineCreateInfo.renderPass = appState.RenderPass;
 			VK(appState.Device.vkCreateGraphicsPipelines(appState.Device.device, appState.Context.pipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &appState.Scene.colored.pipeline));
+			appState.Scene.sky.stages.resize(2);
+			appState.Scene.sky.stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			appState.Scene.sky.stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+			appState.Scene.sky.stages[0].module = appState.Scene.skyVertex;
+			appState.Scene.sky.stages[0].pName = "main";
+			appState.Scene.sky.stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			appState.Scene.sky.stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+			appState.Scene.sky.stages[1].module = appState.Scene.skyFragment;
+			appState.Scene.sky.stages[1].pName = "main";
+			descriptorSetBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorSetBindings[0].descriptorCount = 1;
+			descriptorSetBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			descriptorSetBindings[1].binding = 1;
+			descriptorSetBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorSetBindings[1].descriptorCount = 1;
+			descriptorSetBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			descriptorSetBindings[2].binding = 2;
+			descriptorSetBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorSetBindings[2].descriptorCount = 1;
+			descriptorSetBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			descriptorSetLayoutCreateInfo.bindingCount = 3;
+			descriptorSetLayoutCreateInfo.pBindings = descriptorSetBindings;
+			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.sky.descriptorSetLayout));
+			pipelineLayoutCreateInfo.pSetLayouts = &appState.Scene.sky.descriptorSetLayout;
+			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.sky.pipelineLayout));
+			graphicsPipelineCreateInfo.stageCount = appState.Scene.sky.stages.size();
+			graphicsPipelineCreateInfo.pStages = appState.Scene.sky.stages.data();
+			graphicsPipelineCreateInfo.pVertexInputState = &appState.Scene.skyAttributes.vertexInputState;
+			graphicsPipelineCreateInfo.pInputAssemblyState = &appState.Scene.skyAttributes.inputAssemblyState;
+			graphicsPipelineCreateInfo.layout = appState.Scene.sky.pipelineLayout;
+			VK(appState.Device.vkCreateGraphicsPipelines(appState.Device.device, appState.Context.pipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &appState.Scene.sky.pipeline));
 			appState.Scene.matrices.size = appState.Scene.numBuffers * 2 * sizeof(ovrMatrix4f);
 			bufferCreateInfo.size = appState.Scene.matrices.size;
 			bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -3388,6 +3462,7 @@ void android_main(struct android_app *app)
 					d_lists.last_turbulent = -1;
 					d_lists.last_alias = -1;
 					d_lists.last_particle = -1;
+					d_lists.last_sky = -1;
 					d_lists.last_textured_vertex = -1;
 					d_lists.last_textured_index = -1;
 					d_lists.last_colormapped_vertex = -1;
@@ -3441,6 +3516,11 @@ void android_main(struct android_app *app)
 				if ((*r)->unusedCount >= MAX_UNUSED_COUNT)
 				{
 					PipelineResources *next = (*r)->next;
+					if ((*r)->sky.created)
+					{
+						VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->sky.descriptorPool, 1, &(*r)->sky.descriptorSet));
+						VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, (*r)->sky.descriptorPool, nullptr));
+					}
 					if ((*r)->colored.created)
 					{
 						VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, (*r)->colored.descriptorPool, 1, &(*r)->colored.descriptorSet));
@@ -3753,6 +3833,17 @@ void android_main(struct android_app *app)
 						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, textured.data.data(), textured.size);
 						offset += textured.size;
 					}
+					if (d_lists.last_turbulent >= perImage.turbulentOffsets.size())
+					{
+						perImage.turbulentOffsets.resize(d_lists.last_turbulent + 1);
+					}
+					for (auto i = 0; i <= d_lists.last_turbulent; i++)
+					{
+						auto& turbulent = d_lists.turbulent[i];
+						perImage.turbulentOffsets[i] = offset;
+						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, turbulent.data.data(), turbulent.size);
+						offset += turbulent.size;
+					}
 					if (d_lists.last_alias >= perImage.aliasOffsets.size())
 					{
 						perImage.aliasOffsets.resize(d_lists.last_alias + 1);
@@ -3771,16 +3862,16 @@ void android_main(struct android_app *app)
 							offset += 16384;
 						}
 					}
-					if (d_lists.last_turbulent >= perImage.turbulentOffsets.size())
+					if (d_lists.last_sky >= perImage.skyOffsets.size())
 					{
-						perImage.turbulentOffsets.resize(d_lists.last_turbulent + 1);
+						perImage.skyOffsets.resize(d_lists.last_sky + 1);
 					}
-					for (auto i = 0; i <= d_lists.last_turbulent; i++)
+					for (auto i = 0; i <= d_lists.last_sky; i++)
 					{
-						auto& turbulent = d_lists.turbulent[i];
-						perImage.turbulentOffsets[i] = offset;
-						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, turbulent.data.data(), turbulent.size);
-						offset += turbulent.size;
+						auto& sky = d_lists.sky[i];
+						perImage.skyOffsets[i] = offset;
+						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, sky.data.data(), sky.size);
+						offset += sky.size;
 					}
 					VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
 					VkMappedMemoryRange mappedMemoryRange { };
@@ -4205,6 +4296,72 @@ void android_main(struct android_app *app)
 							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, particle.count, 1, particle.first_index, 0, 0));
 						}
 					}
+					if (d_lists.last_sky >= 0)
+					{
+						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 0, 1, &texturedVertices->buffer, &noOffset));
+						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 1, 1, &texturedVertices->buffer, &noOffset));
+						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 2, 1, &instance->buffer, &noOffset));
+						VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, texturedIndices->buffer, 0, VK_INDEX_TYPE_UINT32));
+						VC(appState.Device.vkCmdBindPipeline(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.sky.pipeline));
+						poolSizes[0].descriptorCount = 1;
+						poolSizes[1].descriptorCount = 2;
+						VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->sky.descriptorPool));
+						descriptorSetAllocateInfo.descriptorPool = resources->sky.descriptorPool;
+						descriptorSetAllocateInfo.pSetLayouts = &appState.Scene.sky.descriptorSetLayout;
+						VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->sky.descriptorSet));
+						resources->sky.created = true;
+						bufferInfo[0].buffer = appState.Scene.matrices.buffer;
+						bufferInfo[0].range = appState.Scene.matrices.size;
+						writes[0].dstBinding = 0;
+						writes[0].dstSet = resources->sky.descriptorSet;
+						writes[0].descriptorCount = 1;
+						writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						writes[0].pBufferInfo = bufferInfo;
+						VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 1, writes, 0, nullptr));
+						for (auto i = 0; i <= d_lists.last_sky; i++)
+						{
+							auto& sky = d_lists.sky[i];
+							auto mipCount = (int)(std::floor(std::log2(std::max(sky.width, sky.height)))) + 1;
+							Texture* texture = nullptr;
+							for (Texture **t = &perImage.textures.oldTextures; *t != nullptr; t = &(*t)->next)
+							{
+								if ((*t)->width == sky.width && (*t)->height == sky.height)
+								{
+									texture = *t;
+									*t = (*t)->next;
+									break;
+								}
+							}
+							if (texture == nullptr)
+							{
+								createTexture(appState, perImage.commandBuffer, sky.width, sky.height, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
+							}
+							fillMipmappedTexture(appState, texture, mipCount, stagingBuffer, perImage.skyOffsets[i], perImage.commandBuffer);
+							texture->unusedCount = 0;
+							texture->next = perImage.textures.textures;
+							perImage.textures.textures = texture;
+							VkDescriptorImageInfo textureInfo[2] { };
+							textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							textureInfo[0].sampler = texture->sampler;
+							textureInfo[0].imageView = texture->view;
+							textureInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+							textureInfo[1].sampler = palette->sampler;
+							textureInfo[1].imageView = palette->view;
+							writes[0].dstBinding = 1;
+							writes[0].dstSet = resources->sky.descriptorSet;
+							writes[0].descriptorCount = 1;
+							writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+							writes[0].pImageInfo = textureInfo;
+							writes[1].dstBinding = 2;
+							writes[1].dstSet = resources->sky.descriptorSet;
+							writes[1].descriptorCount = 1;
+							writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+							writes[1].pImageInfo = textureInfo + 1;
+							VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
+							VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.sky.pipelineLayout, 0, 1, &resources->sky.descriptorSet, 0, nullptr));
+							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, sky.count, 1, sky.first_index, 0, 0));
+						}
+					}
 				}
 			}
 			VC(appState.Device.vkCmdEndRenderPass(perImage.commandBuffer));
@@ -4489,25 +4646,30 @@ void android_main(struct android_app *app)
 			for (PipelineResources *pipelineResources = perImage.pipelineResources, *next = nullptr; pipelineResources != nullptr; pipelineResources = next)
 			{
 				next = pipelineResources->next;
-				if (pipelineResources->textured.created)
+				if (pipelineResources->sky.created)
 				{
-					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->textured.descriptorPool, 1, &pipelineResources->textured.descriptorSet));
-					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->textured.descriptorPool, nullptr));
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->sky.descriptorPool, 1, &pipelineResources->sky.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->sky.descriptorPool, nullptr));
 				}
-				if (pipelineResources->turbulent.created)
+				if (pipelineResources->colored.created)
 				{
-					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->turbulent.descriptorPool, 1, &pipelineResources->turbulent.descriptorSet));
-					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->turbulent.descriptorPool, nullptr));
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->colored.descriptorPool, 1, &pipelineResources->colored.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->colored.descriptorPool, nullptr));
 				}
 				if (pipelineResources->colormapped.created)
 				{
 					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->colormapped.descriptorPool, 1, &pipelineResources->colormapped.descriptorSet));
 					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->colormapped.descriptorPool, nullptr));
 				}
-				if (pipelineResources->colored.created)
+				if (pipelineResources->turbulent.created)
 				{
-					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->colored.descriptorPool, 1, &pipelineResources->colored.descriptorSet));
-					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->colored.descriptorPool, nullptr));
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->turbulent.descriptorPool, 1, &pipelineResources->turbulent.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->turbulent.descriptorPool, nullptr));
+				}
+				if (pipelineResources->textured.created)
+				{
+					VC(appState.Device.vkFreeDescriptorSets(appState.Device.device, pipelineResources->textured.descriptorPool, 1, &pipelineResources->textured.descriptorSet));
+					VC(appState.Device.vkDestroyDescriptorPool(appState.Device.device, pipelineResources->textured.descriptorPool, nullptr));
 				}
 				delete pipelineResources;
 			}
@@ -4531,23 +4693,28 @@ void android_main(struct android_app *app)
 	vrapi_DestroyTextureSwapChain(appState.Console.SwapChain);
 	VC(appState.Device.vkDestroyRenderPass(appState.Device.device, appState.RenderPass, nullptr));
 	VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.sky.pipeline, nullptr));
+	VC(appState.Device.vkDestroyPipelineLayout(appState.Device.device, appState.Scene.sky.pipelineLayout, nullptr));
+	VC(appState.Device.vkDestroyDescriptorSetLayout(appState.Device.device, appState.Scene.sky.descriptorSetLayout, nullptr));
 	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.colored.pipeline, nullptr));
 	VC(appState.Device.vkDestroyPipelineLayout(appState.Device.device, appState.Scene.colored.pipelineLayout, nullptr));
 	VC(appState.Device.vkDestroyDescriptorSetLayout(appState.Device.device, appState.Scene.colored.descriptorSetLayout, nullptr));
-	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.turbulent.pipeline, nullptr));
-	VC(appState.Device.vkDestroyPipelineLayout(appState.Device.device, appState.Scene.turbulent.pipelineLayout, nullptr));
-	VC(appState.Device.vkDestroyDescriptorSetLayout(appState.Device.device, appState.Scene.turbulent.descriptorSetLayout, nullptr));
 	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.colormapped.pipeline, nullptr));
 	VC(appState.Device.vkDestroyPipelineLayout(appState.Device.device, appState.Scene.colormapped.pipelineLayout, nullptr));
 	VC(appState.Device.vkDestroyDescriptorSetLayout(appState.Device.device, appState.Scene.colormapped.descriptorSetLayout, nullptr));
+	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.turbulent.pipeline, nullptr));
+	VC(appState.Device.vkDestroyPipelineLayout(appState.Device.device, appState.Scene.turbulent.pipelineLayout, nullptr));
+	VC(appState.Device.vkDestroyDescriptorSetLayout(appState.Device.device, appState.Scene.turbulent.descriptorSetLayout, nullptr));
 	VC(appState.Device.vkDestroyPipeline(appState.Device.device, appState.Scene.textured.pipeline, nullptr));
 	VC(appState.Device.vkDestroyPipelineLayout(appState.Device.device, appState.Scene.textured.pipelineLayout, nullptr));
 	VC(appState.Device.vkDestroyDescriptorSetLayout(appState.Device.device, appState.Scene.textured.descriptorSetLayout, nullptr));
+	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.skyFragment, nullptr));
+	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.skyVertex, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.coloredFragment, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.coloredVertex, nullptr));
-	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.turbulentFragment, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.colormappedFragment, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.colormappedVertex, nullptr));
+	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.turbulentFragment, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.texturedFragment, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.texturedVertex, nullptr));
 	if (appState.Scene.matrices.mapped != nullptr)

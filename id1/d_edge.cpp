@@ -208,8 +208,16 @@ void D_DrawSurfaces (void)
 					R_MakeSky ();
 				}
 
-				D_DrawSkyScans8 (s->spans);
-				D_DrawZSpans (s->spans);
+				if (d_uselists)
+				{
+					pface = (msurface_t*)s->data;
+					D_AddSkyToLists(pface, currententity);
+				}
+				else
+				{
+					D_DrawSkyScans8 (s->spans);
+					D_DrawZSpans (s->spans);
+				}
 			}
 			else if (s->flags & SURF_DRAWBACKGROUND)
 			{
