@@ -26,6 +26,13 @@
 #define VC(func) func;
 #define MAX_UNUSED_COUNT 16
 
+enum PermissionsGrantStatus
+{
+	PermissionsPending,
+	PermissionsGranted,
+	PermissionsDenied
+};
+
 enum AppMode
 {
 	AppStartupMode,
@@ -368,6 +375,20 @@ static const int CPU_LEVEL = 2;
 static const int GPU_LEVEL = 3;
 
 extern m_state_t m_state;
+
+PermissionsGrantStatus PermissionsGrantStatus;
+
+extern "C" void Java_com_heribertodelgado_slipnfrag_MainActivity_notifyPermissionsGrantStatus(JNIEnv* jni, jclass clazz, int permissionsGranted)
+{
+	if (permissionsGranted != 0)
+	{
+		PermissionsGrantStatus = PermissionsGranted;
+	}
+	else
+	{
+		PermissionsGrantStatus = PermissionsDenied;
+	}
+}
 
 void checkErrors(VkResult result, const char *function)
 {
@@ -2768,6 +2789,10 @@ void android_main(struct android_app *app)
 		{
 			continue;
 		}
+		if (PermissionsGrantStatus == PermissionsDenied)
+		{
+			ANativeActivity_finish(app->activity);
+		}
 		if (!appState.Scene.createdScene)
 		{
 			int frameFlags = 0;
@@ -4531,7 +4556,6 @@ void android_main(struct android_app *app)
 	}
 	VC(appState.Device.vkDestroyBuffer(appState.Device.device, appState.Scene.matrices.buffer, nullptr));
 	VC(appState.Device.vkFreeMemory(appState.Device.device, appState.Scene.matrices.memory, nullptr));
-	appState.Scene.createdScene = false;
 	vrapi_DestroySystemVulkan();
 	if (appState.Context.device != nullptr)
 	{

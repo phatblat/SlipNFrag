@@ -8,6 +8,10 @@ android {
   // Use only letters to remain compatible with the package name.
   project.archivesBaseName = "slipnfrag"
 
+  dependencies {
+    implementation 'com.android.support:appcompat-v7:26.0.0'
+  }
+
   defaultConfig {
     // Gradle replaces the manifest package with this value, which must
     // be unique on a system.  If you don't change it, a new app
