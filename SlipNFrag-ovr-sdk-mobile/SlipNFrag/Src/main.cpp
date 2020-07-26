@@ -682,6 +682,17 @@ void resetCachedBuffers(AppState& appState, CachedBuffers& cachedBuffers)
 	cachedBuffers.mapped = nullptr;
 }
 
+void deleteTexture(AppState& appState, Texture* texture)
+{
+	VC(appState.Device.vkDestroySampler(appState.Device.device, texture->sampler, nullptr));
+	if (texture->memory != VK_NULL_HANDLE)
+	{
+		VC(appState.Device.vkDestroyImageView(appState.Device.device, texture->view, nullptr));
+		VC(appState.Device.vkDestroyImage(appState.Device.device, texture->image, nullptr));
+		VC(appState.Device.vkFreeMemory(appState.Device.device, texture->memory, nullptr));
+	}
+}
+
 void resetCachedTextures(AppState& appState, CachedTextures& cachedTextures)
 {
 	for (Texture** t = &cachedTextures.oldTextures; *t != nullptr; )
@@ -690,10 +701,7 @@ void resetCachedTextures(AppState& appState, CachedTextures& cachedTextures)
 		if ((*t)->unusedCount >= MAX_UNUSED_COUNT)
 		{
 			Texture* next = (*t)->next;
-			VC(appState.Device.vkDestroyImageView(appState.Device.device, (*t)->view, nullptr));
-			VC(appState.Device.vkDestroyImage(appState.Device.device, (*t)->image, nullptr));
-			VC(appState.Device.vkFreeMemory(appState.Device.device, (*t)->memory, nullptr));
-			VC(appState.Device.vkDestroySampler(appState.Device.device, (*t)->sampler, nullptr));
+			deleteTexture(appState, *t);
 			delete *t;
 			*t = next;
 		}
@@ -845,25 +853,13 @@ void deleteCachedTextures(AppState& appState, CachedTextures& cachedTextures)
 	for (Texture* t = cachedTextures.textures, *next = nullptr; t != nullptr; t = next)
 	{
 		next = t->next;
-		if (t->memory != VK_NULL_HANDLE)
-		{
-			VC(appState.Device.vkDestroyImageView(appState.Device.device, t->view, nullptr));
-			VC(appState.Device.vkDestroyImage(appState.Device.device, t->image, nullptr));
-			VC(appState.Device.vkFreeMemory(appState.Device.device, t->memory, nullptr));
-		}
-		VC(appState.Device.vkDestroySampler(appState.Device.device, t->sampler, nullptr));
+		deleteTexture(appState, t);
 		delete t;
 	}
 	for (Texture* t = cachedTextures.oldTextures, *next = nullptr; t != nullptr; t = next)
 	{
 		next = t->next;
-		if (t->memory != VK_NULL_HANDLE)
-		{
-			VC(appState.Device.vkDestroyImageView(appState.Device.device, t->view, nullptr));
-			VC(appState.Device.vkDestroyImage(appState.Device.device, t->image, nullptr));
-			VC(appState.Device.vkFreeMemory(appState.Device.device, t->memory, nullptr));
-		}
-		VC(appState.Device.vkDestroySampler(appState.Device.device, t->sampler, nullptr));
+		deleteTexture(appState, t);
 		delete t;
 	}
 }
@@ -4492,23 +4488,11 @@ void android_main(struct android_app *app)
 			}
 			if (view.framebuffer.colorTextures.size() > 0)
 			{
-				VC(appState.Device.vkDestroySampler(appState.Device.device, view.framebuffer.colorTextures[i].sampler, nullptr));
-				if (view.framebuffer.colorTextures[i].memory != VK_NULL_HANDLE)
-				{
-					VC(appState.Device.vkDestroyImageView(appState.Device.device, view.framebuffer.colorTextures[i].view, nullptr));
-					VC(appState.Device.vkDestroyImage(appState.Device.device, view.framebuffer.colorTextures[i].image, nullptr));
-					VC(appState.Device.vkFreeMemory(appState.Device.device, view.framebuffer.colorTextures[i].memory, nullptr));
-				}
+				deleteTexture(appState, &view.framebuffer.colorTextures[i]);
 			}
 			if (view.framebuffer.fragmentDensityTextures.size() > 0)
 			{
-				VC(appState.Device.vkDestroySampler(appState.Device.device, view.framebuffer.fragmentDensityTextures[i].sampler, nullptr));
-				if (view.framebuffer.fragmentDensityTextures[i].memory != VK_NULL_HANDLE)
-				{
-					VC(appState.Device.vkDestroyImageView(appState.Device.device, view.framebuffer.fragmentDensityTextures[i].view, nullptr));
-					VC(appState.Device.vkDestroyImage(appState.Device.device, view.framebuffer.fragmentDensityTextures[i].image, nullptr));
-					VC(appState.Device.vkFreeMemory(appState.Device.device, view.framebuffer.fragmentDensityTextures[i].memory, nullptr));
-				}
+				deleteTexture(appState, &view.framebuffer.fragmentDensityTextures[i]);
 			}
 		}
 		if (view.framebuffer.depthImage != VK_NULL_HANDLE)
@@ -4519,13 +4503,7 @@ void android_main(struct android_app *app)
 		}
 		if (view.framebuffer.renderTexture.image != VK_NULL_HANDLE)
 		{
-			VC(appState.Device.vkDestroySampler(appState.Device.device, view.framebuffer.renderTexture.sampler, nullptr));
-			if (view.framebuffer.renderTexture.memory != VK_NULL_HANDLE)
-			{
-				VC(appState.Device.vkDestroyImageView(appState.Device.device, view.framebuffer.renderTexture.view, nullptr));
-				VC(appState.Device.vkDestroyImage(appState.Device.device, view.framebuffer.renderTexture.image, nullptr));
-				VC(appState.Device.vkFreeMemory(appState.Device.device, view.framebuffer.renderTexture.memory, nullptr));
-			}
+			deleteTexture(appState, &view.framebuffer.renderTexture);
 		}
 		vrapi_DestroyTextureSwapChain(view.framebuffer.colorTextureSwapChain);
 		for (auto& perImage : view.perImage)
