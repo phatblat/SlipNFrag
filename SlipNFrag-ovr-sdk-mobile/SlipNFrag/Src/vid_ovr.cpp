@@ -12,6 +12,7 @@ int con_height;
 std::vector<short> zbuffer;
 std::vector<byte> surfcache;
 int surfcache_extrasize;
+int pal_changed;
 
 unsigned short d_8to16table[256];
 unsigned d_8to24table[256];
@@ -40,6 +41,7 @@ void VID_SetPalette(unsigned char *palette)
         *table++ = v;
     }
     d_8to24table[255] &= 0xFFFFFF;    // 255 is transparent
+    pal_changed++;
 }
 
 void VID_ShiftPalette(unsigned char *palette)
@@ -72,6 +74,7 @@ void VID_Init(unsigned char *palette)
     surfcache.resize(surfcachesize);
     D_InitCaches(surfcache.data(), (int)surfcache.size());
     surfcache_extrasize = 0;
+    pal_changed = 0;
 }
 
 void VID_Resize()

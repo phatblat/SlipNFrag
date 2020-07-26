@@ -4,7 +4,7 @@
 #include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0 };
+dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
 
 qboolean d_uselists = false;
 
@@ -35,7 +35,6 @@ void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entit
 		textured.data.resize(textured.size);
 	}
 	memcpy(textured.data.data(), cache->data, textured.size);
-	d_lists.texture_data_size += textured.size;
 	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
@@ -183,7 +182,6 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		turbulent.data.resize(turbulent.size);
 	}
 	memcpy(turbulent.data.data(), (byte*)texture + texture->offsets[0], turbulent.size);
-	d_lists.texture_data_size += turbulent.size;
 	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
@@ -330,7 +328,6 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		alias.data.resize(alias.size);
 	}
 	memcpy(alias.data.data(), (byte *)aliashdr + skindesc->skin, alias.size);
-	d_lists.texture_data_size += alias.size;
 	if (colormap == host_colormap)
 	{
 		alias.is_host_colormap = 1;
@@ -343,7 +340,6 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 			alias.colormap.resize(16384);
 		}
 		memcpy(alias.colormap.data(), colormap, 16384);
-		d_lists.texture_data_size += 16384;
 	}
 	vec3_t angles;
 	angles[ROLL] = currententity->angles[ROLL];
