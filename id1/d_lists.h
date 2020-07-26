@@ -30,6 +30,12 @@ struct dcolor_t
 	int count;
 };
 
+struct dsky_t
+{
+	int first_index;
+	int count;
+};
+
 struct dlists_t
 {
 	int last_textured;
@@ -49,7 +55,7 @@ struct dlists_t
 	std::vector<dtexture_t> turbulent;
 	std::vector<dcolormappedtexture_t> alias;
 	std::vector<dcolor_t> particles;
-	std::vector<dtexture_t> sky;
+	std::vector<dsky_t> sky;
 	std::vector<float> textured_vertices;
 	std::vector<uint32_t> textured_indices;
 	std::vector<float> colormapped_vertices;

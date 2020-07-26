@@ -782,23 +782,6 @@ void D_AddSkyToLists (msurface_t* face, entity_t* entity)
 		d_lists.sky.emplace_back();
 	}
 	auto& sky = d_lists.sky[d_lists.last_sky];
-	sky.width = 128;
-	sky.height = 128;
-	sky.size = sky.width * sky.height;
-	if (sky.size > sky.data.size())
-	{
-		sky.data.resize(sky.size);
-	}
-	auto source = r_skysource;
-	auto target = sky.data.data();
-	for (auto i = 0; i < sky.height; i++)
-	{
-		memcpy(target, source, sky.width);
-		source += sky.width;
-		source += sky.width;
-		target += sky.width;
-	}
-	d_lists.texture_data_size += sky.size;
 	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
