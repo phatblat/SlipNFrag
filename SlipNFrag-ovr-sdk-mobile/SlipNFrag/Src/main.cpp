@@ -284,6 +284,7 @@ struct PerImage
 	int skyOffset;
 	int paletteChanged;
 	Texture* palette;
+	Texture* host_colormap;
 	VkDeviceSize texturedVertexBase;
 	VkDeviceSize colormappedVertexBase;
 	VkDeviceSize colormappedIndexBase;
@@ -3817,8 +3818,13 @@ void android_main(struct android_app *app)
 						}
 						perImage.paletteChanged = pal_changed;
 					}
-					perImage.host_colormapOffset = stagingBufferSize;
-					stagingBufferSize += 16384;
+					perImage.host_colormapOffset = -1;
+					if (host_colormap != nullptr && perImage.host_colormap == nullptr)
+					{
+						createTexture(appState, perImage.commandBuffer, 256, 64, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.host_colormap);
+						perImage.host_colormapOffset = stagingBufferSize;
+						stagingBufferSize += 16384;
+					}
 					if (d_lists.last_textured >= perImage.texturedOffsets.size())
 					{
 						perImage.texturedOffsets.resize(d_lists.last_textured + 1);
@@ -3887,8 +3893,11 @@ void android_main(struct android_app *app)
 						memcpy(stagingBuffer->mapped, d_8to24table, 1024);
 						offset += 1024;
 					}
-					memcpy(((unsigned char*)stagingBuffer->mapped) + offset, host_colormap, 16384);
-					offset += 16384;
+					if (perImage.host_colormapOffset >= 0)
+					{
+						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, host_colormap, 16384);
+						offset += 16384;
+					}
 					for (auto i = 0; i <= d_lists.last_textured; i++)
 					{
 						auto& textured = d_lists.textured[i];
@@ -4076,20 +4085,12 @@ void android_main(struct android_app *app)
 						VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.turbulent.pipelineLayout, 0, 1, &resources->turbulent.descriptorSet, 0, nullptr));
 						VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, turbulent.count, 1, turbulent.first_index, 0, 0));
 					}
-					if (d_lists.last_alias >= 0)
+					if (d_lists.last_alias >= 0 && perImage.host_colormap != nullptr)
 					{
-						Texture* host_colormap_texture = nullptr;
-						if (perImage.colormaps.oldTextures != nullptr)
+						if (perImage.host_colormapOffset >= 0)
 						{
-							host_colormap_texture = perImage.colormaps.oldTextures;
-							perImage.colormaps.oldTextures = host_colormap_texture->next;
+							fillTexture(appState, perImage.host_colormap, stagingBuffer, perImage.host_colormapOffset, perImage.commandBuffer);
 						}
-						else
-						{
-							createTexture(appState, perImage.commandBuffer, 256, 64, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, host_colormap_texture);
-						}
-						fillTexture(appState, host_colormap_texture, stagingBuffer, 1024, perImage.commandBuffer);
-						moveTextureToFront(host_colormap_texture, perImage.colormaps);
 						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 0, 1, &vertices->buffer, &perImage.colormappedVertexBase));
 						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 1, 1, &vertices->buffer, &perImage.colormappedVertexBase));
 						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 2, 1, &vertices->buffer, &perImage.colormappedVertexBase));
@@ -4155,7 +4156,7 @@ void android_main(struct android_app *app)
 							}
 							else
 							{
-								colormap = host_colormap_texture;
+								colormap = perImage.host_colormap;
 							}
 							textureInfo[0].sampler = texture->sampler;
 							textureInfo[0].imageView = texture->view;
@@ -4555,7 +4556,14 @@ void android_main(struct android_app *app)
 				deletePipelineDescriptorResources(appState, pipelineResources->textured);
 				delete pipelineResources;
 			}
-			deleteTexture(appState, perImage.palette);
+			if (perImage.host_colormap != nullptr)
+			{
+				deleteTexture(appState, perImage.host_colormap);
+			}
+			if (perImage.palette != nullptr)
+			{
+				deleteTexture(appState, perImage.palette);
+			}
 			deleteCachedTextures(appState, perImage.sky);
 			deleteCachedTextures(appState, perImage.colormaps);
 			deleteCachedTextures(appState, perImage.textures);
