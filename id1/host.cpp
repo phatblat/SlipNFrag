@@ -41,6 +41,7 @@ double		host_frametime;
 double		host_time;
 double		realtime;				// without any filtering or bounding
 double		oldrealtime;			// last frame run
+int 		host_clearcount;
 int			host_framecount;
 
 client_t	*host_client;			// current client
@@ -514,6 +515,7 @@ void Host_ClearMemory (void)
 	sv.Clear();
     cl.Clear();
     cl_static_entities.clear();
+    host_clearcount++;
 }
 
 

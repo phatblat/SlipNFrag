@@ -320,6 +320,7 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		d_lists.alias.emplace_back();
 	}
 	auto& alias = d_lists.alias[d_lists.last_alias];
+	alias.key = mdl;
 	alias.width = mdl->skinwidth;
 	alias.height = mdl->skinheight;
 	alias.size = alias.width * alias.height;

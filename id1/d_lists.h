@@ -13,6 +13,7 @@ struct dtexture_t
 
 struct dcolormappedtexture_t
 {
+	void* key;
 	int width;
 	int height;
 	int size;
