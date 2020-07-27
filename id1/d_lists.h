@@ -3,6 +3,7 @@
 
 struct dtexture_t
 {
+	void* key;
 	int width;
 	int height;
 	int size;

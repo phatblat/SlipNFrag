@@ -174,6 +174,7 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		d_lists.turbulent.emplace_back();
 	}
 	auto& turbulent = d_lists.turbulent[d_lists.last_turbulent];
+	turbulent.key = texture;
 	turbulent.width = texture->width;
 	turbulent.height = texture->height;
 	turbulent.size = turbulent.width * turbulent.height;

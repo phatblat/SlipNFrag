@@ -271,6 +271,7 @@ struct PerImage
 	CachedBuffers uniforms;
 	CachedBuffers stagingBuffers;
 	CachedTextures textures;
+	CachedTextures turbulentTextures;
 	CachedTextures aliasTextures;
 	CachedTextures colormaps;
 	CachedTextures sky;
@@ -286,6 +287,7 @@ struct PerImage
 	Texture* palette;
 	Texture* host_colormap;
 	int hostClearCount;
+	std::unordered_map<void*, Texture*> turbulentTexturesPerKey;
 	std::unordered_map<void*, Texture*> aliasTexturesPerKey;
 	VkDeviceSize texturedVertexBase;
 	VkDeviceSize colormappedVertexBase;
@@ -3530,6 +3532,7 @@ void android_main(struct android_app *app)
 			resetCachedBuffers(appState, perImage.uniforms);
 			resetCachedBuffers(appState, perImage.stagingBuffers);
 			resetCachedTextures(appState, perImage.textures);
+			resetCachedTextures(appState, perImage.turbulentTextures);
 			resetCachedTextures(appState, perImage.aliasTextures);
 			resetCachedTextures(appState, perImage.colormaps);
 			resetCachedTextures(appState, perImage.sky);
@@ -3837,10 +3840,52 @@ void android_main(struct android_app *app)
 					{
 						perImage.turbulentOffsets.resize(d_lists.last_turbulent + 1);
 					}
+					perImage.turbulentTexturesPerKey.clear();
 					for (auto i = 0; i <= d_lists.last_turbulent; i++)
 					{
-						perImage.turbulentOffsets[i] = stagingBufferSize;
-						stagingBufferSize += d_lists.turbulent[i].size;
+						auto& turbulent = d_lists.turbulent[i];
+						if (perImage.hostClearCount == host_clearcount && perImage.turbulentTexturesPerKey.find(turbulent.key) != perImage.turbulentTexturesPerKey.end())
+						{
+							perImage.turbulentOffsets[i] = -1;
+						}
+						else if (perImage.hostClearCount == host_clearcount)
+						{
+							Texture* texture = nullptr;
+							for (Texture** t = &perImage.turbulentTextures.oldTextures; *t != nullptr; t = &(*t)->next)
+							{
+								if ((*t)->key == turbulent.key)
+								{
+									texture = *t;
+									*t = (*t)->next;
+									break;
+								}
+							}
+							if (texture == nullptr)
+							{
+								auto mipCount = (int) (std::floor(std::log2(std::max(turbulent.width, turbulent.height)))) + 1;
+								createTexture(appState, perImage.commandBuffer, turbulent.width, turbulent.height, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
+								texture->key = turbulent.key;
+								perImage.turbulentOffsets[i] = stagingBufferSize;
+								stagingBufferSize += d_lists.turbulent[i].size;
+							}
+							else
+							{
+								perImage.turbulentOffsets[i] = -1;
+							}
+							perImage.turbulentTexturesPerKey.insert({ texture->key, texture });
+							moveTextureToFront(texture, perImage.turbulentTextures);
+						}
+						else
+						{
+							Texture* texture;
+							auto mipCount = (int) (std::floor(std::log2(std::max(turbulent.width, turbulent.height)))) + 1;
+							createTexture(appState, perImage.commandBuffer, turbulent.width, turbulent.height, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
+							texture->key = turbulent.key;
+							perImage.turbulentOffsets[i] = stagingBufferSize;
+							stagingBufferSize += d_lists.turbulent[i].size;
+							perImage.turbulentTexturesPerKey.insert({ texture->key, texture });
+							moveTextureToFront(texture, perImage.turbulentTextures);
+						}
 					}
 					if (d_lists.last_alias >= perImage.aliasOffsets.size())
 					{
@@ -3949,8 +3994,11 @@ void android_main(struct android_app *app)
 					for (auto i = 0; i <= d_lists.last_turbulent; i++)
 					{
 						auto& turbulent = d_lists.turbulent[i];
-						memcpy(((unsigned char*)stagingBuffer->mapped) + offset, turbulent.data.data(), turbulent.size);
-						offset += turbulent.size;
+						if (perImage.turbulentOffsets[i] >= 0)
+						{
+							memcpy(((unsigned char*)stagingBuffer->mapped) + offset, turbulent.data.data(), turbulent.size);
+							offset += turbulent.size;
+						}
 					}
 					for (auto i = 0; i <= d_lists.last_alias; i++)
 					{
@@ -4102,23 +4150,12 @@ void android_main(struct android_app *app)
 					for (auto i = 0; i <= d_lists.last_turbulent; i++)
 					{
 						auto& turbulent = d_lists.turbulent[i];
-						auto mipCount = (int)(std::floor(std::log2(std::max(turbulent.width, turbulent.height)))) + 1;
-						Texture* texture = nullptr;
-						for (Texture** t = &perImage.textures.oldTextures; *t != nullptr; t = &(*t)->next)
+						auto texture = perImage.turbulentTexturesPerKey.find(turbulent.key)->second;
+						if (perImage.turbulentOffsets[i] >= 0)
 						{
-							if ((*t)->width == turbulent.width && (*t)->height == turbulent.height)
-							{
-								texture = *t;
-								*t = (*t)->next;
-								break;
-							}
+							auto mipCount = (int) (std::floor(std::log2(std::max(turbulent.width, turbulent.height)))) + 1;
+							fillMipmappedTexture(appState, texture, mipCount, stagingBuffer, perImage.turbulentOffsets[i], perImage.commandBuffer);
 						}
-						if (texture == nullptr)
-						{
-							createTexture(appState, perImage.commandBuffer, turbulent.width, turbulent.height, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
-						}
-						fillMipmappedTexture(appState, texture, mipCount, stagingBuffer, perImage.turbulentOffsets[i], perImage.commandBuffer);
-						moveTextureToFront(texture, perImage.textures);
 						textureInfo[0].sampler = texture->sampler;
 						textureInfo[0].imageView = texture->view;
 						writes[0].dstBinding = 1;
@@ -4601,6 +4638,7 @@ void android_main(struct android_app *app)
 			deleteCachedTextures(appState, perImage.sky);
 			deleteCachedTextures(appState, perImage.colormaps);
 			deleteCachedTextures(appState, perImage.aliasTextures);
+			deleteCachedTextures(appState, perImage.turbulentTextures);
 			deleteCachedTextures(appState, perImage.textures);
 			deleteCachedBuffers(appState, perImage.stagingBuffers);
 			deleteCachedBuffers(appState, perImage.uniforms);
