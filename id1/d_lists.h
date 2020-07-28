@@ -1,5 +1,4 @@
 #include "r_shared.h"
-#include <unordered_set>
 
 struct dsurface_t
 {
@@ -20,7 +19,7 @@ struct dturbulent_t
 	int width;
 	int height;
 	int size;
-	std::vector<unsigned char> data;
+	unsigned char* data;
 	int first_index;
 	int count;
 };
@@ -31,7 +30,7 @@ struct dalias_t
 	int width;
 	int height;
 	int size;
-	std::vector<unsigned char> data;
+	unsigned char* data;
 	std::vector<unsigned char> colormap;
 	int is_host_colormap;
 	int first_index;

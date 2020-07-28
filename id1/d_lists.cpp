@@ -181,11 +181,7 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 	turbulent.width = texture->width;
 	turbulent.height = texture->height;
 	turbulent.size = turbulent.width * turbulent.height;
-	if (turbulent.size > turbulent.data.size())
-	{
-		turbulent.data.resize(turbulent.size);
-	}
-	memcpy(turbulent.data.data(), (byte*)texture + texture->offsets[0], turbulent.size);
+	turbulent.data = (unsigned char*)texture + texture->offsets[0];
 	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
@@ -328,11 +324,7 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 	alias.width = mdl->skinwidth;
 	alias.height = mdl->skinheight;
 	alias.size = alias.width * alias.height;
-	if (alias.size > alias.data.size())
-	{
-		alias.data.resize(alias.size);
-	}
-	memcpy(alias.data.data(), (byte *)aliashdr + skindesc->skin, alias.size);
+	alias.data = (byte *)aliashdr + skindesc->skin;
 	if (colormap == host_colormap)
 	{
 		alias.is_host_colormap = 1;
