@@ -306,9 +306,9 @@ void D_DrawSurfaces (void)
 				if (d_uselists)
 				{
 				// FIXME: make this passed in to D_CacheSurface
-					pcurrentcache = D_CacheSurface (pface, d_minmip);
+					auto created = D_CacheSurface (pface, d_minmip, &pcurrentcache);
 
-					D_AddTexturedToLists (pface, pcurrentcache, currententity);
+					D_AddTexturedToLists (pface, pcurrentcache, currententity, created);
 				}
 				else
 				{
@@ -316,7 +316,7 @@ void D_DrawSurfaces (void)
 					* pface->texinfo->mipadjust);
 
 				// FIXME: make this passed in to D_CacheSurface
-					pcurrentcache = D_CacheSurface (pface, miplevel);
+					D_CacheSurface (pface, miplevel, &pcurrentcache);
 
 					cacheblock = (pixel_t *)pcurrentcache->data;
 					cachewidth = pcurrentcache->width;

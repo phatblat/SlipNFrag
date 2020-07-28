@@ -263,7 +263,7 @@ int D_log2 (int num)
 D_CacheSurface
 ================
 */
-surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
+qboolean D_CacheSurface (msurface_t *surface, int miplevel, surfcache_t **result)
 {
 	surfcache_t     *cache;
 
@@ -287,8 +287,10 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 			&& cache->lightadj[1] == r_drawsurf.lightadj[1]
 			&& cache->lightadj[2] == r_drawsurf.lightadj[2]
 			&& cache->lightadj[3] == r_drawsurf.lightadj[3] )
-		return cache;
-
+	{
+		(*result) = cache;
+		return false;
+	}
 //
 // determine shape of surface
 //
@@ -331,7 +333,8 @@ surfcache_t *D_CacheSurface (msurface_t *surface, int miplevel)
 	c_surf++;
 	R_DrawSurface ();
 
-	return surface->cachespots[miplevel];
+	(*result) = surface->cachespots[miplevel];
+	return true;
 }
 
 

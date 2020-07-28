@@ -4,6 +4,8 @@
 struct dtexture_t
 {
 	void* key;
+	void* key2;
+	int created;
 	int width;
 	int height;
 	int size;
@@ -69,7 +71,7 @@ extern dlists_t d_lists;
 
 extern qboolean d_uselists;
 
-void D_AddTexturedToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity);
+void D_AddTexturedToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity, qboolean created);
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity);
 void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap);
 void D_AddParticleToLists (particle_t* particle);

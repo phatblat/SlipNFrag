@@ -14,7 +14,7 @@ extern float r_shadelight;
 extern float r_avertexnormals[NUMVERTEXNORMALS][3];
 extern vec3_t r_plightvec;
 
-void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entity)
+void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entity, qboolean created)
 {
 	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
 	{
@@ -27,6 +27,9 @@ void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entit
 		d_lists.textured.emplace_back();
 	}
 	auto& textured = d_lists.textured[d_lists.last_textured];
+	textured.key = face;
+	textured.key2 = entity;
+	textured.created = (created ? 1: 0);
 	textured.width = cache->width;
 	textured.height = cache->height;
 	textured.size = textured.width * textured.height;
