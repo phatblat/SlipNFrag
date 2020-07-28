@@ -14,30 +14,30 @@ extern float r_shadelight;
 extern float r_avertexnormals[NUMVERTEXNORMALS][3];
 extern vec3_t r_plightvec;
 
-void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entity, qboolean created)
+void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity, qboolean created)
 {
 	if (face->numedges < 3 || cache->width <= 0 || cache->height <= 0)
 	{
 		return;
 	}
 	auto texinfo = face->texinfo;
-	d_lists.last_textured++;
-	if (d_lists.last_textured >= d_lists.textured.size())
+	d_lists.last_surface++;
+	if (d_lists.last_surface >= d_lists.surfaces.size())
 	{
-		d_lists.textured.emplace_back();
+		d_lists.surfaces.emplace_back();
 	}
-	auto& textured = d_lists.textured[d_lists.last_textured];
-	textured.key = face;
-	textured.key2 = entity;
-	textured.created = (created ? 1: 0);
-	textured.width = cache->width;
-	textured.height = cache->height;
-	textured.size = textured.width * textured.height;
-	if (textured.size > textured.data.size())
+	auto& surface = d_lists.surfaces[d_lists.last_surface];
+	surface.surface = face;
+	surface.entity = entity;
+	surface.created = (created ? 1: 0);
+	surface.width = cache->width;
+	surface.height = cache->height;
+	surface.size = surface.width * surface.height;
+	if (surface.size > surface.data.size())
 	{
-		textured.data.resize(textured.size);
+		surface.data.resize(surface.size);
 	}
-	memcpy(textured.data.data(), cache->data, textured.size);
+	memcpy(surface.data.data(), cache->data, surface.size);
 	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
@@ -110,8 +110,8 @@ void D_AddTexturedToLists (msurface_t* face, surfcache_t* cache, entity_t* entit
 		}
 		edgeindex++;
 	}
-	textured.first_index = d_lists.last_textured_index + 1;
-	textured.count = (face->numedges - 2) * 3;
+	surface.first_index = d_lists.last_textured_index + 1;
+	surface.count = (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
 	{
@@ -177,7 +177,7 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		d_lists.turbulent.emplace_back();
 	}
 	auto& turbulent = d_lists.turbulent[d_lists.last_turbulent];
-	turbulent.key = texture;
+	turbulent.texture = texture;
 	turbulent.width = texture->width;
 	turbulent.height = texture->height;
 	turbulent.size = turbulent.width * turbulent.height;
@@ -324,7 +324,7 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		d_lists.alias.emplace_back();
 	}
 	auto& alias = d_lists.alias[d_lists.last_alias];
-	alias.key = mdl;
+	alias.model = mdl;
 	alias.width = mdl->skinwidth;
 	alias.height = mdl->skinheight;
 	alias.size = alias.width * alias.height;
@@ -563,12 +563,12 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 	}
 }
 
-void D_AddParticleToLists (particle_t* particle)
+void D_AddParticleToLists (particle_t* part)
 {
-	dcolor_t* color;
-	if (d_lists.last_particle >= 0 && d_lists.particles[d_lists.last_particle].color == particle->color)
+	dparticle_t* particle;
+	if (d_lists.last_particle >= 0 && d_lists.particles[d_lists.last_particle].color == part->color)
 	{
-		color = d_lists.particles.data() + d_lists.last_particle;
+		particle = d_lists.particles.data() + d_lists.last_particle;
 	}
 	else
 	{
@@ -576,19 +576,19 @@ void D_AddParticleToLists (particle_t* particle)
 		if (d_lists.last_particle >= d_lists.particles.size())
 		{
 			d_lists.particles.emplace_back();
-			color = d_lists.particles.data() + d_lists.last_particle;
+			particle = d_lists.particles.data() + d_lists.last_particle;
 		}
 		else
 		{
-			color = d_lists.particles.data() + d_lists.last_particle;
-			color->count = 0;
+			particle = d_lists.particles.data() + d_lists.last_particle;
+			particle->count = 0;
 		}
-		color->first_index = d_lists.last_colored_index + 1;
-		color->color = particle->color;
+		particle->first_index = d_lists.last_colored_index + 1;
+		particle->color = part->color;
 	}
-	auto x = particle->org[0] - vright[0] * 0.5 + vup[0] * 0.5;
-	auto y = particle->org[1] - vright[1] * 0.5 + vup[1] * 0.5;
-	auto z = particle->org[2] - vright[2] * 0.5 + vup[2] * 0.5;
+	auto x = part->org[0] - vright[0] * 0.5 + vup[0] * 0.5;
+	auto y = part->org[1] - vright[1] * 0.5 + vup[1] * 0.5;
+	auto z = part->org[2] - vright[2] * 0.5 + vup[2] * 0.5;
 	auto first_vertex = (d_lists.last_colored_vertex + 1) / 3;
 	d_lists.last_colored_vertex++;
 	if (d_lists.last_colored_vertex >= d_lists.colored_vertices.size())
@@ -707,7 +707,7 @@ void D_AddParticleToLists (particle_t* particle)
 	{
 		d_lists.colored_vertices[d_lists.last_colored_vertex] = -y;
 	}
-	color->count += 6;
+	particle->count += 6;
 	auto v0 = first_vertex;
 	auto v1 = first_vertex + 1;
 	auto v2 = first_vertex + 2;
@@ -776,7 +776,6 @@ void D_AddSkyToLists (msurface_t* face, entity_t* entity)
 	{
 		return;
 	}
-	auto texinfo = face->texinfo;
 	d_lists.last_sky++;
 	if (d_lists.last_sky >= d_lists.sky.size())
 	{

@@ -308,7 +308,7 @@ void D_DrawSurfaces (void)
 				// FIXME: make this passed in to D_CacheSurface
 					auto created = D_CacheSurface (pface, d_minmip, &pcurrentcache);
 
-					D_AddTexturedToLists (pface, pcurrentcache, currententity, created);
+					D_AddSurfaceToLists (pface, pcurrentcache, currententity, created);
 				}
 				else
 				{

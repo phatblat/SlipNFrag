@@ -1,10 +1,10 @@
 #include "r_shared.h"
 #include <unordered_set>
 
-struct dtexture_t
+struct dsurface_t
 {
-	void* key;
-	void* key2;
+	void* surface;
+	void* entity;
 	int created;
 	int width;
 	int height;
@@ -14,9 +14,20 @@ struct dtexture_t
 	int count;
 };
 
-struct dcolormappedtexture_t
+struct dturbulent_t
 {
-	void* key;
+	void* texture;
+	int width;
+	int height;
+	int size;
+	std::vector<unsigned char> data;
+	int first_index;
+	int count;
+};
+
+struct dalias_t
+{
+	void* model;
 	int width;
 	int height;
 	int size;
@@ -27,7 +38,7 @@ struct dcolormappedtexture_t
 	int count;
 };
 
-struct dcolor_t
+struct dparticle_t
 {
 	byte color;
 	int first_index;
@@ -42,7 +53,7 @@ struct dsky_t
 
 struct dlists_t
 {
-	int last_textured;
+	int last_surface;
 	int last_turbulent;
 	int last_alias;
 	int last_particle;
@@ -54,10 +65,10 @@ struct dlists_t
 	int last_colored_vertex;
 	int last_colored_index;
 	int clear_color;
-	std::vector<dtexture_t> textured;
-	std::vector<dtexture_t> turbulent;
-	std::vector<dcolormappedtexture_t> alias;
-	std::vector<dcolor_t> particles;
+	std::vector<dsurface_t> surfaces;
+	std::vector<dturbulent_t> turbulent;
+	std::vector<dalias_t> alias;
+	std::vector<dparticle_t> particles;
 	std::vector<dsky_t> sky;
 	std::vector<float> textured_vertices;
 	std::vector<uint32_t> textured_indices;
@@ -71,8 +82,8 @@ extern dlists_t d_lists;
 
 extern qboolean d_uselists;
 
-void D_AddTexturedToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity, qboolean created);
+void D_AddSurfaceToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity, qboolean created);
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity);
 void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap);
-void D_AddParticleToLists (particle_t* particle);
+void D_AddParticleToLists (particle_t* part);
 void D_AddSkyToLists (msurface_t* face, entity_t* entity);
