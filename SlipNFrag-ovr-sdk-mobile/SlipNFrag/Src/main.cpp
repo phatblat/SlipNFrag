@@ -379,6 +379,7 @@ struct AppState
 	ovrMatrix4f ProjectionMatrices[VRAPI_FRAME_LAYER_EYE_MAX];
 	float Yaw;
 	float Pitch;
+	float Roll;
 	Screen Console;
 	Screen Screen;
 	double PreviousTime;
@@ -603,7 +604,7 @@ void createShaderModule(AppState& appState, struct android_app* app, const char*
 	size_t length = AAsset_getLength(file);
 	if ((length % 4) != 0)
 	{
-		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): %s is not 4-byte aligned.", filename);
+		__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "createShaderModule(): %s is not 4-byte aligned.", filename);
 		exit(0);
 	}
 	std::vector<unsigned char> buffer(length);
@@ -955,6 +956,30 @@ bool rightButtonIsDown(AppState& appState, uint32_t button)
 bool rightButtonIsUp(AppState& appState, uint32_t button)
 {
 	return ((appState.RightButtons & button) == 0 && (appState.PreviousRightButtons & button) != 0);
+}
+
+void D_Sky_uv_To_st_forSize (int width, int height, int u, int v, fixed16_t *s, fixed16_t *t)
+{
+	float	wu, wv, temp;
+	vec3_t	end;
+
+	if (width >= height)
+		temp = (float)width;
+	else
+		temp = (float)height;
+
+	wu = 8192.0 * (float)(u-((int)width>>1)) / temp;
+	wv = 8192.0 * (float)(((int)height>>1)-v) / temp;
+
+	end[0] = 4096*vpn[0] + wu*vright[0] + wv*vup[0];
+	end[1] = 4096*vpn[1] + wu*vright[1] + wv*vup[1];
+	end[2] = 4096*vpn[2] + wu*vright[2] + wv*vup[2];
+	end[2] *= 3;
+	VectorNormalize (end);
+
+	temp = skytime*skyspeed;	// TODO: add D_SetupFrame & set this there
+	*s = (int)((temp + 6*(SKYSIZE/2-1)*end[0]) * 0x10000);
+	*t = (int)((temp + 6*(SKYSIZE/2-1)*end[1]) * 0x10000);
 }
 
 void android_main(struct android_app *app)
@@ -2009,6 +2034,8 @@ void android_main(struct android_app *app)
 	auto horizontalFOV = vrapi_GetSystemPropertyInt(&appState.Java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X);
 	auto verticalFOV = vrapi_GetSystemPropertyInt(&appState.Java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_Y);
 	appState.FOV = std::max(horizontalFOV, verticalFOV);
+	auto skyTextureWidth = eyeTextureWidth / 2;
+	auto skyTextureHeight = eyeTextureHeight / 2;
 	for (auto& view : appState.Views)
 	{
 		view.colorSwapChain.SwapChain = vrapi_CreateTextureSwapChain3(isMultiview ? VRAPI_TEXTURE_TYPE_2D_ARRAY : VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, eyeTextureWidth, eyeTextureHeight, 1, 3);
@@ -3445,16 +3472,19 @@ void android_main(struct android_app *app)
 		{
 			appState.Yaw = 0;
 			appState.Pitch = -M_PI / 2;
+			appState.Roll = atan2(2 * (psign * Q[1] * Q[0] + w * Q[2]), ww + Q22 - Q11 - Q33);
 		}
 		else if (s2 > 1 - singularityRadius)
 		{
 			appState.Yaw = 0;
 			appState.Pitch = M_PI / 2;
+			appState.Roll = atan2(2 * (psign * Q[1] * Q[0] + w * Q[2]), ww + Q22 - Q11 - Q33);
 		}
 		else
 		{
 			appState.Yaw = -(atan2(-2 * (w * Q[1] - psign * Q[0] * Q[2]), ww + Q33 - Q11 - Q22));
-			appState.Pitch = -asin(s2);
+			appState.Pitch = asin(s2);
+			appState.Roll = atan2(2 * (w * Q[2] - psign * Q[1] * Q[0]), ww + Q11 - Q22 - Q33);
 		}
 		bool host_updated = false;
 		if (host_initialized)
@@ -3462,7 +3492,8 @@ void android_main(struct android_app *app)
 			if (appState.Mode == AppWorldMode)
 			{
 				cl.viewangles[YAW] = appState.Yaw * 180 / M_PI + 90;
-				cl.viewangles[PITCH] = appState.Pitch * 180 / M_PI;
+				cl.viewangles[PITCH] = -appState.Pitch * 180 / M_PI;
+				cl.viewangles[ROLL] = -appState.Roll * 180 / M_PI;
 			}
 			if (appState.PreviousTime < 0)
 			{
@@ -3910,9 +3941,11 @@ void android_main(struct android_app *app)
 					for (auto i = 0; i <= d_lists.last_turbulent; i++)
 					{
 						auto& turbulent = d_lists.turbulent[i];
-						if (perImage.hostClearCount == host_clearcount && perImage.turbulentTexturesPerKey.find(turbulent.texture) != perImage.turbulentTexturesPerKey.end())
+						auto entry = perImage.turbulentTexturesPerKey.find(turbulent.texture);
+						if (perImage.hostClearCount == host_clearcount && entry != perImage.turbulentTexturesPerKey.end())
 						{
 							perImage.turbulentOffsets[i] = -1;
+							entry->second->unusedCount = 0;
 						}
 						else if (perImage.hostClearCount == host_clearcount)
 						{
@@ -3962,9 +3995,11 @@ void android_main(struct android_app *app)
 					for (auto i = 0; i <= d_lists.last_alias; i++)
 					{
 						auto& alias = d_lists.alias[i];
-						if (perImage.hostClearCount == host_clearcount && perImage.aliasTexturesPerKey.find(alias.model) != perImage.aliasTexturesPerKey.end())
+						auto entry = perImage.aliasTexturesPerKey.find(alias.model);
+						if (perImage.hostClearCount == host_clearcount && entry != perImage.aliasTexturesPerKey.end())
 						{
 							perImage.aliasOffsets[i] = -1;
+							entry->second->unusedCount = 0;
 						}
 						else if (perImage.hostClearCount == host_clearcount)
 						{
@@ -4018,7 +4053,7 @@ void android_main(struct android_app *app)
 					if (d_lists.last_sky >= 0)
 					{
 						perImage.skyOffset = stagingBufferSize;
-						stagingBufferSize += 16384;
+						stagingBufferSize += skyTextureWidth * skyTextureHeight;
 					}
 					else
 					{
@@ -4085,13 +4120,81 @@ void android_main(struct android_app *app)
 					}
 					if (d_lists.last_sky >= 0)
 					{
-						auto source = r_skysource;
-						for (auto i = 0; i < 128; i++)
+						static const int SKY_SPAN_SHIFT = 5;
+						static const int SKY_SPAN_MAX = 1 << SKY_SPAN_SHIFT;
+						static const int R_SKY_SMASK = 0x007F0000;
+						static const int R_SKY_TMASK = 0x007F0000;
+
+						int				count, spancount;
+						unsigned char	*pdest;
+						fixed16_t		snext, tnext, sstep, tstep;
+						int				spancountminus1;
+
+						sstep = 0;	// keep compiler happy
+						tstep = 0;	// ditto
+						snext = 0;
+						tnext = 0;
+
+						pdest = ((unsigned char*)stagingBuffer->mapped) + offset;
+						for (auto i = 0; i < skyTextureHeight; i++)
 						{
-							memcpy(((unsigned char*)stagingBuffer->mapped) + offset, source, 128);
-							source += 256;
-							offset += 128;
-						}
+							count = skyTextureWidth;
+							fixed16_t		s, t;
+							// calculate the initial s & t
+							auto u = 0;
+							auto v = i;
+							D_Sky_uv_To_st_forSize (skyTextureWidth, skyTextureHeight, u, v, &s, &t);
+
+							do
+							{
+								if (count >= SKY_SPAN_MAX)
+									spancount = SKY_SPAN_MAX;
+								else
+									spancount = count;
+
+								count -= spancount;
+
+								if (count)
+								{
+									u += spancount;
+
+									// calculate s and t at far end of span,
+									// calculate s and t steps across span by shifting
+									D_Sky_uv_To_st_forSize (skyTextureWidth, skyTextureHeight, u, v, &snext, &tnext);
+
+									sstep = (snext - s) >> SKY_SPAN_SHIFT;
+									tstep = (tnext - t) >> SKY_SPAN_SHIFT;
+								}
+								else
+								{
+									// calculate s and t at last pixel in span,
+									// calculate s and t steps across span by division
+									spancountminus1 = (float)(spancount - 1);
+
+									if (spancountminus1 > 0)
+									{
+										u += spancountminus1;
+										D_Sky_uv_To_st_forSize (skyTextureWidth, skyTextureHeight, u, v, &snext, &tnext);
+
+										sstep = (snext - s) / spancountminus1;
+										tstep = (tnext - t) / spancountminus1;
+									}
+								}
+
+								do
+								{
+									*pdest++ = r_skysource[((t & R_SKY_TMASK) >> 8) +
+														   ((s & R_SKY_SMASK) >> 16)];
+									s += sstep;
+									t += tstep;
+								} while (--spancount > 0);
+
+								s = snext;
+								t = tnext;
+
+							} while (count > 0);
+
+						};
 					}
 					VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
 					VkMappedMemoryRange mappedMemoryRange { };
@@ -4185,7 +4288,7 @@ void android_main(struct android_app *app)
 					bufferInfo[0].buffer = appState.Scene.matrices.buffer;
 					bufferInfo[0].range = appState.Scene.matrices.size;
 					bufferInfo[1].buffer = uniforms->buffer;
-					bufferInfo[1].range = uniforms->size;
+					bufferInfo[1].range = sizeof(float);
 					textureInfo[0].sampler = perImage.palette->sampler;
 					textureInfo[0].imageView = perImage.palette->view;
 					writes[0].dstBinding = 0;
@@ -4333,7 +4436,7 @@ void android_main(struct android_app *app)
 							textureInfo.imageView = perImage.palette->view;
 							bufferInfo[1].buffer = uniforms->buffer;
 							bufferInfo[1].offset = (1 + i) * sizeof(float);
-							bufferInfo[1].range = uniforms->size;
+							bufferInfo[1].range = sizeof(float);
 							writes[0].dstBinding = 1;
 							writes[0].dstSet = resources->colored.descriptorSet;
 							writes[0].descriptorCount = 1;
@@ -4354,7 +4457,7 @@ void android_main(struct android_app *app)
 						Texture* texture = nullptr;
 						for (Texture** t = &perImage.sky.oldTextures; *t != nullptr; t = &(*t)->next)
 						{
-							if ((*t)->width == 128 && (*t)->height == 128)
+							if ((*t)->width == skyTextureWidth && (*t)->height == skyTextureHeight)
 							{
 								texture = *t;
 								*t = (*t)->next;
@@ -4363,8 +4466,8 @@ void android_main(struct android_app *app)
 						}
 						if (texture == nullptr)
 						{
-							auto mipCount = (int)(std::floor(std::log2(128))) + 1;
-							createTexture(appState, perImage.commandBuffer, 128, 128, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
+							auto mipCount = (int)(std::floor(std::log2(std::max(skyTextureWidth, skyTextureHeight)))) + 1;
+							createTexture(appState, perImage.commandBuffer, skyTextureWidth, skyTextureHeight, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
 						}
 						fillMipmappedTexture(appState, texture, stagingBuffer, perImage.skyOffset, perImage.commandBuffer);
 						moveTextureToFront(texture, perImage.sky);
@@ -4560,7 +4663,7 @@ void android_main(struct android_app *app)
 			console.HeadPose = tracking.HeadPose;
 			const float density = 4500;
 			float rotateYaw = appState.Yaw;
-			float rotatePitch = -appState.Pitch;
+			float rotatePitch = appState.Pitch;
 			const float radius = 1;
 			const ovrVector3f translation = { tracking.HeadPose.Pose.Position.x, tracking.HeadPose.Pose.Position.y, tracking.HeadPose.Pose.Position.z };
 			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.Console.Height * VRAPI_PI / density, radius);

@@ -26,4 +26,5 @@ void main()
 	float z = lowColor.z + delta * (highColor.z - lowColor.z);
 	float w = lowColor.w + delta * (highColor.w - lowColor.w);
 	outColor = vec4(x, y, z, w);
+	gl_FragDepth = 1;
 }
