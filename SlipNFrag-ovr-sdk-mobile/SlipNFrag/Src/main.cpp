@@ -958,30 +958,6 @@ bool rightButtonIsUp(AppState& appState, uint32_t button)
 	return ((appState.RightButtons & button) == 0 && (appState.PreviousRightButtons & button) != 0);
 }
 
-void D_Sky_uv_To_st_forSize (int width, int height, int u, int v, fixed16_t *s, fixed16_t *t)
-{
-	float	wu, wv, temp;
-	vec3_t	end;
-
-	if (width >= height)
-		temp = (float)width;
-	else
-		temp = (float)height;
-
-	wu = 8192.0 * (float)(u-((int)width>>1)) / temp;
-	wv = 8192.0 * (float)(((int)height>>1)-v) / temp;
-
-	end[0] = 4096*vpn[0] + wu*vright[0] + wv*vup[0];
-	end[1] = 4096*vpn[1] + wu*vright[1] + wv*vup[1];
-	end[2] = 4096*vpn[2] + wu*vright[2] + wv*vup[2];
-	end[2] *= 3;
-	VectorNormalize (end);
-
-	temp = skytime*skyspeed;	// TODO: add D_SetupFrame & set this there
-	*s = (int)((temp + 6*(SKYSIZE/2-1)*end[0]) * 0x10000);
-	*t = (int)((temp + 6*(SKYSIZE/2-1)*end[1]) * 0x10000);
-}
-
 void android_main(struct android_app *app)
 {
 	ANativeActivity_setWindowFlags(app->activity, AWINDOW_FLAG_KEEP_SCREEN_ON, 0);
@@ -2034,8 +2010,6 @@ void android_main(struct android_app *app)
 	auto horizontalFOV = vrapi_GetSystemPropertyInt(&appState.Java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X);
 	auto verticalFOV = vrapi_GetSystemPropertyInt(&appState.Java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_Y);
 	appState.FOV = std::max(horizontalFOV, verticalFOV);
-	auto skyTextureWidth = eyeTextureWidth / 2;
-	auto skyTextureHeight = eyeTextureHeight / 2;
 	for (auto& view : appState.Views)
 	{
 		view.colorSwapChain.SwapChain = vrapi_CreateTextureSwapChain3(isMultiview ? VRAPI_TEXTURE_TYPE_2D_ARRAY : VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, eyeTextureWidth, eyeTextureHeight, 1, 3);
@@ -3355,7 +3329,11 @@ void android_main(struct android_app *app)
 			descriptorSetBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[2].descriptorCount = 1;
 			descriptorSetBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			descriptorSetLayoutCreateInfo.bindingCount = 3;
+			descriptorSetBindings[3].binding = 3;
+			descriptorSetBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			descriptorSetBindings[3].descriptorCount = 1;
+			descriptorSetBindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			descriptorSetLayoutCreateInfo.bindingCount = 4;
 			descriptorSetLayoutCreateInfo.pBindings = descriptorSetBindings;
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.sky.descriptorSetLayout));
 			pipelineLayoutCreateInfo.pSetLayouts = &appState.Scene.sky.descriptorSetLayout;
@@ -3741,7 +3719,7 @@ void android_main(struct android_app *app)
 						createVertexBuffer(appState, vertexSize, vertices);
 					}
 					moveBufferToFront(vertices, perImage.vertices);
-					VK(appState.Device.vkMapMemory(appState.Device.device, vertices->memory, 0, vertices->size, 0, &vertices->mapped));
+					VK(appState.Device.vkMapMemory(appState.Device.device, vertices->memory, 0, vertexSize, 0, &vertices->mapped));
 					auto pose = vrapi_LocateTrackingSpace(appState.Ovr, VRAPI_TRACKING_SPACE_LOCAL_FLOOR);
 					auto playerHeight = 32;
 					if (cl.viewentity >= 0 && cl.viewentity < cl_entities.size())
@@ -3821,7 +3799,7 @@ void android_main(struct android_app *app)
 						createIndexBuffer(appState, indexSize, indices);
 					}
 					moveBufferToFront(indices, perImage.indices);
-					VK(appState.Device.vkMapMemory(appState.Device.device, indices->memory, 0, indices->size, 0, &indices->mapped));
+					VK(appState.Device.vkMapMemory(appState.Device.device, indices->memory, 0, indexSize, 0, &indices->mapped));
 					memcpy((unsigned char*)indices->mapped, d_lists.textured_indices.data(), texturedIndexSize);
 					memcpy((unsigned char*)indices->mapped + texturedIndexSize, d_lists.colormapped_indices.data(), colormappedIndexSize);
 					perImage.colormappedIndexBase = texturedIndexSize;
@@ -4053,7 +4031,7 @@ void android_main(struct android_app *app)
 					if (d_lists.last_sky >= 0)
 					{
 						perImage.skyOffset = stagingBufferSize;
-						stagingBufferSize += skyTextureWidth * skyTextureHeight;
+						stagingBufferSize += 128 * 128;
 					}
 					else
 					{
@@ -4120,81 +4098,14 @@ void android_main(struct android_app *app)
 					}
 					if (d_lists.last_sky >= 0)
 					{
-						static const int SKY_SPAN_SHIFT = 5;
-						static const int SKY_SPAN_MAX = 1 << SKY_SPAN_SHIFT;
-						static const int R_SKY_SMASK = 0x007F0000;
-						static const int R_SKY_TMASK = 0x007F0000;
-
-						int				count, spancount;
-						unsigned char	*pdest;
-						fixed16_t		snext, tnext, sstep, tstep;
-						int				spancountminus1;
-
-						sstep = 0;	// keep compiler happy
-						tstep = 0;	// ditto
-						snext = 0;
-						tnext = 0;
-
-						pdest = ((unsigned char*)stagingBuffer->mapped) + offset;
-						for (auto i = 0; i < skyTextureHeight; i++)
+						auto source = r_skysource;
+						auto target = ((unsigned char*)stagingBuffer->mapped) + offset;
+						for (auto i = 0; i < 128; i++)
 						{
-							count = skyTextureWidth;
-							fixed16_t		s, t;
-							// calculate the initial s & t
-							auto u = 0;
-							auto v = i;
-							D_Sky_uv_To_st_forSize (skyTextureWidth, skyTextureHeight, u, v, &s, &t);
-
-							do
-							{
-								if (count >= SKY_SPAN_MAX)
-									spancount = SKY_SPAN_MAX;
-								else
-									spancount = count;
-
-								count -= spancount;
-
-								if (count)
-								{
-									u += spancount;
-
-									// calculate s and t at far end of span,
-									// calculate s and t steps across span by shifting
-									D_Sky_uv_To_st_forSize (skyTextureWidth, skyTextureHeight, u, v, &snext, &tnext);
-
-									sstep = (snext - s) >> SKY_SPAN_SHIFT;
-									tstep = (tnext - t) >> SKY_SPAN_SHIFT;
-								}
-								else
-								{
-									// calculate s and t at last pixel in span,
-									// calculate s and t steps across span by division
-									spancountminus1 = (float)(spancount - 1);
-
-									if (spancountminus1 > 0)
-									{
-										u += spancountminus1;
-										D_Sky_uv_To_st_forSize (skyTextureWidth, skyTextureHeight, u, v, &snext, &tnext);
-
-										sstep = (snext - s) / spancountminus1;
-										tstep = (tnext - t) / spancountminus1;
-									}
-								}
-
-								do
-								{
-									*pdest++ = r_skysource[((t & R_SKY_TMASK) >> 8) +
-														   ((s & R_SKY_SMASK) >> 16)];
-									s += sstep;
-									t += tstep;
-								} while (--spancount > 0);
-
-								s = snext;
-								t = tnext;
-
-							} while (count > 0);
-
-						};
+							memcpy(target, source, 128);
+							source += 256;
+							target += 128;
+						}
 					}
 					VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
 					VkMappedMemoryRange mappedMemoryRange { };
@@ -4213,7 +4124,7 @@ void android_main(struct android_app *app)
 					textureInfo[0].sampler = perImage.palette->sampler;
 					textureInfo[0].imageView = perImage.palette->view;
 					textureInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-					VkWriteDescriptorSet writes[3] { };
+					VkWriteDescriptorSet writes[4] { };
 					writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 					writes[0].dstSet = resources->textured.descriptorSet;
 					writes[0].descriptorCount = 1;
@@ -4226,6 +4137,7 @@ void android_main(struct android_app *app)
 					writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 					writes[1].pImageInfo = textureInfo;
 					writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 					VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
 					for (auto i = 0; i <= d_lists.last_surface; i++)
 					{
@@ -4262,7 +4174,7 @@ void android_main(struct android_app *app)
 						createUniformBuffer(appState, size, uniforms);
 					}
 					moveBufferToFront(uniforms, perImage.uniforms);
-					VK(appState.Device.vkMapMemory(appState.Device.device, uniforms->memory, 0, uniforms->size, 0, &uniforms->mapped));
+					VK(appState.Device.vkMapMemory(appState.Device.device, uniforms->memory, 0, size, 0, &uniforms->mapped));
 					auto mapped = (float*)uniforms->mapped;
 					(*mapped) = cl.time;
 					mapped++;
@@ -4454,10 +4366,60 @@ void android_main(struct android_app *app)
 					}
 					if (d_lists.last_sky >= 0)
 					{
+						Buffer* uniforms = nullptr;
+						auto size = 13 * sizeof(float);
+						for (Buffer** b = &perImage.uniforms.oldBuffers; *b != nullptr; b = &(*b)->next)
+						{
+							if ((*b)->size >= size && (*b)->size < size * 2)
+							{
+								uniforms = *b;
+								*b = (*b)->next;
+								break;
+							}
+						}
+						if (uniforms == nullptr)
+						{
+							createUniformBuffer(appState, size, uniforms);
+						}
+						moveBufferToFront(uniforms, perImage.uniforms);
+						VK(appState.Device.vkMapMemory(appState.Device.device, uniforms->memory, 0, size, 0, &uniforms->mapped));
+						auto mapped = (float*)uniforms->mapped;
+						(*mapped) = vpn[0];
+						mapped++;
+						(*mapped) = vpn[1];
+						mapped++;
+						(*mapped) = vpn[2];
+						mapped++;
+						(*mapped) = vright[0];
+						mapped++;
+						(*mapped) = vright[1];
+						mapped++;
+						(*mapped) = vright[2];
+						mapped++;
+						(*mapped) = vup[0];
+						mapped++;
+						(*mapped) = vup[1];
+						mapped++;
+						(*mapped) = vup[2];
+						mapped++;
+						(*mapped) = eyeTextureWidth;
+						mapped++;
+						(*mapped) = eyeTextureHeight;
+						mapped++;
+						(*mapped) = std::max(eyeTextureWidth, eyeTextureHeight);
+						mapped++;
+						(*mapped) = skytime*skyspeed;
+						VC(appState.Device.vkUnmapMemory(appState.Device.device, uniforms->memory));
+						uniforms->mapped = nullptr;
+						bufferMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+						bufferMemoryBarrier.dstAccessMask = VK_ACCESS_UNIFORM_READ_BIT;
+						bufferMemoryBarrier.buffer = uniforms->buffer;
+						bufferMemoryBarrier.size = uniforms->size;
+						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 						Texture* texture = nullptr;
 						for (Texture** t = &perImage.sky.oldTextures; *t != nullptr; t = &(*t)->next)
 						{
-							if ((*t)->width == skyTextureWidth && (*t)->height == skyTextureHeight)
+							if ((*t)->width == 128 && (*t)->height == 128)
 							{
 								texture = *t;
 								*t = (*t)->next;
@@ -4466,8 +4428,8 @@ void android_main(struct android_app *app)
 						}
 						if (texture == nullptr)
 						{
-							auto mipCount = (int)(std::floor(std::log2(std::max(skyTextureWidth, skyTextureHeight)))) + 1;
-							createTexture(appState, perImage.commandBuffer, skyTextureWidth, skyTextureHeight, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
+							auto mipCount = (int)(std::floor(std::log2(std::max(128, 128)))) + 1;
+							createTexture(appState, perImage.commandBuffer, 128, 128, VK_FORMAT_R8_UNORM, mipCount, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, texture);
 						}
 						fillMipmappedTexture(appState, texture, stagingBuffer, perImage.skyOffset, perImage.commandBuffer);
 						moveTextureToFront(texture, perImage.sky);
@@ -4476,7 +4438,7 @@ void android_main(struct android_app *app)
 						VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 2, 1, &vertices->buffer, &noOffset));
 						VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices->buffer, noOffset, VK_INDEX_TYPE_UINT32));
 						VC(appState.Device.vkCmdBindPipeline(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.sky.pipeline));
-						poolSizes[0].descriptorCount = 1;
+						poolSizes[0].descriptorCount = 2;
 						poolSizes[1].descriptorCount = 2;
 						VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->sky.descriptorPool));
 						descriptorSetAllocateInfo.descriptorPool = resources->sky.descriptorPool;
@@ -4489,6 +4451,9 @@ void android_main(struct android_app *app)
 						textureInfo[1].imageView = perImage.palette->view;
 						bufferInfo[0].buffer = appState.Scene.matrices.buffer;
 						bufferInfo[0].range = appState.Scene.matrices.size;
+						bufferInfo[1].buffer = uniforms->buffer;
+						bufferInfo[1].offset = 0;
+						bufferInfo[1].range = 13 * sizeof(float);
 						writes[0].dstBinding = 0;
 						writes[0].dstSet = resources->sky.descriptorSet;
 						writes[0].descriptorCount = 1;
@@ -4504,7 +4469,12 @@ void android_main(struct android_app *app)
 						writes[2].descriptorCount = 1;
 						writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 						writes[2].pImageInfo = textureInfo + 1;
-						VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 3, writes, 0, nullptr));
+						writes[3].dstBinding = 3;
+						writes[3].dstSet = resources->sky.descriptorSet;
+						writes[3].descriptorCount = 1;
+						writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+						writes[3].pBufferInfo = bufferInfo + 1;
+						VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 4, writes, 0, nullptr));
 						VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.sky.pipelineLayout, 0, 1, &resources->sky.descriptorSet, 0, nullptr));
 						for (auto i = 0; i <= d_lists.last_sky; i++)
 						{
