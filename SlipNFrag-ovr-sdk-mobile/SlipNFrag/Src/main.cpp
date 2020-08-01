@@ -399,6 +399,7 @@ static const int CPU_LEVEL = 2;
 static const int GPU_LEVEL = 3;
 
 extern m_state_t m_state;
+extern qboolean r_skip_fov_check;
 
 PermissionsGrantStatus PermissionsGrantStatus = PermissionsPending;
 
@@ -3395,6 +3396,7 @@ void android_main(struct android_app *app)
 			if (appState.Mode == AppScreenMode)
 			{
 				d_uselists = false;
+				r_skip_fov_check = false;
 				Cvar_SetValue("joystick", 1);
 				Cvar_SetValue("joyadvanced", 1);
 				Cvar_SetValue("joyadvaxisx", AxisSide);
@@ -3412,6 +3414,7 @@ void android_main(struct android_app *app)
 			else if (appState.Mode == AppWorldMode)
 			{
 				d_uselists = true;
+				r_skip_fov_check = true;
 				Cvar_SetValue("joystick", 1);
 				Cvar_SetValue("joyadvanced", 1);
 				Cvar_SetValue("joyadvaxisx", AxisSide);
@@ -3420,7 +3423,7 @@ void android_main(struct android_app *app)
 				Cvar_SetValue("joyadvaxisr", AxisNada);
 				Joy_AdvancedUpdate_f();
 				vid_width = appState.Screen.Width;
-				vid_height = appState.Screen.Width;
+				vid_height = appState.Screen.Height;
 				con_width = appState.Console.Width / 3;
 				con_height = appState.Console.Height / 3;
 				Cvar_SetValue("fov", appState.FOV);
@@ -4017,14 +4020,14 @@ void android_main(struct android_app *app)
 							perImage.aliasTexturesPerKey.insert({ texture->key, texture });
 							moveTextureToFront(texture, perImage.aliasTextures);
 						}
-						if (d_lists.alias[i].is_host_colormap == 0)
+						if (d_lists.alias[i].is_host_colormap)
 						{
-							perImage.aliasColormapOffsets[i] = stagingBufferSize;
-							stagingBufferSize += 16384;
+							perImage.aliasColormapOffsets[i] = -1;
 						}
 						else
 						{
-							perImage.aliasColormapOffsets[i] = -1;
+							perImage.aliasColormapOffsets[i] = stagingBufferSize;
+							stagingBufferSize += 16384;
 						}
 					}
 					perImage.hostClearCount = host_clearcount;
@@ -4090,7 +4093,7 @@ void android_main(struct android_app *app)
 							memcpy(((unsigned char*)stagingBuffer->mapped) + offset, alias.data, alias.size);
 							offset += alias.size;
 						}
-						if (alias.is_host_colormap == 0)
+						if (!alias.is_host_colormap)
 						{
 							memcpy(((unsigned char*)stagingBuffer->mapped) + offset, alias.colormap.data(), 16384);
 							offset += 16384;
@@ -4281,7 +4284,11 @@ void android_main(struct android_app *app)
 								fillMipmappedTexture(appState, texture, stagingBuffer, perImage.aliasOffsets[i], perImage.commandBuffer);
 							}
 							Texture* colormap;
-							if (alias.is_host_colormap == 0)
+							if (alias.is_host_colormap)
+							{
+								colormap = perImage.host_colormap;
+							}
+							else
 							{
 								if (perImage.colormaps.oldTextures != nullptr)
 								{
@@ -4294,10 +4301,6 @@ void android_main(struct android_app *app)
 								}
 								fillTexture(appState, colormap, stagingBuffer, perImage.aliasColormapOffsets[i], perImage.commandBuffer);
 								moveTextureToFront(colormap, perImage.colormaps);
-							}
-							else
-							{
-								colormap = perImage.host_colormap;
 							}
 							textureInfo[0].sampler = texture->sampler;
 							textureInfo[0].imageView = texture->view;

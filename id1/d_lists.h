@@ -32,7 +32,7 @@ struct dalias_t
 	int size;
 	unsigned char* data;
 	std::vector<unsigned char> colormap;
-	int is_host_colormap;
+	qboolean is_host_colormap;
 	int first_index;
 	int count;
 };

@@ -327,11 +327,11 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 	alias.data = (byte *)aliashdr + skindesc->skin;
 	if (colormap == host_colormap)
 	{
-		alias.is_host_colormap = 1;
+		alias.is_host_colormap = true;
 	}
 	else
 	{
-		alias.is_host_colormap = 0;
+		alias.is_host_colormap = false;
 		if (alias.colormap.size() < 16384)
 		{
 			alias.colormap.resize(16384);

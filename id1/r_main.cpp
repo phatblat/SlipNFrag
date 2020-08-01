@@ -45,6 +45,7 @@ int			r_clipflags;
 
 byte		*r_warpbuffer;
 
+qboolean	r_skip_fov_check;
 qboolean	r_fov_greater_than_90;
 
 //
@@ -583,7 +584,7 @@ void R_DrawViewModel (void)
 	float		add;
 	dlight_t	*dl;
 	
-	if (!r_drawviewmodel.value || r_fov_greater_than_90)
+	if (!r_drawviewmodel.value || (r_fov_greater_than_90 && !r_skip_fov_check))
 		return;
 
 	if (cl.items & IT_INVISIBILITY)
