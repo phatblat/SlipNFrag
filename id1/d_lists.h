@@ -9,7 +9,8 @@ struct dsurface_t
 	int height;
 	int size;
 	std::vector<unsigned char> data;
-	int first_index;
+	int first_index16;
+	int first_index32;
 	int count;
 };
 
@@ -20,7 +21,8 @@ struct dturbulent_t
 	int height;
 	int size;
 	unsigned char* data;
-	int first_index;
+	int first_index16;
+	int first_index32;
 	int count;
 };
 
@@ -33,20 +35,23 @@ struct dalias_t
 	unsigned char* data;
 	std::vector<unsigned char> colormap;
 	qboolean is_host_colormap;
-	int first_index;
+	int first_index16;
+	int first_index32;
 	int count;
 };
 
 struct dparticle_t
 {
 	byte color;
-	int first_index;
+	int first_index16;
+	int first_index32;
 	int count;
 };
 
 struct dsky_t
 {
-	int first_index;
+	int first_index16;
+	int first_index32;
 	int count;
 };
 
@@ -58,11 +63,14 @@ struct dlists_t
 	int last_particle;
 	int last_sky;
 	int last_textured_vertex;
-	int last_textured_index;
+	int last_textured_index16;
+	int last_textured_index32;
 	int last_colormapped_vertex;
-	int last_colormapped_index;
+	int last_colormapped_index16;
+	int last_colormapped_index32;
 	int last_colored_vertex;
-	int last_colored_index;
+	int last_colored_index16;
+	int last_colored_index32;
 	int clear_color;
 	std::vector<dsurface_t> surfaces;
 	std::vector<dturbulent_t> turbulent;
@@ -70,11 +78,14 @@ struct dlists_t
 	std::vector<dparticle_t> particles;
 	std::vector<dsky_t> sky;
 	std::vector<float> textured_vertices;
-	std::vector<uint32_t> textured_indices;
+	std::vector<uint16_t> textured_indices16;
+	std::vector<uint32_t> textured_indices32;
 	std::vector<float> colormapped_vertices;
-	std::vector<uint32_t> colormapped_indices;
+	std::vector<uint16_t> colormapped_indices16;
+	std::vector<uint32_t> colormapped_indices32;
 	std::vector<float> colored_vertices;
-	std::vector<uint32_t> colored_indices;
+	std::vector<uint16_t> colored_indices16;
+	std::vector<uint32_t> colored_indices32;
 };
 
 extern dlists_t d_lists;

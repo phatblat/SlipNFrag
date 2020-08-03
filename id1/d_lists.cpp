@@ -4,7 +4,7 @@
 #include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1 };
 
 qboolean d_uselists = false;
 
@@ -13,6 +13,68 @@ extern float r_shadelight;
 #define NUMVERTEXNORMALS 162
 extern float r_avertexnormals[NUMVERTEXNORMALS][3];
 extern vec3_t r_plightvec;
+
+void D_AddToIndices16(uint16_t v0, uint16_t v1, uint16_t v2, std::vector<uint16_t>& indices, int& last_index)
+{
+	last_index++;
+	if (last_index >= indices.size())
+	{
+		indices.emplace_back(v0);
+	}
+	else
+	{
+		indices[last_index] = v0;
+	}
+	last_index++;
+	if (last_index >= indices.size())
+	{
+		indices.emplace_back(v1);
+	}
+	else
+	{
+		indices[last_index] = v1;
+	}
+	last_index++;
+	if (last_index >= indices.size())
+	{
+		indices.emplace_back(v2);
+	}
+	else
+	{
+		indices[last_index] = v2;
+	}
+}
+
+void D_AddToIndices32(uint32_t v0, uint32_t v1, uint32_t v2, std::vector<uint32_t>& indices, int& last_index)
+{
+	last_index++;
+	if (last_index >= indices.size())
+	{
+		indices.emplace_back(v0);
+	}
+	else
+	{
+		indices[last_index] = v0;
+	}
+	last_index++;
+	if (last_index >= indices.size())
+	{
+		indices.emplace_back(v1);
+	}
+	else
+	{
+		indices[last_index] = v1;
+	}
+	last_index++;
+	if (last_index >= indices.size())
+	{
+		indices.emplace_back(v2);
+	}
+	else
+	{
+		indices[last_index] = v2;
+	}
+}
 
 void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity, qboolean created)
 {
@@ -110,7 +172,17 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		}
 		edgeindex++;
 	}
-	surface.first_index = d_lists.last_textured_index + 1;
+	auto is_index16 = (next_back < 65520);
+	if (is_index16)
+	{
+		surface.first_index16 = d_lists.last_textured_index16 + 1;
+		surface.first_index32 = -1;
+	}
+	else
+	{
+		surface.first_index16 = -1;
+		surface.first_index32 = d_lists.last_textured_index32 + 1;
+	}
 	surface.count = (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
@@ -133,32 +205,13 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 			v2 = next_back;
 		}
 		use_back = !use_back;
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		if (is_index16)
 		{
-			d_lists.textured_indices.emplace_back(v0);
+			D_AddToIndices16(v0, v1, v2, d_lists.textured_indices16, d_lists.last_textured_index16);
 		}
 		else
 		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v0;
-		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v1);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v1;
-		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v2);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v2;
+			D_AddToIndices32(v0, v1, v2, d_lists.textured_indices32, d_lists.last_textured_index32);
 		}
 	}
 }
@@ -254,7 +307,17 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		}
 		edgeindex++;
 	}
-	turbulent.first_index = d_lists.last_textured_index + 1;
+	auto is_index16 = (next_back < 65520);
+	if (is_index16)
+	{
+		turbulent.first_index16 = d_lists.last_textured_index16 + 1;
+		turbulent.first_index32 = -1;
+	}
+	else
+	{
+		turbulent.first_index16 = -1;
+		turbulent.first_index32 = d_lists.last_textured_index32 + 1;
+	}
 	turbulent.count = (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
@@ -277,32 +340,13 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 			v2 = next_back;
 		}
 		use_back = !use_back;
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+		if (is_index16)
 		{
-			d_lists.textured_indices.emplace_back(v0);
+			D_AddToIndices16(v0, v1, v2, d_lists.textured_indices16, d_lists.last_textured_index16);
 		}
 		else
 		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v0;
-		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v1);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v1;
-		}
-		d_lists.last_textured_index++;
-		if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-		{
-			d_lists.textured_indices.emplace_back(v2);
-		}
-		else
-		{
-			d_lists.textured_indices[d_lists.last_textured_index] = v2;
+			D_AddToIndices32(v0, v1, v2, d_lists.textured_indices32, d_lists.last_textured_index32);
 		}
 	}
 }
@@ -367,7 +411,7 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 	auto texcoordsbase = (stvert_t *)((byte *)aliashdr + aliashdr->stverts);
 	auto texcoords = texcoordsbase;
 	auto basevert = (d_lists.last_colormapped_vertex + 1) / 6;
-	for (auto i = 0; i < mdl->numverts;  i++)
+	for (auto i = 0; i < mdl->numverts; i++)
 	{
 		vec3_t pos { (float)vertex->v[0], (float)vertex->v[1], (float)vertex->v[2] };
 		vec3_t trans;
@@ -510,7 +554,17 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		vertex++;
 		texcoords++;
 	}
-	alias.first_index = d_lists.last_colormapped_index + 1;
+	auto is_index16 = (basevert + mdl->numverts <= 65520);
+	if (is_index16)
+	{
+		alias.first_index16 = d_lists.last_colormapped_index16 + 1;
+		alias.first_index32 = -1;
+	}
+	else
+	{
+		alias.first_index16 = -1;
+		alias.first_index32 = d_lists.last_colormapped_index32 + 1;
+	}
 	alias.count = mdl->numtris * 3;
 	auto triangle = (mtriangle_t *)((byte *)aliashdr + aliashdr->triangles);
 	for (auto i = 0; i < mdl->numtris; i++)
@@ -524,32 +578,13 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		v0 = basevert + v0 * 2 + (v0back ? 1 : 0);
 		v1 = basevert + v1 * 2 + (v1back ? 1 : 0);
 		v2 = basevert + v2 * 2 + (v2back ? 1 : 0);
-		d_lists.last_colormapped_index++;
-		if (d_lists.last_colormapped_index >= d_lists.colormapped_indices.size())
+		if (is_index16)
 		{
-			d_lists.colormapped_indices.emplace_back(v0);
+			D_AddToIndices16(v0, v1, v2, d_lists.colormapped_indices16, d_lists.last_colormapped_index16);
 		}
 		else
 		{
-			d_lists.colormapped_indices[d_lists.last_colormapped_index] = v0;
-		}
-		d_lists.last_colormapped_index++;
-		if (d_lists.last_colormapped_index >= d_lists.colormapped_indices.size())
-		{
-			d_lists.colormapped_indices.emplace_back(v1);
-		}
-		else
-		{
-			d_lists.colormapped_indices[d_lists.last_colormapped_index] = v1;
-		}
-		d_lists.last_colormapped_index++;
-		if (d_lists.last_colormapped_index >= d_lists.colormapped_indices.size())
-		{
-			d_lists.colormapped_indices.emplace_back(v2);
-		}
-		else
-		{
-			d_lists.colormapped_indices[d_lists.last_colormapped_index] = v2;
+			D_AddToIndices32(v0, v1, v2, d_lists.colormapped_indices32, d_lists.last_colormapped_index32);
 		}
 		triangle++;
 	}
@@ -557,8 +592,10 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 
 void D_AddParticleToLists (particle_t* part)
 {
+	auto first_vertex = (d_lists.last_colored_vertex + 1) / 3;
+	auto is_index16 = (first_vertex + 4 <= 65520);
 	dparticle_t* particle;
-	if (d_lists.last_particle >= 0 && d_lists.particles[d_lists.last_particle].color == part->color)
+	if (d_lists.last_particle >= 0 && d_lists.particles[d_lists.last_particle].color == part->color && ((is_index16 && (d_lists.particles[d_lists.last_particle].first_index16 >= 0)) || (!is_index16 && (d_lists.particles[d_lists.last_particle].first_index32 >= 0))))
 	{
 		particle = d_lists.particles.data() + d_lists.last_particle;
 	}
@@ -575,13 +612,21 @@ void D_AddParticleToLists (particle_t* part)
 			particle = d_lists.particles.data() + d_lists.last_particle;
 			particle->count = 0;
 		}
-		particle->first_index = d_lists.last_colored_index + 1;
+		if (is_index16)
+		{
+			particle->first_index16 = d_lists.last_colored_index16 + 1;
+			particle->first_index32 = -1;
+		}
+		else
+		{
+			particle->first_index16 = -1;
+			particle->first_index32 = d_lists.last_colored_index32 + 1;
+		}
 		particle->color = part->color;
 	}
 	auto x = part->org[0] - vright[0] * 0.5 + vup[0] * 0.5;
 	auto y = part->org[1] - vright[1] * 0.5 + vup[1] * 0.5;
 	auto z = part->org[2] - vright[2] * 0.5 + vup[2] * 0.5;
-	auto first_vertex = (d_lists.last_colored_vertex + 1) / 3;
 	d_lists.last_colored_vertex++;
 	if (d_lists.last_colored_vertex >= d_lists.colored_vertices.size())
 	{
@@ -703,62 +748,24 @@ void D_AddParticleToLists (particle_t* part)
 	auto v0 = first_vertex;
 	auto v1 = first_vertex + 1;
 	auto v2 = first_vertex + 2;
-	d_lists.last_colored_index++;
-	if (d_lists.last_colored_index >= d_lists.colored_indices.size())
+	if (is_index16)
 	{
-		d_lists.colored_indices.emplace_back(v0);
+		D_AddToIndices16(v0, v1, v2, d_lists.colored_indices16, d_lists.last_colored_index16);
 	}
 	else
 	{
-		d_lists.colored_indices[d_lists.last_colored_index] = v0;
-	}
-	d_lists.last_colored_index++;
-	if (d_lists.last_colored_index >= d_lists.colored_indices.size())
-	{
-		d_lists.colored_indices.emplace_back(v1);
-	}
-	else
-	{
-		d_lists.colored_indices[d_lists.last_colored_index] = v1;
-	}
-	d_lists.last_colored_index++;
-	if (d_lists.last_colored_index >= d_lists.colored_indices.size())
-	{
-		d_lists.colored_indices.emplace_back(v2);
-	}
-	else
-	{
-		d_lists.colored_indices[d_lists.last_colored_index] = v2;
+		D_AddToIndices32(v0, v1, v2, d_lists.colored_indices32, d_lists.last_colored_index32);
 	}
 	v0 = first_vertex + 2;
 	v1 = first_vertex + 3;
 	v2 = first_vertex;
-	d_lists.last_colored_index++;
-	if (d_lists.last_colored_index >= d_lists.colored_indices.size())
+	if (is_index16)
 	{
-		d_lists.colored_indices.emplace_back(v0);
+		D_AddToIndices16(v0, v1, v2, d_lists.colored_indices16, d_lists.last_colored_index16);
 	}
 	else
 	{
-		d_lists.colored_indices[d_lists.last_colored_index] = v0;
-	}
-	d_lists.last_colored_index++;
-	if (d_lists.last_colored_index >= d_lists.colored_indices.size())
-	{
-		d_lists.colored_indices.emplace_back(v1);
-	}
-	else
-	{
-		d_lists.colored_indices[d_lists.last_colored_index] = v1;
-	}
-	d_lists.last_colored_index++;
-	if (d_lists.last_colored_index >= d_lists.colored_indices.size())
-	{
-		d_lists.colored_indices.emplace_back(v2);
-	}
-	else
-	{
-		d_lists.colored_indices[d_lists.last_colored_index] = v2;
+		D_AddToIndices32(v0, v1, v2, d_lists.colored_indices32, d_lists.last_colored_index32);
 	}
 }
 
@@ -966,66 +973,38 @@ void D_AddSkyToLists (msurface_t* face, entity_t* entity)
 	{
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
 	}
-	sky.first_index = d_lists.last_textured_index + 1;
+	auto is_index16 = (first_vertex + 4 <= 65520);
+	if (is_index16)
+	{
+		sky.first_index16 = d_lists.last_textured_index16 + 1;
+		sky.first_index32 = -1;
+	}
+	else
+	{
+		sky.first_index16 = -1;
+		sky.first_index32 = d_lists.last_textured_index32 + 1;
+	}
 	sky.count = 6;
 	uint32_t v0 = first_vertex;
 	uint32_t v1 = first_vertex + 1;
 	uint32_t v2 = first_vertex + 2;
-	d_lists.last_textured_index++;
-	if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+	if (is_index16)
 	{
-		d_lists.textured_indices.emplace_back(v0);
+		D_AddToIndices16(v0, v1, v2, d_lists.textured_indices16, d_lists.last_textured_index16);
 	}
 	else
 	{
-		d_lists.textured_indices[d_lists.last_textured_index] = v0;
-	}
-	d_lists.last_textured_index++;
-	if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-	{
-		d_lists.textured_indices.emplace_back(v1);
-	}
-	else
-	{
-		d_lists.textured_indices[d_lists.last_textured_index] = v1;
-	}
-	d_lists.last_textured_index++;
-	if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-	{
-		d_lists.textured_indices.emplace_back(v2);
-	}
-	else
-	{
-		d_lists.textured_indices[d_lists.last_textured_index] = v2;
+		D_AddToIndices32(v0, v1, v2, d_lists.textured_indices32, d_lists.last_textured_index32);
 	}
 	v0 = first_vertex + 2;
 	v1 = first_vertex + 3;
 	v2 = first_vertex;
-	d_lists.last_textured_index++;
-	if (d_lists.last_textured_index >= d_lists.textured_indices.size())
+	if (is_index16)
 	{
-		d_lists.textured_indices.emplace_back(v0);
+		D_AddToIndices16(v0, v1, v2, d_lists.textured_indices16, d_lists.last_textured_index16);
 	}
 	else
 	{
-		d_lists.textured_indices[d_lists.last_textured_index] = v0;
-	}
-	d_lists.last_textured_index++;
-	if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-	{
-		d_lists.textured_indices.emplace_back(v1);
-	}
-	else
-	{
-		d_lists.textured_indices[d_lists.last_textured_index] = v1;
-	}
-	d_lists.last_textured_index++;
-	if (d_lists.last_textured_index >= d_lists.textured_indices.size())
-	{
-		d_lists.textured_indices.emplace_back(v2);
-	}
-	else
-	{
-		d_lists.textured_indices[d_lists.last_textured_index] = v2;
+		D_AddToIndices32(v0, v1, v2, d_lists.textured_indices32, d_lists.last_textured_index32);
 	}
 }
