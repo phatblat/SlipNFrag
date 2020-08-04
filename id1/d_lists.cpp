@@ -4,7 +4,7 @@
 #include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1 };
+dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1 };
 
 qboolean d_uselists = false;
 
@@ -213,6 +213,112 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		{
 			D_AddToIndices32(v0, v1, v2, d_lists.textured_indices32, d_lists.last_textured_index32);
 		}
+	}
+}
+
+void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
+{
+	d_lists.last_sprite++;
+	if (d_lists.last_sprite >= d_lists.sprites.size())
+	{
+		d_lists.sprites.emplace_back();
+	}
+	auto& sprite = d_lists.sprites[d_lists.last_sprite];
+	sprite.width = spritedesc->pspriteframe->width;
+	sprite.height = spritedesc->pspriteframe->height;
+	sprite.size = sprite.width * sprite.height;
+	if (sprite.size > sprite.data.size())
+	{
+		sprite.data.resize(sprite.size);
+	}
+	memcpy(sprite.data.data(), &r_spritedesc.pspriteframe->pixels[0], sprite.size);
+	auto first_vertex = (d_lists.last_textured_vertex + 1) / 5;
+	auto is_index16 = (first_vertex + 4 <= 65520);
+	if (is_index16)
+	{
+		sprite.first_index16 = d_lists.last_textured_index16 + 1;
+		sprite.first_index32 = -1;
+	}
+	else
+	{
+		sprite.first_index16 = -1;
+		sprite.first_index32 = d_lists.last_textured_index32 + 1;
+	}
+	for (auto i = 0; i < 4; i++)
+	{
+		auto x = pverts[i][0];
+		auto y = pverts[i][1];
+		auto z = pverts[i][2];
+		auto s = pverts[i][3] / sprite.width;
+		auto t = pverts[i][4] / sprite.height;
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(x);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = x;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(z);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(-y);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(s);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
+		}
+		d_lists.last_textured_vertex++;
+		if (d_lists.last_textured_vertex >= d_lists.textured_vertices.size())
+		{
+			d_lists.textured_vertices.emplace_back(t);
+		}
+		else
+		{
+			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		}
+	}
+	sprite.count += 6;
+	auto v0 = first_vertex;
+	auto v1 = first_vertex + 1;
+	auto v2 = first_vertex + 2;
+	if (is_index16)
+	{
+		D_AddToIndices16(v0, v1, v2, d_lists.textured_indices16, d_lists.last_textured_index16);
+	}
+	else
+	{
+		D_AddToIndices32(v0, v1, v2, d_lists.textured_indices32, d_lists.last_textured_index32);
+	}
+	v0 = first_vertex + 2;
+	v1 = first_vertex + 3;
+	v2 = first_vertex;
+	if (is_index16)
+	{
+		D_AddToIndices16(v0, v1, v2, d_lists.textured_indices16, d_lists.last_textured_index16);
+	}
+	else
+	{
+		D_AddToIndices32(v0, v1, v2, d_lists.textured_indices32, d_lists.last_textured_index32);
 	}
 }
 

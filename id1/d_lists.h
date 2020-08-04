@@ -14,6 +14,17 @@ struct dsurface_t
 	int count;
 };
 
+struct dspritedata_t
+{
+	int width;
+	int height;
+	int size;
+	std::vector<unsigned char> data;
+	int first_index16;
+	int first_index32;
+	int count;
+};
+
 struct dturbulent_t
 {
 	void* texture;
@@ -58,6 +69,7 @@ struct dsky_t
 struct dlists_t
 {
 	int last_surface;
+	int last_sprite;
 	int last_turbulent;
 	int last_alias;
 	int last_particle;
@@ -73,6 +85,7 @@ struct dlists_t
 	int last_colored_index32;
 	int clear_color;
 	std::vector<dsurface_t> surfaces;
+	std::vector<dspritedata_t> sprites;
 	std::vector<dturbulent_t> turbulent;
 	std::vector<dalias_t> alias;
 	std::vector<dparticle_t> particles;
@@ -93,6 +106,7 @@ extern dlists_t d_lists;
 extern qboolean d_uselists;
 
 void D_AddSurfaceToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity, qboolean created);
+void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc);
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity);
 void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap);
 void D_AddParticleToLists (particle_t* part);

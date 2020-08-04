@@ -30,9 +30,9 @@ void main()
 	vec4 lowColor = texelFetch(fragmentPalette, ivec2(lowEntry.x * 255.0, 0), 0);
 	vec4 highColor = texelFetch(fragmentPalette, ivec2(highEntry.x * 255.0, 0), 0);
 	float delta = level.y - lowMip;
-	float x = lowColor.x + delta * (highColor.x - lowColor.x);
-	float y = lowColor.y + delta * (highColor.y - lowColor.y);
-	float z = lowColor.z + delta * (highColor.z - lowColor.z);
-	float w = lowColor.w + delta * (highColor.w - lowColor.w);
-	outColor = vec4(x, y, z, w);
+	float r = lowColor.x + delta * (highColor.x - lowColor.x);
+	float g = lowColor.y + delta * (highColor.y - lowColor.y);
+	float b = lowColor.z + delta * (highColor.z - lowColor.z);
+	float a = lowColor.w + delta * (highColor.w - lowColor.w);
+	outColor = vec4(r, g, b, a);
 }
