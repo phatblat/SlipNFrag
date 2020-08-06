@@ -297,7 +297,7 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
 		}
 	}
-	sprite.count += 6;
+	sprite.count = 6;
 	auto v0 = first_vertex;
 	auto v1 = first_vertex + 1;
 	auto v2 = first_vertex + 2;
