@@ -4306,10 +4306,6 @@ void android_main(struct android_app *app)
 							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, surface.count, 1, surface.first_index32, 0, 0));
 						}
 					}
-
-
-
-
 					VC(appState.Device.vkCmdBindPipeline(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.sprites.pipeline));
 					VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->sprites.descriptorPool));
 					descriptorSetAllocateInfo.descriptorPool = resources->sprites.descriptorPool;
@@ -4362,10 +4358,6 @@ void android_main(struct android_app *app)
 							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, sprite.count, 1, sprite.first_index32, 0, 0));
 						}
 					}
-
-
-
-
 					Buffer* uniforms = nullptr;
 					auto size = (1 + d_lists.last_particle + 1) * sizeof(float);
 					for (Buffer** b = &perImage.uniforms.oldBuffers; *b != nullptr; b = &(*b)->next)
@@ -4726,23 +4718,24 @@ void android_main(struct android_app *app)
 						moveBufferToFront(uniforms, perImage.uniforms);
 						VK(appState.Device.vkMapMemory(appState.Device.device, uniforms->memory, 0, size, 0, &uniforms->mapped));
 						auto mapped = (float*)uniforms->mapped;
-						(*mapped) = vpn[0];
+						auto rotation = ovrMatrix4f_CreateFromQuaternion(&orientation);
+						(*mapped) = -rotation.M[0][2];
 						mapped++;
-						(*mapped) = vpn[1];
+						(*mapped) = rotation.M[2][2];
 						mapped++;
-						(*mapped) = vpn[2];
+						(*mapped) = -rotation.M[1][2];
 						mapped++;
-						(*mapped) = vright[0];
+						(*mapped) = rotation.M[0][0];
 						mapped++;
-						(*mapped) = vright[1];
+						(*mapped) = -rotation.M[2][0];
 						mapped++;
-						(*mapped) = vright[2];
+						(*mapped) = rotation.M[1][0];
 						mapped++;
-						(*mapped) = vup[0];
+						(*mapped) = rotation.M[0][1];
 						mapped++;
-						(*mapped) = vup[1];
+						(*mapped) = -rotation.M[2][1];
 						mapped++;
-						(*mapped) = vup[2];
+						(*mapped) = rotation.M[1][1];
 						mapped++;
 						(*mapped) = eyeTextureWidth;
 						mapped++;
