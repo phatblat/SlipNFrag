@@ -33,7 +33,7 @@ void Mod_LoadBrushModel (model_t *mod, void *buffer);
 void Mod_LoadAliasModel (model_t *mod, void *buffer);
 model_t *Mod_LoadModel (model_t *mod, qboolean crash);
 
-std::vector<byte> mod_novis;
+std::vector<byte> mod_novis(MAX_MAP_LEAFS/8);
 
 std::list<model_t> mod_known;
 
@@ -95,6 +95,7 @@ Mod_Init
 */
 void Mod_Init (void)
 {
+    memset (mod_novis.data(), 0xff, mod_novis.size());
     pr_strings = pr_string_block.data();
 }
 
@@ -195,7 +196,12 @@ byte *Mod_LeafPVS (mleaf_t *leaf, model_t *model)
 {
     if (leaf == model->leafs)
     {
-        mod_novis.resize((sv.worldmodel->numleafs+7)>>3);
+        auto newsize = (sv.worldmodel->numleafs+7)>>3;
+        if (mod_novis.size() < newsize)
+        {
+            mod_novis.resize(newsize);
+            memset(mod_novis.data(), 0xff, newsize);
+        }
         return mod_novis.data();
     }
 	return Mod_DecompressVis (leaf->compressed_vis, model);
