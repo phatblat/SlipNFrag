@@ -3441,7 +3441,7 @@ void android_main(struct android_app *app)
 				con_width = appState.Console.Width / 3;
 				con_height = appState.Console.Height / 3;
 				Cvar_SetValue("fov", appState.DefaultFOV);
-				VID_Resize();
+				VID_Resize(320.0 / 240.0);
 			}
 			else if (appState.Mode == AppWorldMode)
 			{
@@ -3455,11 +3455,11 @@ void android_main(struct android_app *app)
 				Cvar_SetValue("joyadvaxisr", AxisNada);
 				Joy_AdvancedUpdate_f();
 				vid_width = appState.Screen.Width;
-				vid_height = appState.Screen.Height;
+				vid_height = appState.Screen.Width;
 				con_width = appState.Console.Width / 3;
 				con_height = appState.Console.Height / 3;
 				Cvar_SetValue("fov", appState.FOV);
-				VID_Resize();
+				VID_Resize(1);
 			}
 			appState.PreviousMode = appState.Mode;
 		}

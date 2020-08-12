@@ -61,6 +61,10 @@ struct dparticle_t
 
 struct dsky_t
 {
+	float top;
+	float left;
+	float right;
+	float bottom;
 	int first_index16;
 	int first_index32;
 	int count;
@@ -110,4 +114,4 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc);
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity);
 void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap);
 void D_AddParticleToLists (particle_t* part);
-void D_AddSkyToLists (msurface_t* face, entity_t* entity);
+void D_AddSkyToLists (surf_t* surf, msurface_t* face, entity_t* entity);

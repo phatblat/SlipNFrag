@@ -211,7 +211,7 @@ void D_DrawSurfaces (void)
 				if (d_uselists)
 				{
 					pface = (msurface_t*)s->data;
-					D_AddSkyToLists(pface, currententity);
+					D_AddSkyToLists(s, pface, currententity);
 				}
 				else
 				{
