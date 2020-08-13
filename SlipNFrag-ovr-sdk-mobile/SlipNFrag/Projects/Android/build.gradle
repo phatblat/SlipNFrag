@@ -40,7 +40,7 @@ android {
     main {
       manifest.srcFile 'AndroidManifest.xml'
       java.srcDirs = ['../../java']
-      jniLibs.srcDir 'libs'
+      jniLibs.srcDirs 'libs', System.getenv('ANDROID_NDK_HOME') + '/sources/third_party/vulkan/src/build-android/jniLibs'
       res.srcDirs = ['../../res']
       assets.srcDirs = ['../../assets']
       shaders.srcDirs = ['../../shaders']

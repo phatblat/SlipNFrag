@@ -21,6 +21,7 @@
 
 #define DEBUG 1
 #define _DEBUG 1
+#define USE_API_DUMP 1
 
 #define VK(func) checkErrors(func, #func);
 #define VC(func) func;
@@ -359,7 +360,7 @@ struct ScreenPipelineResources
 struct ScreenPerImage
 {
 	CachedBuffers vertices;
-	CachedBuffers indices16;
+	CachedBuffers indices;
 	CachedBuffers stagingBuffers;
 	ScreenPipelineResources* pipelineResources;
 	int paletteOffset;
@@ -448,6 +449,8 @@ struct AppState
 	float Roll;
 	Screen Console;
 	Screen Screen;
+	std::vector<float> ScreenVertices;
+	std::vector<uint16_t> ScreenIndices;
 	double PreviousTime;
 	double CurrentTime;
 	uint32_t PreviousLeftButtons;
@@ -3272,6 +3275,8 @@ void android_main(struct android_app *app)
 			appState.Screen.SubmitInfo.commandBufferCount = 1;
 			appState.Screen.SubmitInfo.pCommandBuffers = &appState.Screen.CommandBuffer;
 			appState.Scene.numBuffers = (isMultiview) ? VRAPI_FRAME_LAYER_EYE_MAX : 1;
+			appState.ScreenVertices.assign({ -1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, -1, 0, 1, 0, -1, -1, 0, 0, 0 });
+			appState.ScreenIndices.assign({ 0, 1, 2, 2, 3, 0 });
 			createShaderModule(appState, app, (isMultiview ? "shaders/textured_multiview.vert.spv" : "shaders/textured.vert.spv"), &appState.Scene.texturedVertex);
 			createShaderModule(appState, app, "shaders/textured.frag.spv", &appState.Scene.texturedFragment);
 			createShaderModule(appState, app, "shaders/sprite.frag.spv", &appState.Scene.spritesFragment);
@@ -5261,7 +5266,7 @@ void android_main(struct android_app *app)
 				perImage.submitted = false;
 			}
 			resetCachedBuffers(appState, perImage.vertices);
-			resetCachedBuffers(appState, perImage.indices16);
+			resetCachedBuffers(appState, perImage.indices);
 			resetCachedBuffers(appState, perImage.stagingBuffers);
 			for (ScreenPipelineResources** r = &perImage.pipelineResources; *r != nullptr; )
 			{
@@ -5315,63 +5320,19 @@ void android_main(struct android_app *app)
 			viewport.maxDepth = 1.0f;
 			VC(appState.Device.vkCmdSetViewport(perImage.commandBuffer, 0, 1, &viewport));
 			VC(appState.Device.vkCmdSetScissor(perImage.commandBuffer, 0, 1, &screenRect));
-			auto vertexSize = 20 * sizeof(float);
 			Buffer* vertices = nullptr;
-			for (Buffer** b = &perImage.vertices.oldBuffers; *b != nullptr; b = &(*b)->next)
+			if (perImage.vertices.oldBuffers != nullptr)
 			{
-				if ((*b)->size >= vertexSize && (*b)->size < vertexSize * 2)
-				{
-					vertices = *b;
-					*b = (*b)->next;
-					break;
-				}
+				vertices = perImage.vertices.oldBuffers;
+				perImage.vertices.oldBuffers = perImage.vertices.oldBuffers->next;
 			}
-			if (vertices == nullptr)
+			else
 			{
-				createVertexBuffer(appState, vertexSize, vertices);
+				createStagingBuffer(appState, appState.ScreenVertices.size() * sizeof(float), vertices);
 			}
 			moveBufferToFront(vertices, perImage.vertices);
-			VK(appState.Device.vkMapMemory(appState.Device.device, vertices->memory, 0, vertexSize, 0, &vertices->mapped));
-			auto mapped = (float*)vertices->mapped;
-			(*mapped) = -1;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = 0;
-			mapped++;
-			(*mapped) = 0;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = 0;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = -1;
-			mapped++;
-			(*mapped) = 0;
-			mapped++;
-			(*mapped) = 1;
-			mapped++;
-			(*mapped) = 0;
-			mapped++;
-			(*mapped) = -1;
-			mapped++;
-			(*mapped) = -1;
-			mapped++;
-			(*mapped) = 0;
-			mapped++;
-			(*mapped) = 0;
-			mapped++;
-			(*mapped) = 0;
+			VK(appState.Device.vkMapMemory(appState.Device.device, vertices->memory, 0, vertices->size, 0, &vertices->mapped));
+			memcpy(vertices->mapped, appState.ScreenVertices.data(), vertices->size);
 			VC(appState.Device.vkUnmapMemory(appState.Device.device, vertices->memory));
 			vertices->mapped = nullptr;
 			VkBufferMemoryBarrier bufferMemoryBarrier { };
@@ -5381,41 +5342,25 @@ void android_main(struct android_app *app)
 			bufferMemoryBarrier.buffer = vertices->buffer;
 			bufferMemoryBarrier.size = vertices->size;
 			VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
-			Buffer* indices16 = nullptr;
-			auto indexSize = 6 * sizeof(uint16_t);
-			for (Buffer** b = &perImage.indices16.oldBuffers; *b != nullptr; b = &(*b)->next)
+			Buffer* indices = nullptr;
+			if (perImage.indices.oldBuffers != nullptr)
 			{
-				if ((*b)->size >= indexSize && (*b)->size < indexSize * 2)
-				{
-					indices16 = *b;
-					*b = (*b)->next;
-					break;
-				}
+				indices = perImage.indices.oldBuffers;
+				perImage.indices.oldBuffers = perImage.indices.oldBuffers->next;
 			}
-			if (indices16 == nullptr)
+			else
 			{
-				createIndexBuffer(appState, indexSize, indices16);
+				createStagingBuffer(appState, appState.ScreenIndices.size() * sizeof(uint16_t), indices);
 			}
-			moveBufferToFront(indices16, perImage.indices16);
-			VK(appState.Device.vkMapMemory(appState.Device.device, indices16->memory, 0, indexSize, 0, &indices16->mapped));
-			auto mapped16 = (uint16_t*)indices16->mapped;
-			(*mapped16) = 0;
-			mapped16++;
-			(*mapped16) = 1;
-			mapped16++;
-			(*mapped16) = 2;
-			mapped16++;
-			(*mapped16) = 2;
-			mapped16++;
-			(*mapped16) = 3;
-			mapped16++;
-			(*mapped16) = 0;
-			VC(appState.Device.vkUnmapMemory(appState.Device.device, indices16->memory));
-			indices16->mapped = nullptr;
+			moveBufferToFront(indices, perImage.indices);
+			VK(appState.Device.vkMapMemory(appState.Device.device, indices->memory, 0, indices->size, 0, &indices->mapped));
+			memcpy(indices->mapped, appState.ScreenIndices.data(), indices->size);
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, indices->memory));
+			indices->mapped = nullptr;
 			bufferMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
 			bufferMemoryBarrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT;
-			bufferMemoryBarrier.buffer = indices16->buffer;
-			bufferMemoryBarrier.size = indices16->size;
+			bufferMemoryBarrier.buffer = indices->buffer;
+			bufferMemoryBarrier.size = indices->size;
 			VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 			VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 0, 1, &vertices->buffer, &noOffset));
 			VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 1, 1, &vertices->buffer, &noOffset));
@@ -5523,7 +5468,7 @@ void android_main(struct android_app *app)
 			writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			writes[1].pImageInfo = textureInfo + 1;
 			VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
-			VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices16->buffer, noOffset, VK_INDEX_TYPE_UINT16));
+			VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices->buffer, noOffset, VK_INDEX_TYPE_UINT16));
 			VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.console.pipelineLayout, 0, 1, &resources->descriptorResources.descriptorSet, 0, nullptr));
 			VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, 6, 1, 0, 0, 0));
 			VC(appState.Device.vkCmdEndRenderPass(perImage.commandBuffer));
@@ -5758,7 +5703,7 @@ void android_main(struct android_app *app)
 			deleteTexture(appState, perImage.palette);
 		}
 		deleteCachedBuffers(appState, perImage.stagingBuffers);
-		deleteCachedBuffers(appState, perImage.indices16);
+		deleteCachedBuffers(appState, perImage.indices);
 		deleteCachedBuffers(appState, perImage.vertices);
 	}
 	VC(appState.Device.vkDestroyRenderPass(appState.Device.device, appState.Console.RenderPass, nullptr));
