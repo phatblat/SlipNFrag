@@ -255,16 +255,20 @@ struct Scene
 	VkShaderModule coloredFragment;
 	VkShaderModule skyVertex;
 	VkShaderModule skyFragment;
+	VkShaderModule consoleVertex;
+	VkShaderModule consoleFragment;
 	Pipeline textured;
 	Pipeline sprites;
 	Pipeline turbulent;
 	Pipeline colormapped;
 	Pipeline colored;
 	Pipeline sky;
+	Pipeline console;
 	PipelineAttributes texturedAttributes;
 	PipelineAttributes colormappedAttributes;
 	PipelineAttributes coloredAttributes;
 	PipelineAttributes skyAttributes;
+	PipelineAttributes consoleAttributes;
 	Buffer matrices;
 	int numBuffers;
 	int hostClearCount;
@@ -345,6 +349,59 @@ struct View
 	std::vector<PerImage> perImage;
 };
 
+struct ScreenPipelineResources
+{
+	ScreenPipelineResources *next;
+	int unusedCount;
+	PipelineDescriptorResources descriptorResources;
+};
+
+struct ScreenPerImage
+{
+	CachedBuffers vertices;
+	CachedBuffers indices16;
+	CachedBuffers stagingBuffers;
+	ScreenPipelineResources* pipelineResources;
+	int paletteOffset;
+	int textureOffset;
+	int paletteChanged;
+	Texture* palette;
+	Texture* texture;
+	VkCommandBuffer commandBuffer;
+	VkFence fence;
+	bool submitted;
+};
+
+struct ScreenFramebuffer
+{
+	int swapChainLength;
+	ovrTextureSwapChain *colorTextureSwapChain;
+	std::vector<Texture> colorTextures;
+	VkImage depthImage;
+	VkDeviceMemory depthMemory;
+	VkImageView depthImageView;
+	Texture renderTexture;
+	std::vector<VkFramebuffer> framebuffers;
+	int width;
+	int height;
+	int currentBuffer;
+};
+
+struct ScreenColorSwapChain
+{
+	int SwapChainLength;
+	ovrTextureSwapChain *SwapChain;
+	std::vector<VkImage> ColorTextures;
+};
+
+struct ScreenView
+{
+	ScreenFramebuffer framebuffer;
+	ScreenColorSwapChain colorSwapChain;
+	int index;
+	std::vector<ScreenPerImage> perImage;
+};
+
 struct Screen
 {
 	ovrTextureSwapChain* SwapChain;
@@ -355,6 +412,8 @@ struct Screen
 	Buffer Buffer;
 	VkCommandBuffer CommandBuffer;
 	VkSubmitInfo SubmitInfo;
+	VkRenderPass RenderPass;
+	ScreenView View;
 };
 
 struct AppState
@@ -2871,30 +2930,253 @@ void android_main(struct android_app *app)
 			vrapi_SubmitFrame2(appState.Ovr, &frameDesc);
 			appState.Console.Width = 960;
 			appState.Console.Height = 600;
-			appState.Console.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Console.Width, appState.Console.Height, 1, 1);
-			appState.Console.Data.resize(appState.Console.Width * appState.Console.Height);
-			appState.Console.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.Console.SwapChain, 0);
-			appState.Console.Buffer.size = appState.Console.Data.size() * sizeof(uint32_t);
-			VkBufferCreateInfo bufferCreateInfo { };
-			bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-			bufferCreateInfo.size = appState.Console.Buffer.size;
-			bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-			VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &appState.Console.Buffer.buffer));
-			appState.Console.Buffer.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+			appState.Console.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Console.Width, appState.Console.Height, 1, 3);
+			appState.Console.View.colorSwapChain.SwapChain = appState.Console.SwapChain;
+			appState.Console.View.colorSwapChain.SwapChainLength = vrapi_GetTextureSwapChainLength(appState.Console.View.colorSwapChain.SwapChain);
+			appState.Console.View.colorSwapChain.ColorTextures.resize(appState.Console.View.colorSwapChain.SwapChainLength);
+			for (auto i = 0; i < appState.Console.View.colorSwapChain.SwapChainLength; i++)
+			{
+				appState.Console.View.colorSwapChain.ColorTextures[i] = vrapi_GetTextureSwapChainBufferVulkan(appState.Console.View.colorSwapChain.SwapChain, i);
+			}
+			uint32_t attachmentCount = 0;
+			VkAttachmentDescription attachments[4] { };
+			attachments[attachmentCount].format = VK_FORMAT_R8G8B8A8_UNORM;
+			attachments[attachmentCount].samples = VK_SAMPLE_COUNT_4_BIT;
+			attachments[attachmentCount].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			attachments[attachmentCount].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[attachmentCount].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[attachmentCount].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[attachmentCount].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachments[attachmentCount].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachmentCount++;
+			attachments[attachmentCount].format = VK_FORMAT_R8G8B8A8_UNORM;
+			attachments[attachmentCount].samples = VK_SAMPLE_COUNT_1_BIT;
+			attachments[attachmentCount].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[attachmentCount].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+			attachments[attachmentCount].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[attachmentCount].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[attachmentCount].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachments[attachmentCount].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			attachmentCount++;
+			attachments[attachmentCount].format = VK_FORMAT_D24_UNORM_S8_UINT;
+			attachments[attachmentCount].samples = VK_SAMPLE_COUNT_4_BIT;
+			attachments[attachmentCount].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+			attachments[attachmentCount].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[attachmentCount].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+			attachments[attachmentCount].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+			attachments[attachmentCount].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			attachments[attachmentCount].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			attachmentCount++;
+			uint32_t sampleMapAttachment = 0;
+			VkAttachmentReference colorAttachmentReference;
+			colorAttachmentReference.attachment = 0;
+			colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			VkAttachmentReference resolveAttachmentReference;
+			resolveAttachmentReference.attachment = 1;
+			resolveAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			VkAttachmentReference depthAttachmentReference;
+			depthAttachmentReference.attachment = 2;
+			depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			VkSubpassDescription subpassDescription { };
+			subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+			subpassDescription.colorAttachmentCount = 1;
+			subpassDescription.pColorAttachments = &colorAttachmentReference;
+			subpassDescription.pResolveAttachments = &resolveAttachmentReference;
+			subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
+			VkRenderPassCreateInfo renderPassCreateInfo { };
+			renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+			renderPassCreateInfo.attachmentCount = attachmentCount;
+			renderPassCreateInfo.pAttachments = attachments;
+			renderPassCreateInfo.subpassCount = 1;
+			renderPassCreateInfo.pSubpasses = &subpassDescription;
+			VK(appState.Device.vkCreateRenderPass(appState.Device.device, &renderPassCreateInfo, nullptr, &appState.Console.RenderPass));
+			appState.Console.View.framebuffer.colorTextureSwapChain = appState.Console.View.colorSwapChain.SwapChain;
+			appState.Console.View.framebuffer.swapChainLength = appState.Console.View.colorSwapChain.SwapChainLength;
+			appState.Console.View.framebuffer.colorTextures.resize(appState.Console.View.framebuffer.swapChainLength);
+			appState.Console.View.framebuffer.framebuffers.resize(appState.Console.View.framebuffer.swapChainLength);
+			appState.Console.View.framebuffer.width = appState.Console.Width;
+			appState.Console.View.framebuffer.height = appState.Console.Height;
+			appState.Console.View.framebuffer.currentBuffer = 0;
+			for (auto i = 0; i < appState.Console.View.framebuffer.swapChainLength; i++)
+			{
+				auto& texture = appState.Console.View.framebuffer.colorTextures[i];
+				texture.width = appState.Console.Width;
+				texture.height = appState.Console.Height;
+				texture.layerCount = 1;
+				texture.image = appState.Console.View.colorSwapChain.ColorTextures[i];
+				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
+				VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+				VkImageMemoryBarrier imageMemoryBarrier { };
+				imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+				imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				imageMemoryBarrier.image = appState.Console.View.colorSwapChain.ColorTextures[i];
+				imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				imageMemoryBarrier.subresourceRange.levelCount = 1;
+				imageMemoryBarrier.subresourceRange.layerCount = texture.layerCount;
+				VC(appState.Device.vkCmdPipelineBarrier(setupCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+				VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
+				VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
+				VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+				VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
+				VkImageViewCreateInfo imageViewCreateInfo { };
+				imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+				imageViewCreateInfo.image = texture.image;
+				imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+				imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+				imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				imageViewCreateInfo.subresourceRange.levelCount = 1;
+				imageViewCreateInfo.subresourceRange.layerCount = texture.layerCount;
+				VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture.view));
+				VkSamplerCreateInfo samplerCreateInfo { };
+				samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+				samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
+				samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
+				samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+				samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+				samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+				samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+				samplerCreateInfo.maxLod = 1;
+				samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+				VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture.sampler));
+			}
+			VkFormatProperties props;
+			VC(instance.vkGetPhysicalDeviceFormatProperties(appState.Device.physicalDevice, VK_FORMAT_R8G8B8A8_UNORM, &props));
+			if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) == 0)
+			{
+				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "android_main(): Color attachment bit in texture is not defined.");
+				vrapi_Shutdown();
+				exit(0);
+			}
+			auto& texture = appState.Console.View.framebuffer.renderTexture;
+			texture.width = appState.Console.View.framebuffer.width;
+			texture.height = appState.Console.View.framebuffer.height;
+			texture.layerCount = 1;
+			VkImageCreateInfo imageCreateInfo { };
+			imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+			imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+			imageCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+			imageCreateInfo.extent.width = texture.width;
+			imageCreateInfo.extent.height = texture.height;
+			imageCreateInfo.extent.depth = 1;
+			imageCreateInfo.mipLevels = 1;
+			imageCreateInfo.arrayLayers = texture.layerCount;
+			imageCreateInfo.samples = VK_SAMPLE_COUNT_4_BIT;
+			imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+			imageCreateInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+			imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &texture.image));
 			VkMemoryRequirements memoryRequirements;
-			VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, appState.Console.Buffer.buffer, &memoryRequirements));
+			VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, texture.image, &memoryRequirements));
 			VkMemoryAllocateInfo memoryAllocateInfo { };
-			createMemoryAllocateInfo(appState, memoryRequirements, appState.Console.Buffer.flags, memoryAllocateInfo);
-			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.Console.Buffer.memory));
-			VK(appState.Device.vkBindBufferMemory(appState.Device.device, appState.Console.Buffer.buffer, appState.Console.Buffer.memory, 0));
-			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &appState.Console.CommandBuffer));
-			appState.Console.SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			appState.Console.SubmitInfo.commandBufferCount = 1;
-			appState.Console.SubmitInfo.pCommandBuffers = &appState.Console.CommandBuffer;
+			createMemoryAllocateInfo(appState, memoryRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memoryAllocateInfo);
+			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &texture.memory));
+			VK(appState.Device.vkBindImageMemory(appState.Device.device, texture.image, texture.memory, 0));
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+			VkImageMemoryBarrier imageMemoryBarrier { };
+			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageMemoryBarrier.image = texture.image;
+			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageMemoryBarrier.subresourceRange.levelCount = 1;
+			imageMemoryBarrier.subresourceRange.layerCount = texture.layerCount;
+			VC(appState.Device.vkCmdPipelineBarrier(setupCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
+			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
+			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
+			VkImageViewCreateInfo imageViewCreateInfo { };
+			imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			imageViewCreateInfo.image = texture.image;
+			imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			imageViewCreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+			imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageViewCreateInfo.subresourceRange.levelCount = 1;
+			imageViewCreateInfo.subresourceRange.layerCount = texture.layerCount;
+			VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &texture.view));
+			VkSamplerCreateInfo samplerCreateInfo { };
+			samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+			samplerCreateInfo.magFilter = VK_FILTER_NEAREST;
+			samplerCreateInfo.minFilter = VK_FILTER_NEAREST;
+			samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+			samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+			samplerCreateInfo.maxLod = 1;
+			samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+			VK(appState.Device.vkCreateSampler(appState.Device.device, &samplerCreateInfo, nullptr, &texture.sampler));
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			imageMemoryBarrier.image = texture.image;
+			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageMemoryBarrier.subresourceRange.levelCount = 1;
+			imageMemoryBarrier.subresourceRange.layerCount = texture.layerCount;
+			VC(appState.Device.vkCmdPipelineBarrier(setupCommandBuffer, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
+			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
+			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
+			imageCreateInfo.format = VK_FORMAT_D24_UNORM_S8_UINT;
+			imageCreateInfo.extent.width = appState.Console.View.framebuffer.width;
+			imageCreateInfo.extent.height = appState.Console.View.framebuffer.height;
+			imageCreateInfo.arrayLayers = 1;
+			imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+			VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &appState.Console.View.framebuffer.depthImage));
+			VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, appState.Console.View.framebuffer.depthImage, &memoryRequirements));
+			createMemoryAllocateInfo(appState, memoryRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memoryAllocateInfo);
+			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.Console.View.framebuffer.depthMemory));
+			VK(appState.Device.vkBindImageMemory(appState.Device.device, appState.Console.View.framebuffer.depthImage, appState.Console.View.framebuffer.depthMemory, 0));
+			imageViewCreateInfo.image = appState.Console.View.framebuffer.depthImage;
+			imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			imageViewCreateInfo.format = imageCreateInfo.format;
+			imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+			imageViewCreateInfo.subresourceRange.layerCount = 1;
+			VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &appState.Console.View.framebuffer.depthImageView));
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			imageMemoryBarrier.image = appState.Console.View.framebuffer.depthImage;
+			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+			imageMemoryBarrier.subresourceRange.layerCount = 1;
+			VC(appState.Device.vkCmdPipelineBarrier(setupCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
+			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
+			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
+			for (auto i = 0; i < appState.Console.View.framebuffer.swapChainLength; i++)
+			{
+				uint32_t attachmentCount = 0;
+				VkImageView attachments[4];
+				attachments[attachmentCount++] = appState.Console.View.framebuffer.renderTexture.view;
+				attachments[attachmentCount++] = appState.Console.View.framebuffer.colorTextures[i].view;
+				attachments[attachmentCount++] = appState.Console.View.framebuffer.depthImageView;
+				VkFramebufferCreateInfo framebufferCreateInfo { };
+				framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+				framebufferCreateInfo.renderPass = appState.Console.RenderPass;
+				framebufferCreateInfo.attachmentCount = attachmentCount;
+				framebufferCreateInfo.pAttachments = attachments;
+				framebufferCreateInfo.width = appState.Console.View.framebuffer.width;
+				framebufferCreateInfo.height = appState.Console.View.framebuffer.height;
+				framebufferCreateInfo.layers = 1;
+				VK(appState.Device.vkCreateFramebuffer(appState.Device.device, &framebufferCreateInfo, nullptr, &appState.Console.View.framebuffer.framebuffers[i]));
+			}
+			appState.Console.View.perImage.resize(appState.Console.View.framebuffer.swapChainLength);
+			for (auto& perImage : appState.Console.View.perImage)
+			{
+				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &perImage.commandBuffer));
+				VK(appState.Device.vkCreateFence(appState.Device.device, &fenceCreateInfo, nullptr, &perImage.fence));
+			}
 			appState.Screen.Width = appState.Console.Width;
 			appState.Screen.Height = appState.Console.Height;
-			appState.Screen.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Screen.Width, appState.Screen.Height, 1, 1);
+			appState.Screen.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Screen.Width, appState.Screen.Height, 1, 3);
 			appState.Screen.Data.resize(appState.Screen.Width * appState.Screen.Height, 255 << 24);
 			appState.Screen.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.Screen.SwapChain, 0);
 			auto playImageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
@@ -2953,7 +3235,11 @@ void android_main(struct android_app *app)
 				}
 			}
 			appState.Screen.Buffer.size = appState.Screen.Data.size() * sizeof(uint32_t);
+			VkBufferCreateInfo bufferCreateInfo { };
+			bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 			bufferCreateInfo.size = appState.Screen.Buffer.size;
+			bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &appState.Screen.Buffer.buffer));
 			appState.Screen.Buffer.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 			VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, appState.Screen.Buffer.buffer, &memoryRequirements));
@@ -2996,6 +3282,8 @@ void android_main(struct android_app *app)
 			createShaderModule(appState, app, "shaders/colored.frag.spv", &appState.Scene.coloredFragment);
 			createShaderModule(appState, app, (isMultiview ? "shaders/sky_multiview.vert.spv" : "shaders/sky.vert.spv"), &appState.Scene.skyVertex);
 			createShaderModule(appState, app, "shaders/sky.frag.spv", &appState.Scene.skyFragment);
+			createShaderModule(appState, app, "shaders/console.vert.spv", &appState.Scene.consoleVertex);
+			createShaderModule(appState, app, "shaders/console.frag.spv", &appState.Scene.consoleFragment);
 			VkPipelineTessellationStateCreateInfo tessellationStateCreateInfo { };
 			tessellationStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
 			VkPipelineViewportStateCreateInfo viewportStateCreateInfo { };
@@ -3194,6 +3482,25 @@ void android_main(struct android_app *app)
 			appState.Scene.skyAttributes.vertexInputState.pVertexAttributeDescriptions = appState.Scene.skyAttributes.vertexAttributes.data();
 			appState.Scene.skyAttributes.inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 			appState.Scene.skyAttributes.inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			appState.Scene.consoleAttributes.vertexAttributes.resize(2);
+			appState.Scene.consoleAttributes.vertexBindings.resize(2);
+			appState.Scene.consoleAttributes.vertexAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+			appState.Scene.consoleAttributes.vertexBindings[0].stride = 5 * sizeof(float);
+			appState.Scene.consoleAttributes.vertexBindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			appState.Scene.consoleAttributes.vertexAttributes[1].location = 1;
+			appState.Scene.consoleAttributes.vertexAttributes[1].binding = 1;
+			appState.Scene.consoleAttributes.vertexAttributes[1].format = VK_FORMAT_R32G32_SFLOAT;
+			appState.Scene.consoleAttributes.vertexAttributes[1].offset = 3 * sizeof(float);
+			appState.Scene.consoleAttributes.vertexBindings[1].binding = 1;
+			appState.Scene.consoleAttributes.vertexBindings[1].stride = 5 * sizeof(float);
+			appState.Scene.consoleAttributes.vertexBindings[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			appState.Scene.consoleAttributes.vertexInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+			appState.Scene.consoleAttributes.vertexInputState.vertexBindingDescriptionCount = appState.Scene.consoleAttributes.vertexBindings.size();
+			appState.Scene.consoleAttributes.vertexInputState.pVertexBindingDescriptions = appState.Scene.consoleAttributes.vertexBindings.data();
+			appState.Scene.consoleAttributes.vertexInputState.vertexAttributeDescriptionCount = appState.Scene.consoleAttributes.vertexAttributes.size();
+			appState.Scene.consoleAttributes.vertexInputState.pVertexAttributeDescriptions = appState.Scene.consoleAttributes.vertexAttributes.data();
+			appState.Scene.consoleAttributes.inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+			appState.Scene.consoleAttributes.inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 			appState.Scene.textured.stages.resize(2);
 			appState.Scene.textured.stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
 			appState.Scene.textured.stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -3215,6 +3522,7 @@ void android_main(struct android_app *app)
 			descriptorSetBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[2].descriptorCount = 1;
 			descriptorSetBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			descriptorSetBindings[3].binding = 3;
 			VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo { };
 			descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 			descriptorSetLayoutCreateInfo.bindingCount = 3;
@@ -3266,7 +3574,6 @@ void android_main(struct android_app *app)
 			appState.Scene.turbulent.stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 			appState.Scene.turbulent.stages[1].module = appState.Scene.turbulentFragment;
 			appState.Scene.turbulent.stages[1].pName = "main";
-			descriptorSetBindings[3].binding = 3;
 			descriptorSetBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorSetBindings[3].descriptorCount = 1;
 			descriptorSetBindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -3290,15 +3597,12 @@ void android_main(struct android_app *app)
 			descriptorSetBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorSetBindings[0].descriptorCount = 1;
 			descriptorSetBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			descriptorSetBindings[1].binding = 1;
 			descriptorSetBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[1].descriptorCount = 1;
 			descriptorSetBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			descriptorSetBindings[2].binding = 2;
 			descriptorSetBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[2].descriptorCount = 1;
 			descriptorSetBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			descriptorSetBindings[3].binding = 3;
 			descriptorSetBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[3].descriptorCount = 1;
 			descriptorSetBindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -3324,11 +3628,9 @@ void android_main(struct android_app *app)
 			descriptorSetBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorSetBindings[0].descriptorCount = 1;
 			descriptorSetBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			descriptorSetBindings[1].binding = 1;
 			descriptorSetBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorSetBindings[1].descriptorCount = 1;
 			descriptorSetBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			descriptorSetBindings[2].binding = 2;
 			descriptorSetBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[2].descriptorCount = 1;
 			descriptorSetBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -3354,15 +3656,12 @@ void android_main(struct android_app *app)
 			descriptorSetBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorSetBindings[0].descriptorCount = 1;
 			descriptorSetBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			descriptorSetBindings[1].binding = 1;
 			descriptorSetBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[1].descriptorCount = 1;
 			descriptorSetBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			descriptorSetBindings[2].binding = 2;
 			descriptorSetBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 			descriptorSetBindings[2].descriptorCount = 1;
 			descriptorSetBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-			descriptorSetBindings[3].binding = 3;
 			descriptorSetBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			descriptorSetBindings[3].descriptorCount = 1;
 			descriptorSetBindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -3377,6 +3676,33 @@ void android_main(struct android_app *app)
 			graphicsPipelineCreateInfo.pInputAssemblyState = &appState.Scene.skyAttributes.inputAssemblyState;
 			graphicsPipelineCreateInfo.layout = appState.Scene.sky.pipelineLayout;
 			VK(appState.Device.vkCreateGraphicsPipelines(appState.Device.device, appState.Context.pipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &appState.Scene.sky.pipeline));
+			appState.Scene.console.stages.resize(2);
+			appState.Scene.console.stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			appState.Scene.console.stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+			appState.Scene.console.stages[0].module = appState.Scene.consoleVertex;
+			appState.Scene.console.stages[0].pName = "main";
+			appState.Scene.console.stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			appState.Scene.console.stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+			appState.Scene.console.stages[1].module = appState.Scene.consoleFragment;
+			appState.Scene.console.stages[1].pName = "main";
+			descriptorSetBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorSetBindings[0].descriptorCount = 1;
+			descriptorSetBindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			descriptorSetBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			descriptorSetBindings[1].descriptorCount = 1;
+			descriptorSetBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			descriptorSetLayoutCreateInfo.bindingCount = 2;
+			descriptorSetLayoutCreateInfo.pBindings = descriptorSetBindings;
+			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.console.descriptorSetLayout));
+			pipelineLayoutCreateInfo.pSetLayouts = &appState.Scene.console.descriptorSetLayout;
+			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.console.pipelineLayout));
+			graphicsPipelineCreateInfo.stageCount = appState.Scene.console.stages.size();
+			graphicsPipelineCreateInfo.pStages = appState.Scene.console.stages.data();
+			graphicsPipelineCreateInfo.pVertexInputState = &appState.Scene.consoleAttributes.vertexInputState;
+			graphicsPipelineCreateInfo.pInputAssemblyState = &appState.Scene.consoleAttributes.inputAssemblyState;
+			graphicsPipelineCreateInfo.layout = appState.Scene.console.pipelineLayout;
+			graphicsPipelineCreateInfo.renderPass = appState.Console.RenderPass;
+			VK(appState.Device.vkCreateGraphicsPipelines(appState.Device.device, appState.Context.pipelineCache, 1, &graphicsPipelineCreateInfo, nullptr, &appState.Scene.console.pipeline));
 			appState.Scene.matrices.size = appState.Scene.numBuffers * 2 * sizeof(ovrMatrix4f);
 			bufferCreateInfo.size = appState.Scene.matrices.size;
 			bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -3389,6 +3715,7 @@ void android_main(struct android_app *app)
 			appState.Scene.createdScene = true;
 		}
 		appState.FrameIndex++;
+		VkDeviceSize noOffset = 0;
 		const double predictedDisplayTime = vrapi_GetPredictedDisplayTime(appState.Ovr, appState.FrameIndex);
 		const ovrTracking2 tracking = vrapi_GetPredictedTracking2(appState.Ovr, predictedDisplayTime);
 		appState.DisplayTime = predictedDisplayTime;
@@ -3823,9 +4150,9 @@ void android_main(struct android_app *app)
 					bufferMemoryBarrier.size = vertices->size;
 					VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 					Buffer* indices16 = nullptr;
-					auto texturedIndexSize = (d_lists.last_textured_index16 + 1) * sizeof(uint32_t);
-					auto colormappedIndexSize = (d_lists.last_colormapped_index16 + 1) * sizeof(uint32_t);
-					auto coloredIndexSize = (d_lists.last_colored_index16 + 1) * sizeof(uint32_t);
+					auto texturedIndexSize = (d_lists.last_textured_index16 + 1) * sizeof(uint16_t);
+					auto colormappedIndexSize = (d_lists.last_colormapped_index16 + 1) * sizeof(uint16_t);
+					auto coloredIndexSize = (d_lists.last_colored_index16 + 1) * sizeof(uint16_t);
 					auto indexSize = texturedIndexSize + colormappedIndexSize + coloredIndexSize;
 					if (indexSize > 0)
 					{
@@ -3892,7 +4219,6 @@ void android_main(struct android_app *app)
 						bufferMemoryBarrier.size = indices32->size;
 						VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 					}
-					VkDeviceSize noOffset = 0;
 					VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 0, 1, &vertices->buffer, &perImage.texturedVertexBase));
 					VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 1, 1, &vertices->buffer, &perImage.texturedVertexBase));
 					VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 2, 1, &vertices->buffer, &noOffset));
@@ -4923,47 +5249,303 @@ void android_main(struct android_app *app)
 		}
 		else if (appState.Mode == AppWorldMode)
 		{
-			auto width = appState.Console.Width;
-			auto targetWidth = width * 4;
-			auto sourceIndex = 0;
-			auto targetIndex = 0;
-			auto y = 0;
-			while (y < appState.Console.Height)
+			VkRect2D screenRect { };
+			screenRect.extent.width = appState.Console.View.framebuffer.width;
+			screenRect.extent.height = appState.Console.View.framebuffer.height;
+			appState.Console.View.index = (appState.Console.View.index + 1) % appState.Console.View.framebuffer.swapChainLength;
+			auto& perImage = appState.Console.View.perImage[appState.Console.View.index];
+			if (perImage.submitted)
 			{
-				auto x = 0;
-				while (x < width)
+				VK(appState.Device.vkWaitForFences(appState.Device.device, 1, &perImage.fence, VK_TRUE, 1ULL * 1000 * 1000 * 1000));
+				VK(appState.Device.vkResetFences(appState.Device.device, 1, &perImage.fence));
+				perImage.submitted = false;
+			}
+			resetCachedBuffers(appState, perImage.vertices);
+			resetCachedBuffers(appState, perImage.indices16);
+			resetCachedBuffers(appState, perImage.stagingBuffers);
+			for (ScreenPipelineResources** r = &perImage.pipelineResources; *r != nullptr; )
+			{
+				(*r)->unusedCount++;
+				if ((*r)->unusedCount >= MAX_UNUSED_COUNT)
 				{
-					auto pixel = d_8to24table[con_buffer[sourceIndex]];
-					do
-					{
-						appState.Console.Data[targetIndex] = pixel;
-						targetIndex++;
-						x++;
-					} while ((x % 3) != 0);
-					sourceIndex++;
+					ScreenPipelineResources *next = (*r)->next;
+					deletePipelineDescriptorResources(appState, (*r)->descriptorResources);
+					delete *r;
+					*r = next;
 				}
-				y++;
-				while ((y % 3) != 0)
+				else
 				{
-					memcpy(appState.Console.Data.data() + targetIndex, appState.Console.Data.data() + targetIndex - width, targetWidth);
-					targetIndex += width;
-					y++;
+					r = &(*r)->next;
 				}
 			}
-			VK(appState.Device.vkMapMemory(appState.Device.device, appState.Console.Buffer.memory, 0, appState.Console.Buffer.size, 0, &appState.Console.Buffer.mapped));
-			memcpy(appState.Console.Buffer.mapped, appState.Console.Data.data(), appState.Console.Data.size() * sizeof(uint32_t));
-			VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.Console.Buffer.memory));
-			appState.Console.Buffer.mapped = nullptr;
-			VK(appState.Device.vkBeginCommandBuffer(appState.Console.CommandBuffer, &commandBufferBeginInfo));
-			VkBufferImageCopy region { };
-			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			region.imageSubresource.layerCount = 1;
-			region.imageExtent.width = appState.Console.Width;
-			region.imageExtent.height = appState.Console.Height;
-			region.imageExtent.depth = 1;
-			VC(appState.Device.vkCmdCopyBufferToImage(appState.Console.CommandBuffer, appState.Console.Buffer.buffer, appState.Console.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
-			VK(appState.Device.vkEndCommandBuffer(appState.Console.CommandBuffer));
-			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &appState.Console.SubmitInfo, VK_NULL_HANDLE));
+			VK(appState.Device.vkResetCommandBuffer(perImage.commandBuffer, 0));
+			VK(appState.Device.vkBeginCommandBuffer(perImage.commandBuffer, &commandBufferBeginInfo));
+			VkMemoryBarrier memoryBarrier { };
+			memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+			memoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 1, &memoryBarrier, 0, nullptr, 0, nullptr));
+			appState.Console.View.framebuffer.currentBuffer = (appState.Console.View.framebuffer.currentBuffer + 1) % appState.Console.View.framebuffer.swapChainLength;
+			auto& texture = appState.Console.View.framebuffer.colorTextures[appState.Console.View.framebuffer.currentBuffer];
+			VkImageMemoryBarrier imageMemoryBarrier { };
+			imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			imageMemoryBarrier.image = texture.image;
+			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			imageMemoryBarrier.subresourceRange.levelCount = 1;
+			imageMemoryBarrier.subresourceRange.layerCount = texture.layerCount;
+			VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
+			VkClearValue clearValues[3] { };
+			VkRenderPassBeginInfo renderPassBeginInfo { };
+			renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassBeginInfo.renderPass = appState.Console.RenderPass;
+			renderPassBeginInfo.framebuffer = appState.Console.View.framebuffer.framebuffers[appState.Console.View.framebuffer.currentBuffer];
+			renderPassBeginInfo.renderArea = screenRect;
+			renderPassBeginInfo.clearValueCount = 3;
+			renderPassBeginInfo.pClearValues = clearValues;
+			VC(appState.Device.vkCmdBeginRenderPass(perImage.commandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE));
+			VkViewport viewport;
+			viewport.x = (float) screenRect.offset.x;
+			viewport.y = (float) screenRect.offset.y;
+			viewport.width = (float) screenRect.extent.width;
+			viewport.height = (float) screenRect.extent.height;
+			viewport.minDepth = 0.0f;
+			viewport.maxDepth = 1.0f;
+			VC(appState.Device.vkCmdSetViewport(perImage.commandBuffer, 0, 1, &viewport));
+			VC(appState.Device.vkCmdSetScissor(perImage.commandBuffer, 0, 1, &screenRect));
+			auto vertexSize = 20 * sizeof(float);
+			Buffer* vertices = nullptr;
+			for (Buffer** b = &perImage.vertices.oldBuffers; *b != nullptr; b = &(*b)->next)
+			{
+				if ((*b)->size >= vertexSize && (*b)->size < vertexSize * 2)
+				{
+					vertices = *b;
+					*b = (*b)->next;
+					break;
+				}
+			}
+			if (vertices == nullptr)
+			{
+				createVertexBuffer(appState, vertexSize, vertices);
+			}
+			moveBufferToFront(vertices, perImage.vertices);
+			VK(appState.Device.vkMapMemory(appState.Device.device, vertices->memory, 0, vertexSize, 0, &vertices->mapped));
+			auto mapped = (float*)vertices->mapped;
+			(*mapped) = -1;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = 0;
+			mapped++;
+			(*mapped) = 0;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = 0;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = -1;
+			mapped++;
+			(*mapped) = 0;
+			mapped++;
+			(*mapped) = 1;
+			mapped++;
+			(*mapped) = 0;
+			mapped++;
+			(*mapped) = -1;
+			mapped++;
+			(*mapped) = -1;
+			mapped++;
+			(*mapped) = 0;
+			mapped++;
+			(*mapped) = 0;
+			mapped++;
+			(*mapped) = 0;
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, vertices->memory));
+			vertices->mapped = nullptr;
+			VkBufferMemoryBarrier bufferMemoryBarrier { };
+			bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			bufferMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			bufferMemoryBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+			bufferMemoryBarrier.buffer = vertices->buffer;
+			bufferMemoryBarrier.size = vertices->size;
+			VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+			Buffer* indices16 = nullptr;
+			auto indexSize = 6 * sizeof(uint16_t);
+			for (Buffer** b = &perImage.indices16.oldBuffers; *b != nullptr; b = &(*b)->next)
+			{
+				if ((*b)->size >= indexSize && (*b)->size < indexSize * 2)
+				{
+					indices16 = *b;
+					*b = (*b)->next;
+					break;
+				}
+			}
+			if (indices16 == nullptr)
+			{
+				createIndexBuffer(appState, indexSize, indices16);
+			}
+			moveBufferToFront(indices16, perImage.indices16);
+			VK(appState.Device.vkMapMemory(appState.Device.device, indices16->memory, 0, indexSize, 0, &indices16->mapped));
+			auto mapped16 = (uint16_t*)indices16->mapped;
+			(*mapped16) = 0;
+			mapped16++;
+			(*mapped16) = 1;
+			mapped16++;
+			(*mapped16) = 2;
+			mapped16++;
+			(*mapped16) = 2;
+			mapped16++;
+			(*mapped16) = 3;
+			mapped16++;
+			(*mapped16) = 0;
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, indices16->memory));
+			indices16->mapped = nullptr;
+			bufferMemoryBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			bufferMemoryBarrier.dstAccessMask = VK_ACCESS_INDEX_READ_BIT;
+			bufferMemoryBarrier.buffer = indices16->buffer;
+			bufferMemoryBarrier.size = indices16->size;
+			VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
+			VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 0, 1, &vertices->buffer, &noOffset));
+			VC(appState.Device.vkCmdBindVertexBuffers(perImage.commandBuffer, 1, 1, &vertices->buffer, &noOffset));
+			VC(appState.Device.vkCmdBindPipeline(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.console.pipeline));
+			auto resources = new ScreenPipelineResources();
+			memset(resources, 0, sizeof(ScreenPipelineResources));
+			VkDescriptorPoolSize poolSize;
+			poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			poolSize.descriptorCount = 2;
+			VkDescriptorPoolCreateInfo descriptorPoolCreateInfo { };
+			descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+			descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+			descriptorPoolCreateInfo.maxSets = 1;
+			descriptorPoolCreateInfo.poolSizeCount = 1;
+			descriptorPoolCreateInfo.pPoolSizes = &poolSize;
+			VK(appState.Device.vkCreateDescriptorPool(appState.Device.device, &descriptorPoolCreateInfo, nullptr, &resources->descriptorResources.descriptorPool));
+			VkDescriptorSetAllocateInfo descriptorSetAllocateInfo { };
+			descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+			descriptorSetAllocateInfo.descriptorPool = resources->descriptorResources.descriptorPool;
+			descriptorSetAllocateInfo.descriptorSetCount = 1;
+			descriptorSetAllocateInfo.pSetLayouts = &appState.Scene.console.descriptorSetLayout;
+			VK(appState.Device.vkAllocateDescriptorSets(appState.Device.device, &descriptorSetAllocateInfo, &resources->descriptorResources.descriptorSet));
+			resources->descriptorResources.created = true;
+			resources->next = perImage.pipelineResources;
+			perImage.pipelineResources = resources;
+			auto stagingBufferSize = 0;
+			perImage.paletteOffset = -1;
+			if (perImage.palette == nullptr || perImage.paletteChanged != pal_changed)
+			{
+				if (perImage.palette == nullptr)
+				{
+					createTexture(appState, perImage.commandBuffer, 256, 1, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.palette);
+					perImage.paletteOffset = stagingBufferSize;
+					stagingBufferSize += 1024;
+				}
+				else if (perImage.paletteChanged != pal_changed)
+				{
+					perImage.paletteOffset = stagingBufferSize;
+					stagingBufferSize += 1024;
+				}
+				perImage.paletteChanged = pal_changed;
+			}
+			if (perImage.texture == nullptr)
+			{
+				createTexture(appState, perImage.commandBuffer, con_width, con_height, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.texture);
+			}
+			perImage.textureOffset = stagingBufferSize;
+			stagingBufferSize += con_buffer.size();
+			Buffer* stagingBuffer = nullptr;
+			for (Buffer** b = &perImage.stagingBuffers.oldBuffers; *b != nullptr; b = &(*b)->next)
+			{
+				if ((*b)->size >= stagingBufferSize && (*b)->size < stagingBufferSize * 2)
+				{
+					stagingBuffer = *b;
+					*b = (*b)->next;
+					break;
+				}
+			}
+			if (stagingBuffer == nullptr)
+			{
+				createStagingBuffer(appState, stagingBufferSize, stagingBuffer);
+			}
+			moveBufferToFront(stagingBuffer, perImage.stagingBuffers);
+			VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, stagingBufferSize, 0, &stagingBuffer->mapped));
+			auto offset = 0;
+			if (perImage.paletteOffset >= 0)
+			{
+				memcpy(stagingBuffer->mapped, d_8to24table, 1024);
+				offset += 1024;
+			}
+			if (perImage.textureOffset >= 0)
+			{
+				memcpy(((unsigned char*)stagingBuffer->mapped) + offset, con_buffer.data(), con_buffer.size());
+			}
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, stagingBuffer->memory));
+			VkMappedMemoryRange mappedMemoryRange { };
+			mappedMemoryRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+			mappedMemoryRange.memory = stagingBuffer->memory;
+			VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
+			if (perImage.paletteOffset >= 0)
+			{
+				fillTexture(appState, perImage.palette, stagingBuffer, perImage.paletteOffset, perImage.commandBuffer);
+			}
+			if (perImage.textureOffset >= 0)
+			{
+				fillTexture(appState, perImage.texture, stagingBuffer, perImage.textureOffset, perImage.commandBuffer);
+			}
+			VkDescriptorImageInfo textureInfo[2] { };
+			textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			textureInfo[0].sampler = perImage.texture->sampler;
+			textureInfo[0].imageView = perImage.texture->view;
+			textureInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			textureInfo[1].sampler = perImage.palette->sampler;
+			textureInfo[1].imageView = perImage.palette->view;
+			VkWriteDescriptorSet writes[2] { };
+			writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[0].dstSet = resources->descriptorResources.descriptorSet;
+			writes[0].descriptorCount = 1;
+			writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[0].pImageInfo = textureInfo;
+			writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[1].dstBinding = 1;
+			writes[1].dstSet = resources->descriptorResources.descriptorSet;
+			writes[1].descriptorCount = 1;
+			writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			writes[1].pImageInfo = textureInfo + 1;
+			VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
+			VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices16->buffer, noOffset, VK_INDEX_TYPE_UINT16));
+			VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.console.pipelineLayout, 0, 1, &resources->descriptorResources.descriptorSet, 0, nullptr));
+			VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, 6, 1, 0, 0, 0));
+			VC(appState.Device.vkCmdEndRenderPass(perImage.commandBuffer));
+			auto& colorTexture = appState.Console.View.framebuffer.colorTextures[appState.Console.View.index];
+			VkImageMemoryBarrier colorImageMemoryBarrier { };
+			colorImageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			colorImageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			colorImageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			colorImageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			colorImageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			colorImageMemoryBarrier.image = colorTexture.image;
+			colorImageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			colorImageMemoryBarrier.subresourceRange.levelCount = 1;
+			colorImageMemoryBarrier.subresourceRange.layerCount = colorTexture.layerCount;
+			VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &colorImageMemoryBarrier));
+			VK(appState.Device.vkEndCommandBuffer(perImage.commandBuffer));
+			VkSubmitInfo submitInfo { };
+			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+			submitInfo.commandBufferCount = 1;
+			submitInfo.pCommandBuffers = &perImage.commandBuffer;
+			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &submitInfo, perImage.fence));
+			perImage.submitted = true;
 		}
 		ovrLayerProjection2 worldLayer = vrapi_DefaultLayerProjection2();
 		worldLayer.HeadPose = tracking.HeadPose;
@@ -5005,7 +5587,7 @@ void android_main(struct android_app *app)
 				ovrMatrix4f modelViewMatrix = ovrMatrix4f_Multiply(&tracking.Eye[i].ViewMatrix, &cylinderTransform);
 				console.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_Inverse(&modelViewMatrix);
 				console.Textures[i].ColorSwapChain = appState.Console.SwapChain;
-				console.Textures[i].SwapChainIndex = 0;
+				console.Textures[i].SwapChainIndex = appState.Console.View.index;
 				const float texScaleX = circScale;
 				const float texBiasX = circBias;
 				const float texScaleY = 0.5;
@@ -5135,16 +5717,64 @@ void android_main(struct android_app *app)
 	}
 	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.Screen.CommandBuffer));
 	vrapi_DestroyTextureSwapChain(appState.Screen.SwapChain);
+	for (auto i = 0; i < appState.Console.View.framebuffer.swapChainLength; i++)
+	{
+		if (appState.Console.View.framebuffer.framebuffers.size() > 0)
+		{
+			VC(appState.Device.vkDestroyFramebuffer(appState.Device.device, appState.Console.View.framebuffer.framebuffers[i], nullptr));
+		}
+		if (appState.Console.View.framebuffer.colorTextures.size() > 0)
+		{
+			deleteTexture(appState, &appState.Console.View.framebuffer.colorTextures[i]);
+		}
+	}
+	if (appState.Console.View.framebuffer.depthImage != VK_NULL_HANDLE)
+	{
+		VC(appState.Device.vkDestroyImageView(appState.Device.device, appState.Console.View.framebuffer.depthImageView, nullptr));
+		VC(appState.Device.vkDestroyImage(appState.Device.device, appState.Console.View.framebuffer.depthImage, nullptr));
+		VC(appState.Device.vkFreeMemory(appState.Device.device, appState.Console.View.framebuffer.depthMemory, nullptr));
+	}
+	if (appState.Console.View.framebuffer.renderTexture.image != VK_NULL_HANDLE)
+	{
+		deleteTexture(appState, &appState.Console.View.framebuffer.renderTexture);
+	}
+	vrapi_DestroyTextureSwapChain(appState.Console.View.framebuffer.colorTextureSwapChain);
+	for (auto& perImage : appState.Console.View.perImage)
+	{
+		VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &perImage.commandBuffer));
+		VC(appState.Device.vkDestroyFence(appState.Device.device, perImage.fence, nullptr));
+		for (ScreenPipelineResources *pipelineResources = perImage.pipelineResources, *next = nullptr; pipelineResources != nullptr; pipelineResources = next)
+		{
+			next = pipelineResources->next;
+			deletePipelineDescriptorResources(appState, pipelineResources->descriptorResources);
+			delete pipelineResources;
+		}
+		if (perImage.texture != nullptr)
+		{
+			deleteTexture(appState, perImage.texture);
+		}
+		if (perImage.palette != nullptr)
+		{
+			deleteTexture(appState, perImage.palette);
+		}
+		deleteCachedBuffers(appState, perImage.stagingBuffers);
+		deleteCachedBuffers(appState, perImage.indices16);
+		deleteCachedBuffers(appState, perImage.vertices);
+	}
+	VC(appState.Device.vkDestroyRenderPass(appState.Device.device, appState.Console.RenderPass, nullptr));
 	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.Console.CommandBuffer));
 	vrapi_DestroyTextureSwapChain(appState.Console.SwapChain);
 	VC(appState.Device.vkDestroyRenderPass(appState.Device.device, appState.RenderPass, nullptr));
 	VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+	deletePipeline(appState, appState.Scene.console);
 	deletePipeline(appState, appState.Scene.sky);
 	deletePipeline(appState, appState.Scene.colored);
 	deletePipeline(appState, appState.Scene.colormapped);
 	deletePipeline(appState, appState.Scene.turbulent);
 	deletePipeline(appState, appState.Scene.sprites);
 	deletePipeline(appState, appState.Scene.textured);
+	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.consoleFragment, nullptr));
+	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.consoleVertex, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.skyFragment, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.skyVertex, nullptr));
 	VC(appState.Device.vkDestroyShaderModule(appState.Device.device, appState.Scene.coloredFragment, nullptr));

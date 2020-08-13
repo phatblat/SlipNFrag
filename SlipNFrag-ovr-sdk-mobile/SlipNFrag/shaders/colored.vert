@@ -19,5 +19,5 @@ out gl_PerVertex
 
 void main(void)
 {
-	gl_Position = ProjectionMatrix * (ViewMatrix * (vertexTransform * vec4(vertexPosition, 1.0)));
+	gl_Position = ProjectionMatrix * (ViewMatrix * (vertexTransform * vec4(vertexPosition, 1)));
 }
