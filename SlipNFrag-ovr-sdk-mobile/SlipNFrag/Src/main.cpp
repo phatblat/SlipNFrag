@@ -403,18 +403,22 @@ struct ScreenView
 	std::vector<ScreenPerImage> perImage;
 };
 
+struct Console
+{
+	ovrTextureSwapChain* SwapChain;
+	VkCommandBuffer CommandBuffer;
+	VkRenderPass RenderPass;
+	ScreenView View;
+};
+
 struct Screen
 {
 	ovrTextureSwapChain* SwapChain;
-	int Width;
-	int Height;
 	std::vector<uint32_t> Data;
 	VkImage Image;
 	Buffer Buffer;
 	VkCommandBuffer CommandBuffer;
 	VkSubmitInfo SubmitInfo;
-	VkRenderPass RenderPass;
-	ScreenView View;
 };
 
 struct AppState
@@ -447,8 +451,12 @@ struct AppState
 	float Yaw;
 	float Pitch;
 	float Roll;
-	Screen Console;
+	int ScreenWidth;
+	int ScreenHeight;
+	int ConsoleWidth;
+	int ConsoleHeight;
 	Screen Screen;
+	Console Console;
 	std::vector<float> ScreenVertices;
 	std::vector<uint16_t> ScreenIndices;
 	double PreviousTime;
@@ -2931,9 +2939,11 @@ void android_main(struct android_app *app)
 			frameDesc.LayerCount = 2;
 			frameDesc.Layers = layers;
 			vrapi_SubmitFrame2(appState.Ovr, &frameDesc);
-			appState.Console.Width = 960;
-			appState.Console.Height = 600;
-			appState.Console.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Console.Width, appState.Console.Height, 1, 3);
+			appState.ScreenWidth = 960;
+			appState.ScreenHeight = 600;
+			appState.ConsoleWidth = 320;
+			appState.ConsoleHeight = 200;
+			appState.Console.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.ScreenWidth, appState.ScreenHeight, 1, 3);
 			appState.Console.View.colorSwapChain.SwapChain = appState.Console.SwapChain;
 			appState.Console.View.colorSwapChain.SwapChainLength = vrapi_GetTextureSwapChainLength(appState.Console.View.colorSwapChain.SwapChain);
 			appState.Console.View.colorSwapChain.ColorTextures.resize(appState.Console.View.colorSwapChain.SwapChainLength);
@@ -2997,14 +3007,14 @@ void android_main(struct android_app *app)
 			appState.Console.View.framebuffer.swapChainLength = appState.Console.View.colorSwapChain.SwapChainLength;
 			appState.Console.View.framebuffer.colorTextures.resize(appState.Console.View.framebuffer.swapChainLength);
 			appState.Console.View.framebuffer.framebuffers.resize(appState.Console.View.framebuffer.swapChainLength);
-			appState.Console.View.framebuffer.width = appState.Console.Width;
-			appState.Console.View.framebuffer.height = appState.Console.Height;
+			appState.Console.View.framebuffer.width = appState.ScreenWidth;
+			appState.Console.View.framebuffer.height = appState.ScreenHeight;
 			appState.Console.View.framebuffer.currentBuffer = 0;
 			for (auto i = 0; i < appState.Console.View.framebuffer.swapChainLength; i++)
 			{
 				auto& texture = appState.Console.View.framebuffer.colorTextures[i];
-				texture.width = appState.Console.Width;
-				texture.height = appState.Console.Height;
+				texture.width = appState.ScreenWidth;
+				texture.height = appState.ScreenHeight;
 				texture.layerCount = 1;
 				texture.image = appState.Console.View.colorSwapChain.ColorTextures[i];
 				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
@@ -3177,10 +3187,8 @@ void android_main(struct android_app *app)
 				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &perImage.commandBuffer));
 				VK(appState.Device.vkCreateFence(appState.Device.device, &fenceCreateInfo, nullptr, &perImage.fence));
 			}
-			appState.Screen.Width = appState.Console.Width;
-			appState.Screen.Height = appState.Console.Height;
-			appState.Screen.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.Screen.Width, appState.Screen.Height, 1, 3);
-			appState.Screen.Data.resize(appState.Screen.Width * appState.Screen.Height, 255 << 24);
+			appState.Screen.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.ScreenWidth, appState.ScreenHeight, 1, 3);
+			appState.Screen.Data.resize(appState.ScreenWidth * appState.ScreenHeight, 255 << 24);
 			appState.Screen.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.Screen.SwapChain, 0);
 			auto playImageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
 			auto playImageFileLength = AAsset_getLength(playImageFile);
@@ -3190,7 +3198,7 @@ void android_main(struct android_app *app)
 			int playImageHeight;
 			int playImageComponents;
 			auto playImage = stbi_load_from_memory(playImageSource.data(), playImageFileLength, &playImageWidth, &playImageHeight, &playImageComponents, 4);
-			auto texIndex = ((appState.Screen.Height - playImageHeight) * appState.Screen.Width + appState.Screen.Width - playImageWidth) / 2;
+			auto texIndex = ((appState.ScreenHeight - playImageHeight) * appState.ScreenWidth + appState.ScreenWidth - playImageWidth) / 2;
 			auto playIndex = 0;
 			for (auto y = 0; y < playImageHeight; y++)
 			{
@@ -3211,30 +3219,30 @@ void android_main(struct android_app *app)
 					appState.Screen.Data[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
 					texIndex++;
 				}
-				texIndex += appState.Screen.Width - playImageWidth;
+				texIndex += appState.ScreenWidth - playImageWidth;
 			}
 			stbi_image_free(playImage);
 			for (auto b = 0; b < 5; b++)
 			{
 				auto i = (unsigned char)(192.0 * sin(M_PI / (double)(b - 1)));
 				auto color = ((uint32_t)255 << 24) | ((uint32_t)i << 16) | ((uint32_t)i << 8) | i;
-				auto texTopIndex = b * appState.Screen.Width + b;
-				auto texBottomIndex = (appState.Screen.Height - 1 - b) * appState.Screen.Width + b;
-				for (auto x = 0; x < appState.Screen.Width - b - b; x++)
+				auto texTopIndex = b * appState.ScreenWidth + b;
+				auto texBottomIndex = (appState.ScreenHeight - 1 - b) * appState.ScreenWidth + b;
+				for (auto x = 0; x < appState.ScreenWidth - b - b; x++)
 				{
 					appState.Screen.Data[texTopIndex] = color;
 					texTopIndex++;
 					appState.Screen.Data[texBottomIndex] = color;
 					texBottomIndex++;
 				}
-				auto texLeftIndex = (b + 1) * appState.Screen.Width + b;
-				auto texRightIndex = (b + 1) * appState.Screen.Width + appState.Screen.Width - 1 - b;
-				for (auto y = 0; y < appState.Screen.Height - b - 1 - b - 1; y++)
+				auto texLeftIndex = (b + 1) * appState.ScreenWidth + b;
+				auto texRightIndex = (b + 1) * appState.ScreenWidth + appState.ScreenWidth - 1 - b;
+				for (auto y = 0; y < appState.ScreenHeight - b - 1 - b - 1; y++)
 				{
 					appState.Screen.Data[texLeftIndex] = color;
-					texLeftIndex += appState.Screen.Width;
+					texLeftIndex += appState.ScreenWidth;
 					appState.Screen.Data[texRightIndex] = color;
-					texRightIndex += appState.Screen.Width;
+					texRightIndex += appState.ScreenWidth;
 				}
 			}
 			appState.Screen.Buffer.size = appState.Screen.Data.size() * sizeof(uint32_t);
@@ -3262,8 +3270,8 @@ void android_main(struct android_app *app)
 			VkBufferImageCopy region { };
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			region.imageSubresource.layerCount = 1;
-			region.imageExtent.width = appState.Screen.Width;
-			region.imageExtent.height = appState.Screen.Height;
+			region.imageExtent.width = appState.ScreenWidth;
+			region.imageExtent.height = appState.ScreenHeight;
 			region.imageExtent.depth = 1;
 			VC(appState.Device.vkCmdCopyBufferToImage(setupCommandBuffer, appState.Screen.Buffer.buffer, appState.Screen.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
@@ -3768,10 +3776,10 @@ void android_main(struct android_app *app)
 				Cvar_SetValue("joyadvaxisz", AxisTurn);
 				Cvar_SetValue("joyadvaxisr", AxisLook);
 				Joy_AdvancedUpdate_f();
-				vid_width = appState.Screen.Width;
-				vid_height = appState.Screen.Height;
-				con_width = appState.Console.Width / 3;
-				con_height = appState.Console.Height / 3;
+				vid_width = appState.ScreenWidth;
+				vid_height = appState.ScreenHeight;
+				con_width = appState.ConsoleWidth;
+				con_height = appState.ConsoleHeight;
 				Cvar_SetValue("fov", appState.DefaultFOV);
 				VID_Resize(320.0 / 240.0);
 			}
@@ -3786,10 +3794,10 @@ void android_main(struct android_app *app)
 				Cvar_SetValue("joyadvaxisz", AxisNada);
 				Cvar_SetValue("joyadvaxisr", AxisNada);
 				Joy_AdvancedUpdate_f();
-				vid_width = appState.Screen.Width;
-				vid_height = appState.Screen.Width;
-				con_width = appState.Console.Width / 3;
-				con_height = appState.Console.Height / 3;
+				vid_width = appState.ScreenWidth;
+				vid_height = appState.ScreenWidth; // to force a square screen for VR, and to get better results for FOV angle calculations
+				con_width = appState.ConsoleWidth;
+				con_height = appState.ConsoleHeight;
 				Cvar_SetValue("fov", appState.FOV);
 				VID_Resize(1);
 			}
@@ -5245,8 +5253,8 @@ void android_main(struct android_app *app)
 			VkBufferImageCopy region { };
 			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 			region.imageSubresource.layerCount = 1;
-			region.imageExtent.width = appState.Screen.Width;
-			region.imageExtent.height = appState.Screen.Height;
+			region.imageExtent.width = appState.ScreenWidth;
+			region.imageExtent.height = appState.ScreenHeight;
 			region.imageExtent.depth = 1;
 			VC(appState.Device.vkCmdCopyBufferToImage(appState.Screen.CommandBuffer, appState.Screen.Buffer.buffer, appState.Screen.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 			VK(appState.Device.vkEndCommandBuffer(appState.Screen.CommandBuffer));
@@ -5405,7 +5413,7 @@ void android_main(struct android_app *app)
 			}
 			if (perImage.texture == nullptr)
 			{
-				createTexture(appState, perImage.commandBuffer, con_width, con_height, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.texture);
+				createTexture(appState, perImage.commandBuffer, appState.ConsoleWidth, appState.ConsoleHeight, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.texture);
 			}
 			perImage.textureOffset = stagingBufferSize;
 			stagingBufferSize += con_buffer.size();
@@ -5518,14 +5526,14 @@ void android_main(struct android_app *app)
 			float rotatePitch = appState.Pitch;
 			const float radius = 1;
 			const ovrVector3f translation = { tracking.HeadPose.Pose.Position.x, tracking.HeadPose.Pose.Position.y, tracking.HeadPose.Pose.Position.z };
-			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.Console.Height * VRAPI_PI / density, radius);
+			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.ScreenHeight * VRAPI_PI / density, radius);
 			const ovrMatrix4f transMatrix = ovrMatrix4f_CreateTranslation(translation.x, translation.y, translation.z);
 			const ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0, 0);
 			const ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0, rotateYaw, 0);
 			const ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
 			const ovrMatrix4f m1 = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
 			ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&transMatrix, &m1);
-			float circScale = density * 0.5 / appState.Console.Width;
+			float circScale = density * 0.5 / appState.ScreenWidth;
 			float circBias = -circScale * (0.5 * (1 - 1 / circScale));
 			for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
 			{
@@ -5560,12 +5568,12 @@ void android_main(struct android_app *app)
 			const float rotateYaw = 0;
 			float rotatePitch = 0;
 			const float radius = 1;
-			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.Screen.Height * VRAPI_PI / density, radius);
+			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.ScreenHeight * VRAPI_PI / density, radius);
 			const ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
 			const ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
 			const ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
 			const ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
-			float circScale = density * 0.5f / appState.Screen.Width;
+			float circScale = density * 0.5f / appState.ScreenWidth;
 			float circBias = -circScale * (0.5f * (1.0f - 1.0f / circScale));
 			for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
 			{
