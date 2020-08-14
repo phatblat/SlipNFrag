@@ -140,6 +140,11 @@ void M_DrawPic (int x, int y, qpic_t *pic)
 	Draw_PicOnConsole (x + ((vid.conwidth - 320)>>1), y, pic);
 }
 
+void M_DrawPicOnAltConsole (int x, int y, qpic_t *pic)
+{
+	Draw_PicOnAltConsole (x + ((vid.width - 320)>>1), y, pic);
+}
+
 byte identityTable[256];
 byte translationTable[256];
 

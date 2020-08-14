@@ -315,6 +315,106 @@ void Draw_CharacterOnScreen (int x, int y, int num)
 }
 
 /*
+ ================
+ Draw_CharacterOnAltConsole
+
+ Draws one 8*8 graphics character on the alternative console, with 0 being transparent.
+ It can be clipped to the top of the screen to allow the console to be
+ smoothly scrolled off.
+ ================
+ */
+void Draw_CharacterOnAltConsole (int x, int y, int num)
+{
+	byte            *dest;
+	byte            *source;
+	unsigned short    *pusdest;
+	int                drawline;
+	int                row, col;
+
+	num &= 255;
+
+	if (y <= -8)
+		return;            // totally off screen
+
+#ifdef PARANOID
+	if (y > vid.height - 8 || x < 0 || x > vid.width - 8)
+        Sys_Error ("Con_DrawCharacterOnScreen: (%i, %i)", x, y);
+    if (num < 0 || num > 255)
+        Sys_Error ("Con_DrawCharacterOnScreen: char %i", num);
+#endif
+
+	row = num>>4;
+	col = num&15;
+	source = draw_chars + (row<<10) + (col<<3);
+
+	if (y < 0)
+	{    // clipped
+		drawline = 8 + y;
+		source -= 128*y;
+		y = 0;
+	}
+	else
+		drawline = 8;
+
+
+	if (r_pixbytes == 1)
+	{
+		dest = vid.altconbuffer + y*vid.rowbytes + x;
+
+		while (drawline--)
+		{
+			if (source[0])
+				dest[0] = source[0];
+			if (source[1])
+				dest[1] = source[1];
+			if (source[2])
+				dest[2] = source[2];
+			if (source[3])
+				dest[3] = source[3];
+			if (source[4])
+				dest[4] = source[4];
+			if (source[5])
+				dest[5] = source[5];
+			if (source[6])
+				dest[6] = source[6];
+			if (source[7])
+				dest[7] = source[7];
+			source += 128;
+			dest += vid.rowbytes;
+		}
+	}
+	else
+	{
+		// FIXME: pre-expand to native format?
+		pusdest = (unsigned short *)
+				((byte *)vid.altconbuffer + y*vid.rowbytes + (x<<1));
+
+		while (drawline--)
+		{
+			if (source[0])
+				pusdest[0] = d_8to16table[source[0]];
+			if (source[1])
+				pusdest[1] = d_8to16table[source[1]];
+			if (source[2])
+				pusdest[2] = d_8to16table[source[2]];
+			if (source[3])
+				pusdest[3] = d_8to16table[source[3]];
+			if (source[4])
+				pusdest[4] = d_8to16table[source[4]];
+			if (source[5])
+				pusdest[5] = d_8to16table[source[5]];
+			if (source[6])
+				pusdest[6] = d_8to16table[source[6]];
+			if (source[7])
+				pusdest[7] = d_8to16table[source[7]];
+
+			source += 128;
+			pusdest += (vid.rowbytes >> 1);
+		}
+	}
+}
+
+/*
 ================
 Draw_String
 ================
@@ -342,6 +442,21 @@ void Draw_StringOnScreen (int x, int y, const char *str)
         str++;
         x += 8;
     }
+}
+
+/*
+ ================
+ Draw_StringOnAltConsole
+ ================
+ */
+void Draw_StringOnAltConsole (int x, int y, const char *str)
+{
+	while (*str)
+	{
+		Draw_CharacterOnAltConsole (x, y, *str);
+		str++;
+		x += 8;
+	}
 }
 
 /*
@@ -486,6 +601,57 @@ void Draw_PicOnConsole (int x, int y, qpic_t *pic)
             source += pic->width;
         }
     }
+}
+
+
+/*
+=============
+Draw_Pic
+=============
+*/
+void Draw_PicOnAltConsole (int x, int y, qpic_t *pic)
+{
+	byte			*dest, *source;
+	unsigned short	*pusdest;
+	int				v, u;
+
+	if ((x < 0) ||
+		(x + pic->width > vid.width) ||
+		(y < 0) ||
+		(y + pic->height > vid.height))
+	{
+		return;
+	}
+
+	source = pic->data;
+
+	if (r_pixbytes == 1)
+	{
+		dest = vid.altconbuffer + y * vid.rowbytes + x;
+
+		for (v=0 ; v<pic->height ; v++)
+		{
+			Q_memcpy (dest, source, pic->width);
+			dest += vid.rowbytes;
+			source += pic->width;
+		}
+	}
+	else
+	{
+		// FIXME: pretranslate at load time?
+		pusdest = (unsigned short *)vid.altconbuffer + y * (vid.rowbytes >> 1) + x;
+
+		for (v=0 ; v<pic->height ; v++)
+		{
+			for (u=0 ; u<pic->width ; u++)
+			{
+				pusdest[u] = d_8to16table[source[u]];
+			}
+
+			pusdest += vid.rowbytes >> 1;
+			source += pic->width;
+		}
+	}
 }
 
 
@@ -665,6 +831,93 @@ void Draw_TransPicOnConsole (int x, int y, qpic_t *pic)
 
 /*
 =============
+Draw_TransPicOnAltConsole
+=============
+*/
+void Draw_TransPicOnAltConsole (int x, int y, qpic_t *pic)
+{
+	byte	*dest, *source, tbyte;
+	unsigned short	*pusdest;
+	int				v, u;
+
+	if (x < 0 || (unsigned)(x + pic->width) > vid.width || y < 0 ||
+		(unsigned)(y + pic->height) > vid.height)
+	{
+		Sys_Error ("Draw_TransPic: bad coordinates");
+	}
+
+	source = pic->data;
+
+	if (r_pixbytes == 1)
+	{
+		dest = vid.altconbuffer + y * vid.rowbytes + x;
+
+		if (pic->width & 7)
+		{	// general
+			for (v=0 ; v<pic->height ; v++)
+			{
+				for (u=0 ; u<pic->width ; u++)
+					if ( (tbyte=source[u]) != TRANSPARENT_COLOR)
+						dest[u] = tbyte;
+
+				dest += vid.rowbytes;
+				source += pic->width;
+			}
+		}
+		else
+		{	// unwound
+			for (v=0 ; v<pic->height ; v++)
+			{
+				for (u=0 ; u<pic->width ; u+=8)
+				{
+					if ( (tbyte=source[u]) != TRANSPARENT_COLOR)
+						dest[u] = tbyte;
+					if ( (tbyte=source[u+1]) != TRANSPARENT_COLOR)
+						dest[u+1] = tbyte;
+					if ( (tbyte=source[u+2]) != TRANSPARENT_COLOR)
+						dest[u+2] = tbyte;
+					if ( (tbyte=source[u+3]) != TRANSPARENT_COLOR)
+						dest[u+3] = tbyte;
+					if ( (tbyte=source[u+4]) != TRANSPARENT_COLOR)
+						dest[u+4] = tbyte;
+					if ( (tbyte=source[u+5]) != TRANSPARENT_COLOR)
+						dest[u+5] = tbyte;
+					if ( (tbyte=source[u+6]) != TRANSPARENT_COLOR)
+						dest[u+6] = tbyte;
+					if ( (tbyte=source[u+7]) != TRANSPARENT_COLOR)
+						dest[u+7] = tbyte;
+				}
+				dest += vid.rowbytes;
+				source += pic->width;
+			}
+		}
+	}
+	else
+	{
+		// FIXME: pretranslate at load time?
+		pusdest = (unsigned short *)vid.altconbuffer + y * (vid.rowbytes >> 1) + x;
+
+		for (v=0 ; v<pic->height ; v++)
+		{
+			for (u=0 ; u<pic->width ; u++)
+			{
+				tbyte = source[u];
+
+				if (tbyte != TRANSPARENT_COLOR)
+				{
+					pusdest[u] = d_8to16table[tbyte];
+				}
+			}
+
+			pusdest += vid.rowbytes >> 1;
+			source += pic->width;
+		}
+	}
+}
+
+
+/*
+=============
 Draw_TransPicTranslate
 =============
 */
@@ -834,6 +1087,93 @@ void Draw_TransPicTranslateOnConsole (int x, int y, qpic_t *pic, byte *translati
             source += pic->width;
         }
     }
+}
+
+
+/*
+=============
+Draw_TransPicTranslateOnAltConsole
+=============
+*/
+void Draw_TransPicTranslateOnAltConsole (int x, int y, qpic_t *pic, byte *translation)
+{
+	byte	*dest, *source, tbyte;
+	unsigned short	*pusdest;
+	int				v, u;
+
+	if (x < 0 || (unsigned)(x + pic->width) > vid.width || y < 0 ||
+		(unsigned)(y + pic->height) > vid.height)
+	{
+		Sys_Error ("Draw_TransPicTranslate: bad coordinates");
+	}
+
+	source = pic->data;
+
+	if (r_pixbytes == 1)
+	{
+		dest = vid.altconbuffer + y * vid.rowbytes + x;
+
+		if (pic->width & 7)
+		{	// general
+			for (v=0 ; v<pic->height ; v++)
+			{
+				for (u=0 ; u<pic->width ; u++)
+					if ( (tbyte=source[u]) != TRANSPARENT_COLOR)
+						dest[u] = translation[tbyte];
+
+				dest += vid.rowbytes;
+				source += pic->width;
+			}
+		}
+		else
+		{	// unwound
+			for (v=0 ; v<pic->height ; v++)
+			{
+				for (u=0 ; u<pic->width ; u+=8)
+				{
+					if ( (tbyte=source[u]) != TRANSPARENT_COLOR)
+						dest[u] = translation[tbyte];
+					if ( (tbyte=source[u+1]) != TRANSPARENT_COLOR)
+						dest[u+1] = translation[tbyte];
+					if ( (tbyte=source[u+2]) != TRANSPARENT_COLOR)
+						dest[u+2] = translation[tbyte];
+					if ( (tbyte=source[u+3]) != TRANSPARENT_COLOR)
+						dest[u+3] = translation[tbyte];
+					if ( (tbyte=source[u+4]) != TRANSPARENT_COLOR)
+						dest[u+4] = translation[tbyte];
+					if ( (tbyte=source[u+5]) != TRANSPARENT_COLOR)
+						dest[u+5] = translation[tbyte];
+					if ( (tbyte=source[u+6]) != TRANSPARENT_COLOR)
+						dest[u+6] = translation[tbyte];
+					if ( (tbyte=source[u+7]) != TRANSPARENT_COLOR)
+						dest[u+7] = translation[tbyte];
+				}
+				dest += vid.rowbytes;
+				source += pic->width;
+			}
+		}
+	}
+	else
+	{
+		// FIXME: pretranslate at load time?
+		pusdest = (unsigned short *)vid.altconbuffer + y * (vid.rowbytes >> 1) + x;
+
+		for (v=0 ; v<pic->height ; v++)
+		{
+			for (u=0 ; u<pic->width ; u++)
+			{
+				tbyte = source[u];
+
+				if (tbyte != TRANSPARENT_COLOR)
+				{
+					pusdest[u] = d_8to16table[tbyte];
+				}
+			}
+
+			pusdest += vid.rowbytes >> 1;
+			source += pic->width;
+		}
+	}
 }
 
 
@@ -1194,6 +1534,39 @@ void Draw_FillOnConsole(int x, int y, int w, int h, int c)
 		pusdest = (unsigned short*)vid.conbuffer + y * (vid.conrowbytes >> 1) + x;
 		for (v = 0; v < h; v++, pusdest += (vid.conrowbytes >> 1))
 			for (u = 0; u < w; u++)
+				pusdest[u] = uc;
+	}
+}
+
+
+/*
+=============
+Draw_FillOnAltConsole
+
+Fills a box of pixels with a single color to the alternative console
+=============
+*/
+void Draw_FillOnAltConsole (int x, int y, int w, int h, int c)
+{
+	byte			*dest;
+	unsigned short	*pusdest;
+	unsigned		uc;
+	int				u, v;
+
+	if (r_pixbytes == 1)
+	{
+		dest = vid.altconbuffer + y*vid.rowbytes + x;
+		for (v=0 ; v<h ; v++, dest += vid.rowbytes)
+			for (u=0 ; u<w ; u++)
+				dest[u] = c;
+	}
+	else
+	{
+		uc = d_8to16table[c];
+
+		pusdest = (unsigned short *)vid.altconbuffer + y * (vid.rowbytes >> 1) + x;
+		for (v=0 ; v<h ; v++, pusdest += (vid.rowbytes >> 1))
+			for (u=0 ; u<w ; u++)
 				pusdest[u] = uc;
 	}
 }

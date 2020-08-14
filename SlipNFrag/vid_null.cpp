@@ -52,7 +52,8 @@ void	VID_Init (unsigned char *palette)
 	vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
 	vid.buffer = vid.conbuffer = vid_buffer;
 	vid.rowbytes = vid.conrowbytes = BASEWIDTH;
-	
+    vid.altconbuffer = NULL;
+
 	d_pzbuffer = zbuffer;
 	D_InitCaches (surfcache, sizeof(surfcache));
 }

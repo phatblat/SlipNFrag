@@ -47,6 +47,7 @@ typedef struct
 	int				conrowbytes;
 	unsigned		conwidth;
 	unsigned		conheight;
+	pixel_t 		*altconbuffer;
 	int				maxwarpwidth;
 	int				maxwarpheight;
 	pixel_t			*direct;		// direct drawing to framebuffer, if not
