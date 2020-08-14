@@ -62,11 +62,8 @@ int         hipweapons[4] = {HIT_LASER_CANNON_BIT,HIT_MJOLNIR_BIT,4,HIT_PROXIMIT
 qpic_t      *hsb_items[2];
 
 void Sbar_MiniDeathmatchOverlay (void);
-void Sbar_MiniDeathmatchOverlayOnAltConsole (void);
 void Sbar_DeathmatchOverlay (void);
-void Sbar_DeathmatchOverlayOnAltConsole (void);
 void M_DrawPic (int x, int y, qpic_t *pic);
-void M_DrawPicOnAltConsole (int x, int y, qpic_t *pic);
 
 /*
 ===============
@@ -270,16 +267,6 @@ void Sbar_DrawPic (int x, int y, qpic_t *pic)
 
 /*
 =============
-Sbar_DrawPicOnAltConsole
-=============
-*/
-void Sbar_DrawPicOnAltConsole (int x, int y, qpic_t *pic)
-{
-		Draw_PicOnAltConsole (x /* + ((vid.width - 320)>>1)*/, y + (vid.height-SBAR_HEIGHT), pic);
-}
-
-/*
-=============
 Sbar_DrawTransPic
 =============
 */
@@ -289,16 +276,6 @@ void Sbar_DrawTransPic (int x, int y, qpic_t *pic)
 		Draw_TransPic (x /*+ ((vid.width - 320)>>1)*/, y + (vid.height-SBAR_HEIGHT), pic);
 	else
 		Draw_TransPic (x + ((vid.width - 320)>>1), y + (vid.height-SBAR_HEIGHT), pic);
-}
-
-/*
-=============
-Sbar_DrawTransPicOnAltConsole
-=============
-*/
-void Sbar_DrawTransPicOnAltConsole (int x, int y, qpic_t *pic)
-{
-		Draw_TransPicOnAltConsole (x /*+ ((vid.width - 320)>>1)*/, y + (vid.height-SBAR_HEIGHT), pic);
 }
 
 /*
@@ -318,18 +295,6 @@ void Sbar_DrawCharacter (int x, int y, int num)
 
 /*
 ================
-Sbar_DrawCharacterOnAltConsole
-
-Draws one solid graphics character in the alternative console
-================
-*/
-void Sbar_DrawCharacterOnAltConsole (int x, int y, int num)
-{
-		Draw_CharacterOnAltConsole ( x /*+ ((vid.width - 320)>>1) */ + 4 , y + vid.height-SBAR_HEIGHT, num);
-}
-
-/*
-================
 Sbar_DrawString
 ================
 */
@@ -339,16 +304,6 @@ void Sbar_DrawString (int x, int y, char *str)
 		Draw_StringOnScreen (x /*+ ((vid.width - 320)>>1)*/, y+ vid.height-SBAR_HEIGHT, str);
 	else
 		Draw_StringOnScreen (x + ((vid.width - 320)>>1), y+ vid.height-SBAR_HEIGHT, str);
-}
-
-/*
-================
-Sbar_DrawStringOnAltConsole
-================
-*/
-void Sbar_DrawStringOnAltConsole (int x, int y, char *str)
-{
-		Draw_StringOnAltConsole (x /*+ ((vid.width - 320)>>1)*/, y+ vid.height-SBAR_HEIGHT, str);
 }
 
 /*
@@ -413,38 +368,6 @@ void Sbar_DrawNum (int x, int y, int num, int digits, int color)
 			frame = *ptr -'0';
 
 		Sbar_DrawTransPic (x,y,sb_nums[color][frame]);
-		x += 24;
-		ptr++;
-	}
-}
-
-
-/*
-=============
-Sbar_DrawNumOnAltConsole
-=============
-*/
-void Sbar_DrawNumOnAltConsole (int x, int y, int num, int digits, int color)
-{
-	char			str[12];
-	char			*ptr;
-	int				l, frame;
-
-	l = Sbar_itoa (num, str);
-	ptr = str;
-	if (l > digits)
-		ptr += (l-digits);
-	if (l < digits)
-		x += (digits-l)*24;
-
-	while (*ptr)
-	{
-		if (*ptr == '-')
-			frame = STAT_MINUS;
-		else
-			frame = *ptr -'0';
-
-		Sbar_DrawTransPicOnAltConsole (x,y,sb_nums[color][frame]);
 		x += 24;
 		ptr++;
 	}
@@ -558,36 +481,6 @@ void Sbar_SoloScoreboard (void)
 
 /*
 ===============
-Sbar_SoloScoreboard
-===============
-*/
-void Sbar_SoloScoreboardOnAltConsole (void)
-{
-	char	str[80];
-	int		minutes, seconds, tens, units;
-	int		l;
-
-	sprintf (str,"Monsters:%3i /%3i", cl.stats[STAT_MONSTERS], cl.stats[STAT_TOTALMONSTERS]);
-	Sbar_DrawStringOnAltConsole (8, 4, str);
-
-	sprintf (str,"Secrets :%3i /%3i", cl.stats[STAT_SECRETS], cl.stats[STAT_TOTALSECRETS]);
-	Sbar_DrawStringOnAltConsole (8, 12, str);
-
-// time
-	minutes = cl.time / 60;
-	seconds = cl.time - 60*minutes;
-	tens = seconds / 10;
-	units = seconds - 10*tens;
-	sprintf (str,"Time :%3i:%i%i", minutes, tens, units);
-	Sbar_DrawStringOnAltConsole (184, 4, str);
-
-// draw level name
-	l = strlen (cl.levelname);
-	Sbar_DrawStringOnAltConsole (232 - l*4, 12, cl.levelname);
-}
-
-/*
-===============
 Sbar_DrawScoreboard
 ===============
 */
@@ -641,18 +534,6 @@ void Sbar_DrawScoreboard (void)
 		}
 	}
 #endif
-}
-
-/*
-===============
-Sbar_DrawScoreboard
-===============
-*/
-void Sbar_DrawScoreboardOnAltConsole (void)
-{
-	Sbar_SoloScoreboardOnAltConsole ();
-	if (cl.gametype == GAME_DEATHMATCH)
-		Sbar_DeathmatchOverlayOnAltConsole ();
 }
 
 //=============================================================================
@@ -875,224 +756,6 @@ void Sbar_DrawInventory (void)
 	}
 }
 
-/*
-===============
-Sbar_DrawInventory
-===============
-*/
-void Sbar_DrawInventoryOnAltConsole (void)
-{
-	int		i;
-	char	num[6];
-	float	time;
-	int		flashon;
-
-	if (rogue)
-	{
-		if ( cl.stats[STAT_ACTIVEWEAPON] >= RIT_LAVA_NAILGUN )
-			Sbar_DrawPicOnAltConsole (0, -24, rsb_invbar[0]);
-		else
-			Sbar_DrawPicOnAltConsole (0, -24, rsb_invbar[1]);
-	}
-	else
-	{
-		Sbar_DrawPicOnAltConsole (0, -24, sb_ibar);
-	}
-
-// weapons
-	for (i=0 ; i<7 ; i++)
-	{
-		if (cl.items & (IT_SHOTGUN<<i) )
-		{
-			time = cl.item_gettime[i];
-			flashon = (int)((cl.time - time)*10);
-			if (flashon >= 10)
-			{
-				if ( cl.stats[STAT_ACTIVEWEAPON] == (IT_SHOTGUN<<i)  )
-					flashon = 1;
-				else
-					flashon = 0;
-			}
-			else
-				flashon = (flashon%5) + 2;
-
-			Sbar_DrawPicOnAltConsole (i*24, -16, sb_weapons[flashon][i]);
-
-			if (flashon > 1)
-				sb_updates = 0;		// force update to remove flash
-		}
-	}
-
-// MED 01/04/97
-// hipnotic weapons
-	if (hipnotic)
-	{
-		int grenadeflashing=0;
-		for (i=0 ; i<4 ; i++)
-		{
-			if (cl.items & (1<<hipweapons[i]) )
-			{
-				time = cl.item_gettime[hipweapons[i]];
-				flashon = (int)((cl.time - time)*10);
-				if (flashon >= 10)
-				{
-					if ( cl.stats[STAT_ACTIVEWEAPON] == (1<<hipweapons[i])  )
-						flashon = 1;
-					else
-						flashon = 0;
-				}
-				else
-					flashon = (flashon%5) + 2;
-
-				// check grenade launcher
-				if (i==2)
-				{
-					if (cl.items & HIT_PROXIMITY_GUN)
-					{
-						if (flashon)
-						{
-							grenadeflashing = 1;
-							Sbar_DrawPicOnAltConsole (96, -16, hsb_weapons[flashon][2]);
-						}
-					}
-				}
-				else if (i==3)
-				{
-					if (cl.items & (IT_SHOTGUN<<4))
-					{
-						if (flashon && !grenadeflashing)
-						{
-							Sbar_DrawPicOnAltConsole (96, -16, hsb_weapons[flashon][3]);
-						}
-						else if (!grenadeflashing)
-						{
-							Sbar_DrawPicOnAltConsole (96, -16, hsb_weapons[0][3]);
-						}
-					}
-					else
-						Sbar_DrawPicOnAltConsole (96, -16, hsb_weapons[flashon][4]);
-				}
-				else
-					Sbar_DrawPicOnAltConsole (176 + (i*24), -16, hsb_weapons[flashon][i]);
-				if (flashon > 1)
-					sb_updates = 0;      // force update to remove flash
-			}
-		}
-	}
-
-	if (rogue)
-	{
-		// check for powered up weapon.
-		if ( cl.stats[STAT_ACTIVEWEAPON] >= RIT_LAVA_NAILGUN )
-		{
-			for (i=0;i<5;i++)
-			{
-				if (cl.stats[STAT_ACTIVEWEAPON] == (RIT_LAVA_NAILGUN << i))
-				{
-					Sbar_DrawPicOnAltConsole ((i+2)*24, -16, rsb_weapons[i]);
-				}
-			}
-		}
-	}
-
-// ammo counts
-	for (i=0 ; i<4 ; i++)
-	{
-		sprintf (num, "%3i",cl.stats[STAT_SHELLS+i] );
-		if (num[0] != ' ')
-			Sbar_DrawCharacterOnAltConsole ( (6*i+1)*8 - 2, -24, 18 + num[0] - '0');
-		if (num[1] != ' ')
-			Sbar_DrawCharacterOnAltConsole ( (6*i+2)*8 - 2, -24, 18 + num[1] - '0');
-		if (num[2] != ' ')
-			Sbar_DrawCharacterOnAltConsole ( (6*i+3)*8 - 2, -24, 18 + num[2] - '0');
-	}
-
-	flashon = 0;
-	// items
-	for (i=0 ; i<6 ; i++)
-		if (cl.items & (1<<(17+i)))
-		{
-			time = cl.item_gettime[17+i];
-			if (time && time > cl.time - 2 && flashon )
-			{  // flash frame
-				sb_updates = 0;
-			}
-			else
-			{
-				//MED 01/04/97 changed keys
-				if (!hipnotic || (i>1))
-				{
-					Sbar_DrawPicOnAltConsole (192 + i*16, -16, sb_items[i]);
-				}
-			}
-			if (time && time > cl.time - 2)
-				sb_updates = 0;
-		}
-	//MED 01/04/97 added hipnotic items
-	// hipnotic items
-	if (hipnotic)
-	{
-		for (i=0 ; i<2 ; i++)
-			if (cl.items & (1<<(24+i)))
-			{
-				time = cl.item_gettime[24+i];
-				if (time && time > cl.time - 2 && flashon )
-				{  // flash frame
-					sb_updates = 0;
-				}
-				else
-				{
-					Sbar_DrawPicOnAltConsole (288 + i*16, -16, hsb_items[i]);
-				}
-				if (time && time > cl.time - 2)
-					sb_updates = 0;
-			}
-	}
-
-	if (rogue)
-	{
-		// new rogue items
-		for (i=0 ; i<2 ; i++)
-		{
-			if (cl.items & (1<<(29+i)))
-			{
-				time = cl.item_gettime[29+i];
-
-				if (time &&	time > cl.time - 2 && flashon )
-				{	// flash frame
-					sb_updates = 0;
-				}
-				else
-				{
-					Sbar_DrawPicOnAltConsole (288 + i*16, -16, rsb_items[i]);
-				}
-
-				if (time &&	time > cl.time - 2)
-					sb_updates = 0;
-			}
-		}
-	}
-	else
-	{
-		// sigils
-		for (i=0 ; i<4 ; i++)
-		{
-			if (cl.items & (1<<(28+i)))
-			{
-				time = cl.item_gettime[28+i];
-				if (time &&	time > cl.time - 2 && flashon )
-				{	// flash frame
-					sb_updates = 0;
-				}
-				else
-					Sbar_DrawPicOnAltConsole (320-32 + i*8, -16, sb_sigil[i]);
-				if (time &&	time > cl.time - 2)
-					sb_updates = 0;
-			}
-		}
-	}
-}
-
 //=============================================================================
 
 /*
@@ -1149,65 +812,6 @@ void Sbar_DrawFrags (void)
 		{
 			Sbar_DrawCharacter (x*8+2, -24, 16);
 			Sbar_DrawCharacter ( (x+4)*8-4, -24, 17);
-		}
-		x+=4;
-	}
-}
-
-/*
-===============
-Sbar_DrawFragsOnAltConsole
-===============
-*/
-void Sbar_DrawFragsOnAltConsole (void)
-{
-	int				i, k, l;
-	int				top, bottom;
-	int				x, y, f;
-	int				xofs;
-	char			num[12];
-	scoreboard_t	*s;
-
-	Sbar_SortFrags ();
-
-// draw the text
-	l = scoreboardlines <= 4 ? scoreboardlines : 4;
-
-	x = 23;
-	if (cl.gametype == GAME_DEATHMATCH)
-		xofs = 0;
-	else
-		xofs = (vid.width - 320)>>1;
-	y = vid.height - SBAR_HEIGHT - 23;
-
-	for (i=0 ; i<l ; i++)
-	{
-		k = fragsort[i];
-		s = &cl.scores[k];
-		if (!s->name[0])
-			continue;
-
-		// draw background
-		top = s->colors & 0xf0;
-		bottom = (s->colors & 15)<<4;
-		top = Sbar_ColorForMap (top);
-		bottom = Sbar_ColorForMap (bottom);
-
-		Draw_FillOnAltConsole (xofs + x*8 + 10, y, 28, 4, top);
-		Draw_FillOnAltConsole (xofs + x*8 + 10, y+4, 28, 3, bottom);
-
-		// draw number
-		f = s->frags;
-		sprintf (num, "%3i",f);
-
-		Sbar_DrawCharacterOnAltConsole ( (x+1)*8 , -24, num[0]);
-		Sbar_DrawCharacterOnAltConsole ( (x+2)*8 , -24, num[1]);
-		Sbar_DrawCharacterOnAltConsole ( (x+3)*8 , -24, num[2]);
-
-		if (k == cl.viewentity - 1)
-		{
-			Sbar_DrawCharacterOnAltConsole (x*8+2, -24, 16);
-			Sbar_DrawCharacterOnAltConsole ( (x+4)*8-4, -24, 17);
 		}
 		x+=4;
 	}
@@ -1314,111 +918,12 @@ void Sbar_DrawFace (void)
 	Sbar_DrawPic (112, 0, sb_faces[f][anim]);
 }
 
-
 /*
 ===============
-Sbar_DrawFaceOnAltConsole
+Sbar_Draw
 ===============
 */
-void Sbar_DrawFaceOnAltConsole (void)
-{
-	int		f, anim;
-
-// PGM 01/19/97 - team color drawing
-// PGM 03/02/97 - fixed so color swatch only appears in CTF modes
-	if (rogue &&
-		(cl.maxclients != 1) &&
-		(teamplay.value>3) &&
-		(teamplay.value<7))
-	{
-		int				top, bottom;
-		int				xofs;
-		char			num[12];
-		scoreboard_t	*s;
-
-		s = &cl.scores[cl.viewentity - 1];
-		// draw background
-		top = s->colors & 0xf0;
-		bottom = (s->colors & 15)<<4;
-		top = Sbar_ColorForMap (top);
-		bottom = Sbar_ColorForMap (bottom);
-
-		if (cl.gametype == GAME_DEATHMATCH)
-			xofs = 113;
-		else
-			xofs = ((vid.width - 320)>>1) + 113;
-
-		Sbar_DrawPicOnAltConsole (112, 0, rsb_teambord);
-		Draw_FillOnAltConsole (xofs, vid.height-SBAR_HEIGHT+3, 22, 9, top);
-		Draw_FillOnAltConsole (xofs, vid.height-SBAR_HEIGHT+12, 22, 9, bottom);
-
-		// draw number
-		f = s->frags;
-		sprintf (num, "%3i",f);
-
-		if (top==8)
-		{
-			if (num[0] != ' ')
-				Sbar_DrawCharacterOnAltConsole(109, 3, 18 + num[0] - '0');
-			if (num[1] != ' ')
-				Sbar_DrawCharacterOnAltConsole(116, 3, 18 + num[1] - '0');
-			if (num[2] != ' ')
-				Sbar_DrawCharacterOnAltConsole(123, 3, 18 + num[2] - '0');
-		}
-		else
-		{
-			Sbar_DrawCharacterOnAltConsole ( 109, 3, num[0]);
-			Sbar_DrawCharacterOnAltConsole ( 116, 3, num[1]);
-			Sbar_DrawCharacterOnAltConsole ( 123, 3, num[2]);
-		}
-
-		return;
-	}
-// PGM 01/19/97 - team color drawing
-
-	if ( (cl.items & (IT_INVISIBILITY | IT_INVULNERABILITY) )
-		 == (IT_INVISIBILITY | IT_INVULNERABILITY) )
-	{
-		Sbar_DrawPicOnAltConsole (112, 0, sb_face_invis_invuln);
-		return;
-	}
-	if (cl.items & IT_QUAD)
-	{
-		Sbar_DrawPicOnAltConsole (112, 0, sb_face_quad );
-		return;
-	}
-	if (cl.items & IT_INVISIBILITY)
-	{
-		Sbar_DrawPicOnAltConsole (112, 0, sb_face_invis );
-		return;
-	}
-	if (cl.items & IT_INVULNERABILITY)
-	{
-		Sbar_DrawPicOnAltConsole (112, 0, sb_face_invuln);
-		return;
-	}
-
-	if (cl.stats[STAT_HEALTH] >= 100)
-		f = 4;
-	else
-		f = cl.stats[STAT_HEALTH] / 20;
-
-	if (cl.time <= cl.faceanimtime)
-	{
-		anim = 1;
-		sb_updates = 0;		// make sure the anim gets drawn over
-	}
-	else
-		anim = 0;
-	Sbar_DrawPicOnAltConsole (112, 0, sb_faces[f][anim]);
-}
-
-/*
-===============
-Sbar_DrawOnScreen
-===============
-*/
-void Sbar_DrawOnScreen (void)
+void Sbar_Draw (void)
 {
 	if (scr_con_current == vid.height)
 		return;		// console is full screen
@@ -1538,142 +1043,6 @@ void Sbar_DrawOnScreen (void)
 	}
 }
 
-/*
-===============
-Sbar_DrawOnAltConsole
-===============
-*/
-void Sbar_DrawOnAltConsole (void)
-{
-	if (scr_con_current == vid.height)
-		return;		// console is full screen
-
-	scr_copyeverything = 1;
-
-	sb_updates++;
-
-	if (sb_lines > 24)
-	{
-		Sbar_DrawInventoryOnAltConsole ();
-		if (cl.maxclients != 1)
-			Sbar_DrawFragsOnAltConsole ();
-	}
-
-	if (sb_showscores || cl.stats[STAT_HEALTH] <= 0)
-	{
-		Sbar_DrawPicOnAltConsole (0, 0, sb_scorebar);
-		Sbar_DrawScoreboardOnAltConsole ();
-		sb_updates = 0;
-	}
-	else if (sb_lines)
-	{
-		Sbar_DrawPicOnAltConsole (0, 0, sb_sbar);
-
-		// keys (hipnotic only)
-		//MED 01/04/97 moved keys here so they would not be overwritten
-		if (hipnotic)
-		{
-			if (cl.items & IT_KEY1)
-				Sbar_DrawPicOnAltConsole (209, 3, sb_items[0]);
-			if (cl.items & IT_KEY2)
-				Sbar_DrawPicOnAltConsole (209, 12, sb_items[1]);
-		}
-		// armor
-		if (cl.items & IT_INVULNERABILITY)
-		{
-			Sbar_DrawNumOnAltConsole (24, 0, 666, 3, 1);
-			Sbar_DrawPicOnAltConsole (0, 0, draw_disc);
-		}
-		else
-		{
-			if (rogue)
-			{
-				Sbar_DrawNumOnAltConsole (24, 0, cl.stats[STAT_ARMOR], 3,
-							  cl.stats[STAT_ARMOR] <= 25);
-				if (cl.items & RIT_ARMOR3)
-					Sbar_DrawPicOnAltConsole (0, 0, sb_armor[2]);
-				else if (cl.items & RIT_ARMOR2)
-					Sbar_DrawPicOnAltConsole (0, 0, sb_armor[1]);
-				else if (cl.items & RIT_ARMOR1)
-					Sbar_DrawPicOnAltConsole (0, 0, sb_armor[0]);
-			}
-			else
-			{
-				Sbar_DrawNumOnAltConsole (24, 0, cl.stats[STAT_ARMOR], 3
-						, cl.stats[STAT_ARMOR] <= 25);
-				if (cl.items & IT_ARMOR3)
-					Sbar_DrawPicOnAltConsole (0, 0, sb_armor[2]);
-				else if (cl.items & IT_ARMOR2)
-					Sbar_DrawPicOnAltConsole (0, 0, sb_armor[1]);
-				else if (cl.items & IT_ARMOR1)
-					Sbar_DrawPicOnAltConsole (0, 0, sb_armor[0]);
-			}
-		}
-
-		// face
-		Sbar_DrawFaceOnAltConsole ();
-
-		// health
-		Sbar_DrawNumOnAltConsole (136, 0, cl.stats[STAT_HEALTH], 3
-				, cl.stats[STAT_HEALTH] <= 25);
-
-		// ammo icon
-		if (rogue)
-		{
-			if (cl.items & RIT_SHELLS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[0]);
-			else if (cl.items & RIT_NAILS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[1]);
-			else if (cl.items & RIT_ROCKETS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[2]);
-			else if (cl.items & RIT_CELLS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[3]);
-			else if (cl.items & RIT_LAVA_NAILS)
-				Sbar_DrawPicOnAltConsole (224, 0, rsb_ammo[0]);
-			else if (cl.items & RIT_PLASMA_AMMO)
-				Sbar_DrawPicOnAltConsole (224, 0, rsb_ammo[1]);
-			else if (cl.items & RIT_MULTI_ROCKETS)
-				Sbar_DrawPicOnAltConsole (224, 0, rsb_ammo[2]);
-		}
-		else
-		{
-			if (cl.items & IT_SHELLS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[0]);
-			else if (cl.items & IT_NAILS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[1]);
-			else if (cl.items & IT_ROCKETS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[2]);
-			else if (cl.items & IT_CELLS)
-				Sbar_DrawPicOnAltConsole (224, 0, sb_ammo[3]);
-		}
-
-		Sbar_DrawNumOnAltConsole (248, 0, cl.stats[STAT_AMMO], 3,
-					  cl.stats[STAT_AMMO] <= 10);
-	}
-
-	if (vid.width > 320) {
-		if (cl.gametype == GAME_DEATHMATCH)
-			Sbar_MiniDeathmatchOverlayOnAltConsole ();
-	}
-}
-
-/*
-===============
-Sbar_Draw
-===============
-*/
-void Sbar_Draw (void)
-{
-	if (vid.altconbuffer == nullptr)
-	{
-		Sbar_DrawOnScreen ();
-	}
-	else
-	{
-		Sbar_DrawOnAltConsole ();
-	}
-}
-
 //=============================================================================
 
 /*
@@ -1789,70 +1158,6 @@ void Sbar_DeathmatchOverlay (void)
 	}
 }
 
-
-/*
-==================
-Sbar_DeathmatchOverlayOnAltConsole
-
-==================
-*/
-void Sbar_DeathmatchOverlayOnAltConsole (void)
-{
-	qpic_t			*pic;
-	int				i, k, l;
-	int				top, bottom;
-	int				x, y, f;
-	char			num[12];
-	scoreboard_t	*s;
-
-	scr_copyeverything = 1;
-	scr_fullupdate = 0;
-
-	pic = Draw_CachePic ("gfx/ranking.lmp");
-	M_DrawPicOnAltConsole ((320-pic->width)/2, 8, pic);
-
-// scores
-	Sbar_SortFrags ();
-
-// draw the text
-	l = scoreboardlines;
-
-	x = 80 + ((vid.conwidth - 320)>>1);
-	y = 40;
-	for (i=0 ; i<l ; i++)
-	{
-		k = fragsort[i];
-		s = &cl.scores[k];
-		if (!s->name[0])
-			continue;
-
-		// draw background
-		top = s->colors & 0xf0;
-		bottom = (s->colors & 15)<<4;
-		top = Sbar_ColorForMap (top);
-		bottom = Sbar_ColorForMap (bottom);
-
-		Draw_FillOnAltConsole ( x, y, 40, 4, top);
-		Draw_FillOnAltConsole ( x, y+4, 40, 4, bottom);
-
-		// draw number
-		f = s->frags;
-		sprintf (num, "%3i",f);
-
-		Draw_CharacterOnAltConsole ( x+8 , y, num[0]);
-		Draw_CharacterOnAltConsole ( x+16 , y, num[1]);
-		Draw_CharacterOnAltConsole ( x+24 , y, num[2]);
-
-		if (k == cl.viewentity - 1)
-			Draw_CharacterOnAltConsole ( x - 8, y, 12);
-
-		// draw name
-		Draw_StringOnAltConsole (x+64, y, s->name);
-
-		y += 10;
-	}
-}
-
 /*
 ==================
 Sbar_MiniDeathmatchOverlay
@@ -1948,88 +1253,6 @@ void Sbar_MiniDeathmatchOverlay (void)
 
 	// draw name
 		Draw_StringOnScreen (x+48, y, s->name);
-
-		y += 8;
-	}
-}
-
-/*
-==================
-Sbar_MiniDeathmatchOverlayOnAltConsole
-
-==================
-*/
-void Sbar_MiniDeathmatchOverlayOnAltConsole (void)
-{
-	int				i, k;
-	int				top, bottom;
-	int				x, y, f;
-	char			num[12];
-	scoreboard_t	*s;
-	int				numlines;
-
-	if (vid.width < 512 || !sb_lines)
-		return;
-
-	scr_copyeverything = 1;
-	scr_fullupdate = 0;
-
-// scores
-	Sbar_SortFrags ();
-
-// draw the text
-	y = vid.height - sb_lines;
-	numlines = sb_lines/8;
-	if (numlines < 3)
-		return;
-
-	//find us
-	for (i = 0; i < scoreboardlines; i++)
-		if (fragsort[i] == cl.viewentity - 1)
-			break;
-
-	if (i == scoreboardlines) // we're not there
-		i = 0;
-	else // figure out start
-		i = i - numlines/2;
-
-	if (i > scoreboardlines - numlines)
-		i = scoreboardlines - numlines;
-	if (i < 0)
-		i = 0;
-
-	x = 324;
-	for (/* */; i < scoreboardlines && y < vid.height - 8 ; i++)
-	{
-		k = fragsort[i];
-		s = &cl.scores[k];
-		if (!s->name[0])
-			continue;
-
-		// draw background
-		top = s->colors & 0xf0;
-		bottom = (s->colors & 15)<<4;
-		top = Sbar_ColorForMap (top);
-		bottom = Sbar_ColorForMap (bottom);
-
-		Draw_FillOnAltConsole ( x, y+1, 40, 3, top);
-		Draw_FillOnAltConsole ( x, y+4, 40, 4, bottom);
-
-		// draw number
-		f = s->frags;
-		sprintf (num, "%3i",f);
-
-		Draw_CharacterOnAltConsole ( x+8 , y, num[0]);
-		Draw_CharacterOnAltConsole ( x+16 , y, num[1]);
-		Draw_CharacterOnAltConsole ( x+24 , y, num[2]);
-
-		if (k == cl.viewentity - 1) {
-			Draw_CharacterOnAltConsole ( x, y, 16);
-			Draw_CharacterOnAltConsole ( x + 32, y, 17);
-		}
-
-		// draw name
-		Draw_StringOnAltConsole (x+48, y, s->name);
 
 		y += 8;
 	}

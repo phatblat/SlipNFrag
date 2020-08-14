@@ -73,7 +73,6 @@ void VID_Init(unsigned char *palette)
     vid.conbuffer = con_buffer.data();
     vid.rowbytes = vid_width;
     vid.conrowbytes = con_width;
-    vid.altconbuffer = nullptr;
     zbuffer.resize(vid_width * vid_height);
     d_pzbuffer = zbuffer.data();
     srand(time(nullptr));

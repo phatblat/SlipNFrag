@@ -4,7 +4,6 @@
 extern viddef_t vid;
 
 std::vector<unsigned char> vid_buffer;
-std::vector<unsigned char> altcon_buffer;
 int vid_width;
 int vid_height;
 std::vector<unsigned char> con_buffer;
@@ -14,7 +13,6 @@ std::vector<short> zbuffer;
 std::vector<byte> surfcache;
 int surfcache_extrasize;
 int pal_changed;
-int use_altcon;
 
 unsigned short d_8to16table[256];
 unsigned d_8to24table[256];
@@ -54,10 +52,6 @@ void VID_ShiftPalette(unsigned char *palette)
 void VID_Init(unsigned char *palette)
 {
     vid_buffer.resize(vid_width * vid_height);
-    if (use_altcon)
-    {
-        altcon_buffer.resize(vid_width * vid_height);
-    }
     con_buffer.resize(con_width * con_height);
     vid.maxwarpwidth = WARP_WIDTH;
     vid.width = vid_width;
@@ -73,14 +67,6 @@ void VID_Init(unsigned char *palette)
     vid.conbuffer = con_buffer.data();
     vid.rowbytes = vid_width;
     vid.conrowbytes = con_width;
-    if (use_altcon)
-    {
-        vid.altconbuffer = altcon_buffer.data();
-    }
-    else
-    {
-        vid.altconbuffer = nullptr;
-    }
     zbuffer.resize(vid_width * vid_height);
     d_pzbuffer = zbuffer.data();
     srand(time(nullptr));
@@ -95,10 +81,6 @@ void VID_Resize(float forced_aspect)
 {
     D_FlushCaches();
     vid_buffer.resize(vid_width * vid_height);
-    if (use_altcon)
-    {
-        altcon_buffer.resize(vid_width * vid_height);
-    }
     con_buffer.resize(con_width * con_height);
     vid.width = vid_width;
     vid.conwidth = con_width;
@@ -109,14 +91,6 @@ void VID_Resize(float forced_aspect)
     vid.conbuffer = con_buffer.data();
     vid.rowbytes = vid_width;
     vid.conrowbytes = con_width;
-    if (use_altcon)
-    {
-        vid.altconbuffer = altcon_buffer.data();
-    }
-    else
-    {
-        vid.altconbuffer = nullptr;
-    }
     zbuffer.resize(vid_width * vid_height);
     d_pzbuffer = zbuffer.data();
     int surfcachesize = D_SurfaceCacheForRes(vid_width, vid_height);
