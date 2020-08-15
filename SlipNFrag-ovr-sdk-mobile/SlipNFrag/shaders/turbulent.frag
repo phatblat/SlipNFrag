@@ -3,12 +3,12 @@
 #extension GL_EXT_shader_io_blocks : enable
 #extension GL_ARB_enhanced_layouts : enable
 
-precision mediump float;
-precision mediump int;
+precision highp float;
+precision highp int;
 
 layout(binding = 1) uniform sampler2D fragmentTexture;
 layout(binding = 2) uniform sampler2D fragmentPalette;
-layout(binding = 3) uniform Time
+layout(push_constant) uniform Time
 {
 	layout(offset = 0) float time;
 };
@@ -18,9 +18,8 @@ layout(location = 0) out lowp vec4 outColor;
 
 void main()
 {
-	float t = mod(time, 3.14159 * 2);
-	float tx = fragmentTexCoords.x + sin(t + fragmentTexCoords.y * 5) / 10;
-	float ty = fragmentTexCoords.y + sin(t + fragmentTexCoords.x * 5) / 10;
+	float tx = fragmentTexCoords.x + sin(mod(time + fragmentTexCoords.y * 5, 3.14159*2)) / 10;
+	float ty = fragmentTexCoords.y + sin(mod(time + fragmentTexCoords.x * 5, 3.14159*2)) / 10;
 	vec2 texCoords = vec2(tx, ty);
 	vec2 level = textureQueryLod(fragmentTexture, texCoords);
 	float lowMip = floor(level.y);
