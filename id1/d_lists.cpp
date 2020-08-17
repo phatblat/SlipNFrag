@@ -4,7 +4,7 @@
 #include "r_local.h"
 #include "d_local.h"
 
-dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1 };
+dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1 };
 
 qboolean d_uselists = false;
 
@@ -457,19 +457,8 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 	}
 }
 
-void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap)
+void D_AddAliasToLists (dalias_t& alias, mdl_t* mdl, aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* colormap, trivertx_t* vertices)
 {
-	auto mdl = (mdl_t *)((byte *)aliashdr + aliashdr->model);
-	if (mdl->numtris <= 0)
-	{
-		return;
-	}
-	d_lists.last_alias++;
-	if (d_lists.last_alias >= d_lists.alias.size())
-	{
-		d_lists.alias.emplace_back();
-	}
-	auto& alias = d_lists.alias[d_lists.last_alias];
 	alias.model = mdl;
 	alias.width = mdl->skinwidth;
 	alias.height = mdl->skinheight;
@@ -694,6 +683,38 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskinde
 		}
 		triangle++;
 	}
+}
+
+void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* colormap, trivertx_t* vertices)
+{
+	auto mdl = (mdl_t *)((byte *)aliashdr + aliashdr->model);
+	if (mdl->numtris <= 0)
+	{
+		return;
+	}
+	d_lists.last_alias++;
+	if (d_lists.last_alias >= d_lists.alias.size())
+	{
+		d_lists.alias.emplace_back();
+	}
+	auto& alias = d_lists.alias[d_lists.last_alias];
+	D_AddAliasToLists (alias, mdl, aliashdr, skindesc, colormap, vertices);
+}
+
+void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* colormap, trivertx_t* vertices)
+{
+	auto mdl = (mdl_t *)((byte *)aliashdr + aliashdr->model);
+	if (mdl->numtris <= 0)
+	{
+		return;
+	}
+	d_lists.last_viewmodel++;
+	if (d_lists.last_viewmodel >= d_lists.viewmodel.size())
+	{
+		d_lists.viewmodel.emplace_back();
+	}
+	auto& view_model = d_lists.viewmodel[d_lists.last_viewmodel];
+	D_AddAliasToLists (view_model, mdl, aliashdr, skindesc, colormap, vertices);
 }
 
 void D_AddParticleToLists (particle_t* part)

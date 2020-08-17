@@ -734,7 +734,14 @@ void R_AliasDrawModel (alight_t *plighting)
 
 	if (d_uselists)
 	{
-		D_AddAliasToLists (paliashdr, r_apverts, pskindesc, currententity->colormap);
+		if (currententity == &cl.viewent)
+		{
+			D_AddViewModelToLists (paliashdr, pskindesc, currententity->colormap, r_apverts);
+		}
+		else
+		{
+			D_AddAliasToLists (paliashdr, pskindesc, currententity->colormap, r_apverts);
+		}
 	}
 	else
 	{

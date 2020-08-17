@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 
 int			sb_updates;		// if >= vid.numpages, no update needed
+qboolean	sb_onconsole;
 
 #define STAT_MINUS		10	// num frame for '-' stats digit
 qpic_t		*sb_nums[2][11];
@@ -259,7 +260,9 @@ Sbar_DrawPic
 */
 void Sbar_DrawPic (int x, int y, qpic_t *pic)
 {
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (sb_onconsole)
+		Draw_PicOnConsole (x /* + ((vid.conwidth - 320)>>1)*/, y + (vid.conheight-SBAR_HEIGHT), pic);
+	else if (cl.gametype == GAME_DEATHMATCH)
 		Draw_Pic (x /* + ((vid.width - 320)>>1)*/, y + (vid.height-SBAR_HEIGHT), pic);
 	else
 		Draw_Pic (x + ((vid.width - 320)>>1), y + (vid.height-SBAR_HEIGHT), pic);
@@ -272,7 +275,9 @@ Sbar_DrawTransPic
 */
 void Sbar_DrawTransPic (int x, int y, qpic_t *pic)
 {
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (sb_onconsole)
+		Draw_TransPicOnConsole (x /*+ ((vid.conwidth - 320)>>1)*/, y + (vid.conheight-SBAR_HEIGHT), pic);
+	else if (cl.gametype == GAME_DEATHMATCH)
 		Draw_TransPic (x /*+ ((vid.width - 320)>>1)*/, y + (vid.height-SBAR_HEIGHT), pic);
 	else
 		Draw_TransPic (x + ((vid.width - 320)>>1), y + (vid.height-SBAR_HEIGHT), pic);
@@ -287,7 +292,9 @@ Draws one solid graphics character
 */
 void Sbar_DrawCharacter (int x, int y, int num)
 {
-	if (cl.gametype == GAME_DEATHMATCH)
+	if (sb_onconsole)
+		Draw_Character ( x /*+ ((vid.conwidth - 320)>>1) */ + 4 , y + vid.conheight-SBAR_HEIGHT, num);
+	else if (cl.gametype == GAME_DEATHMATCH)
 		Draw_CharacterOnScreen ( x /*+ ((vid.width - 320)>>1) */ + 4 , y + vid.height-SBAR_HEIGHT, num);
 	else
 		Draw_CharacterOnScreen ( x + ((vid.width - 320)>>1) + 4 , y + vid.height-SBAR_HEIGHT, num);
@@ -300,6 +307,8 @@ Sbar_DrawString
 */
 void Sbar_DrawString (int x, int y, char *str)
 {
+	if (sb_onconsole)
+		Draw_String (x /*+ ((vid.conwidth - 320)>>1)*/, y+ vid.conheight-SBAR_HEIGHT, str);
 	if (cl.gametype == GAME_DEATHMATCH)
 		Draw_StringOnScreen (x /*+ ((vid.width - 320)>>1)*/, y+ vid.height-SBAR_HEIGHT, str);
 	else
@@ -928,7 +937,7 @@ void Sbar_Draw (void)
 	if (scr_con_current == vid.height)
 		return;		// console is full screen
 
-	if (sb_updates >= vid.numpages)
+	if (sb_updates >= vid.numpages && !sb_onconsole)
 		return;
 
 	scr_copyeverything = 1;

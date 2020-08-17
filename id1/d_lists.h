@@ -76,6 +76,7 @@ struct dlists_t
 	int last_sprite;
 	int last_turbulent;
 	int last_alias;
+	int last_viewmodel;
 	int last_particle;
 	int last_sky;
 	int last_textured_vertex;
@@ -92,6 +93,7 @@ struct dlists_t
 	std::vector<dspritedata_t> sprites;
 	std::vector<dturbulent_t> turbulent;
 	std::vector<dalias_t> alias;
+	std::vector<dalias_t> viewmodel;
 	std::vector<dparticle_t> particles;
 	std::vector<dsky_t> sky;
 	std::vector<float> textured_vertices;
@@ -112,6 +114,7 @@ extern qboolean d_uselists;
 void D_AddSurfaceToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity, qboolean created);
 void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc);
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity);
-void D_AddAliasToLists (aliashdr_t* aliashdr, trivertx_t* vertices, maliasskindesc_t* skindesc, byte* colormap);
+void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* colormap, trivertx_t* vertices);
+void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* colormap, trivertx_t* vertices);
 void D_AddParticleToLists (particle_t* part);
 void D_AddSkyToLists (surf_t* surf, msurface_t* face, entity_t* entity);
