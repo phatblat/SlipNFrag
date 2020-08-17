@@ -416,6 +416,14 @@ struct Console
 	ConsoleView View;
 };
 
+struct Panel
+{
+	ovrTextureSwapChain* SwapChain;
+	std::vector<uint32_t> Data;
+	VkImage Image;
+	Buffer Buffer;
+};
+
 struct Screen
 {
 	ovrTextureSwapChain* SwapChain;
@@ -460,6 +468,8 @@ struct AppState
 	int ScreenHeight;
 	int ConsoleWidth;
 	int ConsoleHeight;
+	Panel LeftArrows;
+	Panel RightArrows;
 	Screen Screen;
 	Console Console;
 	std::vector<float> ConsoleVertices;
@@ -3149,31 +3159,31 @@ void android_main(struct android_app *app)
 				VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &perImage.commandBuffer));
 				VK(appState.Device.vkCreateFence(appState.Device.device, &fenceCreateInfo, nullptr, &perImage.fence));
 			}
-			appState.Screen.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.ScreenWidth, appState.ScreenHeight, 1, 3);
+			appState.Screen.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.ScreenWidth, appState.ScreenHeight, 1, 1);
 			appState.Screen.Data.resize(appState.ScreenWidth * appState.ScreenHeight, 255 << 24);
 			appState.Screen.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.Screen.SwapChain, 0);
-			auto playImageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
-			auto playImageFileLength = AAsset_getLength(playImageFile);
-			std::vector<stbi_uc> playImageSource(playImageFileLength);
-			AAsset_read(playImageFile, playImageSource.data(), playImageFileLength);
-			int playImageWidth;
-			int playImageHeight;
-			int playImageComponents;
-			auto playImage = stbi_load_from_memory(playImageSource.data(), playImageFileLength, &playImageWidth, &playImageHeight, &playImageComponents, 4);
-			auto texIndex = ((appState.ScreenHeight - playImageHeight) * appState.ScreenWidth + appState.ScreenWidth - playImageWidth) / 2;
-			auto playIndex = 0;
-			for (auto y = 0; y < playImageHeight; y++)
+			auto imageFile = AAssetManager_open(app->activity->assetManager, "play.png", AASSET_MODE_BUFFER);
+			auto imageFileLength = AAsset_getLength(imageFile);
+			std::vector<stbi_uc> imageSource(imageFileLength);
+			AAsset_read(imageFile, imageSource.data(), imageFileLength);
+			int imageWidth;
+			int imageHeight;
+			int imageComponents;
+			auto image = stbi_load_from_memory(imageSource.data(), imageFileLength, &imageWidth, &imageHeight, &imageComponents, 4);
+			auto texIndex = ((appState.ScreenHeight - imageHeight) * appState.ScreenWidth + appState.ScreenWidth - imageWidth) / 2;
+			auto index = 0;
+			for (auto y = 0; y < imageHeight; y++)
 			{
-				for (auto x = 0; x < playImageWidth; x++)
+				for (auto x = 0; x < imageWidth; x++)
 				{
-					auto r = playImage[playIndex];
-					playIndex++;
-					auto g = playImage[playIndex];
-					playIndex++;
-					auto b = playImage[playIndex];
-					playIndex++;
-					auto a = playImage[playIndex];
-					playIndex++;
+					auto r = image[index];
+					index++;
+					auto g = image[index];
+					index++;
+					auto b = image[index];
+					index++;
+					auto a = image[index];
+					index++;
 					auto factor = (double)a / 255;
 					r = (unsigned char)((double)r * factor);
 					g = (unsigned char)((double)g * factor);
@@ -3181,9 +3191,9 @@ void android_main(struct android_app *app)
 					appState.Screen.Data[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
 					texIndex++;
 				}
-				texIndex += appState.ScreenWidth - playImageWidth;
+				texIndex += appState.ScreenWidth - imageWidth;
 			}
-			stbi_image_free(playImage);
+			stbi_image_free(image);
 			for (auto b = 0; b < 5; b++)
 			{
 				auto i = (unsigned char)(192.0 * sin(M_PI / (double)(b - 1)));
@@ -3244,11 +3254,116 @@ void android_main(struct android_app *app)
 			appState.Screen.SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 			appState.Screen.SubmitInfo.commandBufferCount = 1;
 			appState.Screen.SubmitInfo.pCommandBuffers = &appState.Screen.CommandBuffer;
+			appState.LeftArrows.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.ScreenWidth, appState.ScreenHeight, 1, 1);
+			appState.LeftArrows.Data.resize(appState.ScreenWidth * appState.ScreenHeight, 255 << 24);
+			appState.LeftArrows.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.LeftArrows.SwapChain, 0);
+			imageFile = AAssetManager_open(app->activity->assetManager, "leftarrows.png", AASSET_MODE_BUFFER);
+			imageFileLength = AAsset_getLength(imageFile);
+			imageSource.resize(imageFileLength);
+			AAsset_read(imageFile, imageSource.data(), imageFileLength);
+			image = stbi_load_from_memory(imageSource.data(), imageFileLength, &imageWidth, &imageHeight, &imageComponents, 4);
+			texIndex = ((appState.ScreenHeight - imageHeight) * appState.ScreenWidth + appState.ScreenWidth - imageWidth) / 2;
+			index = 0;
+			for (auto y = 0; y < imageHeight; y++)
+			{
+				for (auto x = 0; x < imageWidth; x++)
+				{
+					auto r = image[index];
+					index++;
+					auto g = image[index];
+					index++;
+					auto b = image[index];
+					index++;
+					auto a = image[index];
+					index++;
+					auto factor = (double)a / 255;
+					r = (unsigned char)((double)r * factor);
+					g = (unsigned char)((double)g * factor);
+					b = (unsigned char)((double)b * factor);
+					appState.LeftArrows.Data[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+					texIndex++;
+				}
+				texIndex += appState.ScreenWidth - imageWidth;
+			}
+			stbi_image_free(image);
+			appState.LeftArrows.Buffer.size = appState.LeftArrows.Data.size() * sizeof(uint32_t);
+			bufferCreateInfo.size = appState.LeftArrows.Buffer.size;
+			VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &appState.LeftArrows.Buffer.buffer));
+			appState.LeftArrows.Buffer.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+			VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, appState.LeftArrows.Buffer.buffer, &memoryRequirements));
+			createMemoryAllocateInfo(appState, memoryRequirements, appState.LeftArrows.Buffer.flags, memoryAllocateInfo);
+			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.LeftArrows.Buffer.memory));
+			VK(appState.Device.vkBindBufferMemory(appState.Device.device, appState.LeftArrows.Buffer.buffer, appState.LeftArrows.Buffer.memory, 0));
+			VK(appState.Device.vkMapMemory(appState.Device.device, appState.LeftArrows.Buffer.memory, 0, memoryRequirements.size, 0, &appState.LeftArrows.Buffer.mapped));
+			memcpy(appState.LeftArrows.Buffer.mapped, appState.LeftArrows.Data.data(), appState.LeftArrows.Buffer.size);
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.LeftArrows.Buffer.memory));
+			appState.LeftArrows.Buffer.mapped = nullptr;
+			mappedMemoryRange.memory = appState.LeftArrows.Buffer.memory;
+			VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+			VC(appState.Device.vkCmdCopyBufferToImage(setupCommandBuffer, appState.LeftArrows.Buffer.buffer, appState.LeftArrows.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
+			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
+			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
+			appState.RightArrows.SwapChain = vrapi_CreateTextureSwapChain3(VRAPI_TEXTURE_TYPE_2D, VK_FORMAT_R8G8B8A8_UNORM, appState.ScreenWidth, appState.ScreenHeight, 1, 1);
+			appState.RightArrows.Data.resize(appState.ScreenWidth * appState.ScreenHeight, 255 << 24);
+			appState.RightArrows.Image = vrapi_GetTextureSwapChainBufferVulkan(appState.RightArrows.SwapChain, 0);
+			imageFile = AAssetManager_open(app->activity->assetManager, "rightarrows.png", AASSET_MODE_BUFFER);
+			imageFileLength = AAsset_getLength(imageFile);
+			imageSource.resize(imageFileLength);
+			AAsset_read(imageFile, imageSource.data(), imageFileLength);
+			image = stbi_load_from_memory(imageSource.data(), imageFileLength, &imageWidth, &imageHeight, &imageComponents, 4);
+			texIndex = ((appState.ScreenHeight - imageHeight) * appState.ScreenWidth + appState.ScreenWidth - imageWidth) / 2;
+			index = 0;
+			for (auto y = 0; y < imageHeight; y++)
+			{
+				for (auto x = 0; x < imageWidth; x++)
+				{
+					auto r = image[index];
+					index++;
+					auto g = image[index];
+					index++;
+					auto b = image[index];
+					index++;
+					auto a = image[index];
+					index++;
+					auto factor = (double)a / 255;
+					r = (unsigned char)((double)r * factor);
+					g = (unsigned char)((double)g * factor);
+					b = (unsigned char)((double)b * factor);
+					appState.RightArrows.Data[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+					texIndex++;
+				}
+				texIndex += appState.ScreenWidth - imageWidth;
+			}
+			stbi_image_free(image);
+			appState.RightArrows.Buffer.size = appState.RightArrows.Data.size() * sizeof(uint32_t);
+			bufferCreateInfo.size = appState.RightArrows.Buffer.size;
+			VK(appState.Device.vkCreateBuffer(appState.Device.device, &bufferCreateInfo, nullptr, &appState.RightArrows.Buffer.buffer));
+			appState.RightArrows.Buffer.flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+			VC(appState.Device.vkGetBufferMemoryRequirements(appState.Device.device, appState.RightArrows.Buffer.buffer, &memoryRequirements));
+			createMemoryAllocateInfo(appState, memoryRequirements, appState.RightArrows.Buffer.flags, memoryAllocateInfo);
+			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.RightArrows.Buffer.memory));
+			VK(appState.Device.vkBindBufferMemory(appState.Device.device, appState.RightArrows.Buffer.buffer, appState.RightArrows.Buffer.memory, 0));
+			VK(appState.Device.vkMapMemory(appState.Device.device, appState.RightArrows.Buffer.memory, 0, memoryRequirements.size, 0, &appState.RightArrows.Buffer.mapped));
+			memcpy(appState.RightArrows.Buffer.mapped, appState.RightArrows.Data.data(), appState.RightArrows.Buffer.size);
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.RightArrows.Buffer.memory));
+			appState.RightArrows.Buffer.mapped = nullptr;
+			mappedMemoryRange.memory = appState.RightArrows.Buffer.memory;
+			VC(appState.Device.vkFlushMappedMemoryRanges(appState.Device.device, 1, &mappedMemoryRange));
+			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
+			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
+			VC(appState.Device.vkCmdCopyBufferToImage(setupCommandBuffer, appState.RightArrows.Buffer.buffer, appState.RightArrows.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
+			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
+			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
+			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
 			appState.Scene.numBuffers = (isMultiview) ? VRAPI_FRAME_LAYER_EYE_MAX : 1;
 			auto consoleBottom = (float)(appState.ConsoleHeight - SBAR_HEIGHT - 24) / appState.ConsoleHeight;
 			auto statusBarTop = (float)(appState.ScreenHeight - SBAR_HEIGHT - 24) / appState.ScreenHeight;
-			appState.ConsoleVertices.assign({ -1, consoleBottom * 2 - 1, 0, 0, consoleBottom, 1, consoleBottom * 2 - 1, 0, 1, consoleBottom, 1, -1, 0, 1, 0, -1, -1, 0, 0, 0,
-									 -1, 1, 0, 0, 1, -1.0 / 3.0, 1, 0, 1, 1, -1.0 / 3.0, statusBarTop * 2 - 1, 0, 1, consoleBottom, -1, statusBarTop * 2 - 1, 0, 0, consoleBottom });
+			appState.ConsoleVertices.assign({ -1, consoleBottom * 2 - 1, 0, 0, consoleBottom, 1, consoleBottom * 2 - 1, 0, 1, consoleBottom, 1, -1, 0, 1, 0, -1, -1, 0, 0, 0, -1, 1, 0, 0, 1, -1.0 / 3.0, 1, 0, 1, 1, -1.0 / 3.0, statusBarTop * 2 - 1, 0, 1, consoleBottom, -1, statusBarTop * 2 - 1, 0, 0, consoleBottom });
 			appState.ConsoleIndices.assign({ 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4 });
 			createShaderModule(appState, app, (isMultiview ? "shaders/textured_multiview.vert.spv" : "shaders/textured.vert.spv"), &appState.Scene.texturedVertex);
 			createShaderModule(appState, app, "shaders/textured.frag.spv", &appState.Scene.texturedFragment);
@@ -5679,7 +5794,7 @@ void android_main(struct android_app *app)
 			worldLayer.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_TanAngleMatrixFromProjection(&tracking.Eye[i].ProjectionMatrix);
 		}
 		worldLayer.Header.Flags |= VRAPI_FRAME_LAYER_FLAG_CHROMATIC_ABERRATION_CORRECTION;
-		ovrLayerCylinder2 cylinderLayer;
+		std::vector<ovrLayerCylinder2> cylinderLayers;
 		if (appState.Mode == AppWorldMode)
 		{
 			auto console = vrapi_DefaultLayerCylinder2();
@@ -5721,7 +5836,7 @@ void android_main(struct android_app *app)
 				console.Textures[i].TextureRect.width = 1;
 				console.Textures[i].TextureRect.height = 1;
 			}
-			cylinderLayer = console;
+			cylinderLayers.push_back(console);
 		}
 		else
 		{
@@ -5734,14 +5849,14 @@ void android_main(struct android_app *app)
 			screen.Header.DstBlend = VRAPI_FRAME_LAYER_BLEND_ONE_MINUS_SRC_ALPHA;
 			screen.HeadPose = tracking.HeadPose;
 			const float density = 4500;
-			const float rotateYaw = 0;
+			float rotateYaw = 0;
 			float rotatePitch = 0;
 			const float radius = 1;
-			const ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.ScreenHeight * VRAPI_PI / density, radius);
-			const ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
-			const ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
-			const ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
-			const ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
+			ovrMatrix4f scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.ScreenHeight * VRAPI_PI / density, radius);
+			ovrMatrix4f rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
+			ovrMatrix4f rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
+			ovrMatrix4f m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
+			ovrMatrix4f cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
 			float circScale = density * 0.5f / appState.ScreenWidth;
 			float circBias = -circScale * (0.5f * (1.0f - 1.0f / circScale));
 			for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
@@ -5761,15 +5876,84 @@ void android_main(struct android_app *app)
 				screen.Textures[i].TextureRect.width = 1;
 				screen.Textures[i].TextureRect.height = 1;
 			}
-			cylinderLayer = screen;
+			cylinderLayers.push_back(screen);
+			auto leftArrows = vrapi_DefaultLayerCylinder2();
+			leftArrows.Header.ColorScale.x = 1;
+			leftArrows.Header.ColorScale.y = 1;
+			leftArrows.Header.ColorScale.z = 1;
+			leftArrows.Header.ColorScale.w = 1;
+			leftArrows.Header.SrcBlend = VRAPI_FRAME_LAYER_BLEND_SRC_ALPHA;
+			leftArrows.Header.DstBlend = VRAPI_FRAME_LAYER_BLEND_ONE_MINUS_SRC_ALPHA;
+			leftArrows.HeadPose = tracking.HeadPose;
+			rotateYaw = 2 * M_PI / 3;
+			scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.ScreenHeight * VRAPI_PI / density, radius);
+			rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
+			rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
+			m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
+			cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
+			for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
+			{
+				ovrMatrix4f modelViewMatrix = ovrMatrix4f_Multiply(&tracking.Eye[i].ViewMatrix, &cylinderTransform);
+				leftArrows.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_Inverse(&modelViewMatrix);
+				leftArrows.Textures[i].ColorSwapChain = appState.LeftArrows.SwapChain;
+				leftArrows.Textures[i].SwapChainIndex = 0;
+				const float texScaleX = circScale;
+				const float texBiasX = circBias;
+				const float texScaleY = 0.5;
+				const float texBiasY = -texScaleY * (0.5 * (1 - 1 / texScaleY));
+				leftArrows.Textures[i].TextureMatrix.M[0][0] = texScaleX;
+				leftArrows.Textures[i].TextureMatrix.M[0][2] = texBiasX;
+				leftArrows.Textures[i].TextureMatrix.M[1][1] = texScaleY;
+				leftArrows.Textures[i].TextureMatrix.M[1][2] = texBiasY;
+				leftArrows.Textures[i].TextureRect.width = 1;
+				leftArrows.Textures[i].TextureRect.height = 1;
+			}
+			cylinderLayers.push_back(leftArrows);
+			auto rightArrows = vrapi_DefaultLayerCylinder2();
+			rightArrows.Header.ColorScale.x = 1;
+			rightArrows.Header.ColorScale.y = 1;
+			rightArrows.Header.ColorScale.z = 1;
+			rightArrows.Header.ColorScale.w = 1;
+			rightArrows.Header.SrcBlend = VRAPI_FRAME_LAYER_BLEND_SRC_ALPHA;
+			rightArrows.Header.DstBlend = VRAPI_FRAME_LAYER_BLEND_ONE_MINUS_SRC_ALPHA;
+			rightArrows.HeadPose = tracking.HeadPose;
+			rotateYaw = -2 * M_PI / 3;
+			scaleMatrix = ovrMatrix4f_CreateScale(radius, radius * (float) appState.ScreenHeight * VRAPI_PI / density, radius);
+			rotXMatrix = ovrMatrix4f_CreateRotation(rotatePitch, 0.0f, 0.0f);
+			rotYMatrix = ovrMatrix4f_CreateRotation(0.0f, rotateYaw, 0.0f);
+			m0 = ovrMatrix4f_Multiply(&rotXMatrix, &scaleMatrix);
+			cylinderTransform = ovrMatrix4f_Multiply(&rotYMatrix, &m0);
+			for (auto i = 0; i < VRAPI_FRAME_LAYER_EYE_MAX; i++)
+			{
+				ovrMatrix4f modelViewMatrix = ovrMatrix4f_Multiply(&tracking.Eye[i].ViewMatrix, &cylinderTransform);
+				rightArrows.Textures[i].TexCoordsFromTanAngles = ovrMatrix4f_Inverse(&modelViewMatrix);
+				rightArrows.Textures[i].ColorSwapChain = appState.RightArrows.SwapChain;
+				rightArrows.Textures[i].SwapChainIndex = 0;
+				const float texScaleX = circScale;
+				const float texBiasX = circBias;
+				const float texScaleY = 0.5;
+				const float texBiasY = -texScaleY * (0.5 * (1 - 1 / texScaleY));
+				rightArrows.Textures[i].TextureMatrix.M[0][0] = texScaleX;
+				rightArrows.Textures[i].TextureMatrix.M[0][2] = texBiasX;
+				rightArrows.Textures[i].TextureMatrix.M[1][1] = texScaleY;
+				rightArrows.Textures[i].TextureMatrix.M[1][2] = texBiasY;
+				rightArrows.Textures[i].TextureRect.width = 1;
+				rightArrows.Textures[i].TextureRect.height = 1;
+			}
+			cylinderLayers.push_back(rightArrows);
 		}
-		const ovrLayerHeader2* layers[] = { &worldLayer.Header, &cylinderLayer.Header };
+		std::vector<ovrLayerHeader2*> layers;
+		layers.push_back(&worldLayer.Header);
+		for (auto& layer : cylinderLayers)
+		{
+			layers.push_back((ovrLayerHeader2*)&layer.Header);
+		}
 		ovrSubmitFrameDescription2 frameDesc = { };
 		frameDesc.SwapInterval = appState.SwapInterval;
 		frameDesc.FrameIndex = appState.FrameIndex;
 		frameDesc.DisplayTime = appState.DisplayTime;
-		frameDesc.LayerCount = 2;
-		frameDesc.Layers = layers;
+		frameDesc.LayerCount = layers.size();
+		frameDesc.Layers = layers.data();
 		vrapi_SubmitFrame2(appState.Ovr, &frameDesc);
 	}
 	for (auto& view : appState.Views)
@@ -5839,6 +6023,8 @@ void android_main(struct android_app *app)
 			deleteCachedBuffers(appState, perImage.sceneMatricesStagingBuffers);
 		}
 	}
+	vrapi_DestroyTextureSwapChain(appState.RightArrows.SwapChain);
+	vrapi_DestroyTextureSwapChain(appState.LeftArrows.SwapChain);
 	VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &appState.Screen.CommandBuffer));
 	vrapi_DestroyTextureSwapChain(appState.Screen.SwapChain);
 	for (auto i = 0; i < appState.Console.View.framebuffer.swapChainLength; i++)
