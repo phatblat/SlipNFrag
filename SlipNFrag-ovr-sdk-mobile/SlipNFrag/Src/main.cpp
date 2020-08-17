@@ -386,9 +386,6 @@ struct ConsoleFramebuffer
 	int swapChainLength;
 	ovrTextureSwapChain *colorTextureSwapChain;
 	std::vector<Texture> colorTextures;
-	VkImage depthImage;
-	VkDeviceMemory depthMemory;
-	VkImageView depthImageView;
 	Texture renderTexture;
 	std::vector<VkFramebuffer> framebuffers;
 	int width;
@@ -2960,7 +2957,7 @@ void android_main(struct android_app *app)
 				appState.Console.View.colorSwapChain.ColorTextures[i] = vrapi_GetTextureSwapChainBufferVulkan(appState.Console.View.colorSwapChain.SwapChain, i);
 			}
 			uint32_t attachmentCount = 0;
-			VkAttachmentDescription attachments[4] { };
+			VkAttachmentDescription attachments[2] { };
 			attachments[attachmentCount].format = VK_FORMAT_R8G8B8A8_UNORM;
 			attachments[attachmentCount].samples = VK_SAMPLE_COUNT_4_BIT;
 			attachments[attachmentCount].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -2979,31 +2976,17 @@ void android_main(struct android_app *app)
 			attachments[attachmentCount].initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			attachments[attachmentCount].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			attachmentCount++;
-			attachments[attachmentCount].format = VK_FORMAT_D24_UNORM_S8_UINT;
-			attachments[attachmentCount].samples = VK_SAMPLE_COUNT_4_BIT;
-			attachments[attachmentCount].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-			attachments[attachmentCount].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			attachments[attachmentCount].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-			attachments[attachmentCount].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-			attachments[attachmentCount].initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			attachments[attachmentCount].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			attachmentCount++;
-			uint32_t sampleMapAttachment = 0;
 			VkAttachmentReference colorAttachmentReference;
 			colorAttachmentReference.attachment = 0;
 			colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 			VkAttachmentReference resolveAttachmentReference;
 			resolveAttachmentReference.attachment = 1;
 			resolveAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			VkAttachmentReference depthAttachmentReference;
-			depthAttachmentReference.attachment = 2;
-			depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 			VkSubpassDescription subpassDescription { };
 			subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 			subpassDescription.colorAttachmentCount = 1;
 			subpassDescription.pColorAttachments = &colorAttachmentReference;
 			subpassDescription.pResolveAttachments = &resolveAttachmentReference;
-			subpassDescription.pDepthStencilAttachment = &depthAttachmentReference;
 			VkRenderPassCreateInfo renderPassCreateInfo { };
 			renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 			renderPassCreateInfo.attachmentCount = attachmentCount;
@@ -3144,41 +3127,12 @@ void android_main(struct android_app *app)
 			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
 			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
 			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
-			imageCreateInfo.format = VK_FORMAT_D24_UNORM_S8_UINT;
-			imageCreateInfo.extent.width = appState.Console.View.framebuffer.width;
-			imageCreateInfo.extent.height = appState.Console.View.framebuffer.height;
-			imageCreateInfo.arrayLayers = 1;
-			imageCreateInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-			VK(appState.Device.vkCreateImage(appState.Device.device, &imageCreateInfo, nullptr, &appState.Console.View.framebuffer.depthImage));
-			VC(appState.Device.vkGetImageMemoryRequirements(appState.Device.device, appState.Console.View.framebuffer.depthImage, &memoryRequirements));
-			createMemoryAllocateInfo(appState, memoryRequirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, memoryAllocateInfo);
-			VK(appState.Device.vkAllocateMemory(appState.Device.device, &memoryAllocateInfo, nullptr, &appState.Console.View.framebuffer.depthMemory));
-			VK(appState.Device.vkBindImageMemory(appState.Device.device, appState.Console.View.framebuffer.depthImage, appState.Console.View.framebuffer.depthMemory, 0));
-			imageViewCreateInfo.image = appState.Console.View.framebuffer.depthImage;
-			imageViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-			imageViewCreateInfo.format = imageCreateInfo.format;
-			imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-			imageViewCreateInfo.subresourceRange.layerCount = 1;
-			VK(appState.Device.vkCreateImageView(appState.Device.device, &imageViewCreateInfo, nullptr, &appState.Console.View.framebuffer.depthImageView));
-			VK(appState.Device.vkAllocateCommandBuffers(appState.Device.device, &commandBufferAllocateInfo, &setupCommandBuffer));
-			VK(appState.Device.vkBeginCommandBuffer(setupCommandBuffer, &commandBufferBeginInfo));
-			imageMemoryBarrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			imageMemoryBarrier.image = appState.Console.View.framebuffer.depthImage;
-			imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-			imageMemoryBarrier.subresourceRange.layerCount = 1;
-			VC(appState.Device.vkCmdPipelineBarrier(setupCommandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier));
-			VK(appState.Device.vkEndCommandBuffer(setupCommandBuffer));
-			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &setupSubmitInfo, VK_NULL_HANDLE));
-			VK(appState.Device.vkQueueWaitIdle(appState.Context.queue));
-			VC(appState.Device.vkFreeCommandBuffers(appState.Device.device, appState.Context.commandPool, 1, &setupCommandBuffer));
 			for (auto i = 0; i < appState.Console.View.framebuffer.swapChainLength; i++)
 			{
 				uint32_t attachmentCount = 0;
-				VkImageView attachments[4];
+				VkImageView attachments[2];
 				attachments[attachmentCount++] = appState.Console.View.framebuffer.renderTexture.view;
 				attachments[attachmentCount++] = appState.Console.View.framebuffer.colorTextures[i].view;
-				attachments[attachmentCount++] = appState.Console.View.framebuffer.depthImageView;
 				VkFramebufferCreateInfo framebufferCreateInfo { };
 				framebufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 				framebufferCreateInfo.renderPass = appState.Console.RenderPass;
@@ -5897,12 +5851,6 @@ void android_main(struct android_app *app)
 		{
 			deleteTexture(appState, &appState.Console.View.framebuffer.colorTextures[i]);
 		}
-	}
-	if (appState.Console.View.framebuffer.depthImage != VK_NULL_HANDLE)
-	{
-		VC(appState.Device.vkDestroyImageView(appState.Device.device, appState.Console.View.framebuffer.depthImageView, nullptr));
-		VC(appState.Device.vkDestroyImage(appState.Device.device, appState.Console.View.framebuffer.depthImage, nullptr));
-		VC(appState.Device.vkFreeMemory(appState.Device.device, appState.Console.View.framebuffer.depthMemory, nullptr));
 	}
 	if (appState.Console.View.framebuffer.renderTexture.image != VK_NULL_HANDLE)
 	{
