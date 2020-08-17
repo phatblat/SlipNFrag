@@ -2,7 +2,7 @@
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10" IgnorableNamespaces="uap mp">
   <Identity
     Name="4741HeribertoDelgado.SlipFrag"
-    Publisher="CN=8056193F-0786-4302-BBBA-131EA7457003"
+    Publisher="CN=Heriberto Delgado"
     Version="1.0.0.0" />
   <mp:PhoneIdentity PhoneProductId="815943e4-ddf2-4f55-a25a-df093834bc52" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
   <Properties>

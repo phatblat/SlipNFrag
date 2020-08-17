@@ -214,6 +214,9 @@
     <ClCompile Include="..\id1\net_sock.cpp">
       <Filter>id1</Filter>
     </ClCompile>
+    <ClCompile Include="..\id1\d_lists.cpp">
+      <Filter>id1</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -353,6 +356,9 @@
     <ClInclude Include="..\id1\net_sock.h">
       <Filter>id1</Filter>
     </ClInclude>
+    <ClInclude Include="..\id1\d_lists.h">
+      <Filter>id1</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\LockScreenLogo.scale-200.png" />
@@ -371,6 +377,7 @@
     <None Include="packages.config" />
     <None Include="PropertySheet.props" />
     <None Include="Package.StoreAssociation.xml" />
+    <None Include="SlipNFrag-Windows_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="MainPage.xaml" />
