@@ -38,7 +38,8 @@ enum AppMode
 {
 	AppStartupMode,
 	AppScreenMode,
-	AppWorldMode
+	AppWorldMode,
+	AppNoGameDataMode
 };
 
 struct Instance
@@ -488,6 +489,7 @@ struct AppState
 	int FloorWidth;
 	int FloorHeight;
 	std::vector<uint32_t> FloorData;
+	std::vector<uint32_t> NoGameDataData;
 	double PreviousTime;
 	double CurrentTime;
 	uint32_t PreviousLeftButtons;
@@ -3388,6 +3390,59 @@ void android_main(struct android_app *app)
 			appState.FloorData.resize(imageWidth * imageHeight);
 			memcpy(appState.FloorData.data(), image, appState.FloorData.size() * sizeof(uint32_t));
 			stbi_image_free(image);
+			appState.NoGameDataData.resize(appState.ScreenWidth * appState.ScreenHeight, 255 << 24);
+			imageFile = AAssetManager_open(app->activity->assetManager, "nogamedata.png", AASSET_MODE_BUFFER);
+			imageFileLength = AAsset_getLength(imageFile);
+			imageSource.resize(imageFileLength);
+			AAsset_read(imageFile, imageSource.data(), imageFileLength);
+			image = stbi_load_from_memory(imageSource.data(), imageFileLength, &imageWidth, &imageHeight, &imageComponents, 4);
+			texIndex = ((appState.ScreenHeight - imageHeight) * appState.ScreenWidth + appState.ScreenWidth - imageWidth) / 2;
+			index = 0;
+			for (auto y = 0; y < imageHeight; y++)
+			{
+				for (auto x = 0; x < imageWidth; x++)
+				{
+					auto r = image[index];
+					index++;
+					auto g = image[index];
+					index++;
+					auto b = image[index];
+					index++;
+					auto a = image[index];
+					index++;
+					auto factor = (double)a / 255;
+					r = (unsigned char)((double)r * factor);
+					g = (unsigned char)((double)g * factor);
+					b = (unsigned char)((double)b * factor);
+					appState.NoGameDataData[texIndex] = ((uint32_t)255 << 24) | ((uint32_t)b << 16) | ((uint32_t)g << 8) | r;
+					texIndex++;
+				}
+				texIndex += appState.ScreenWidth - imageWidth;
+			}
+			stbi_image_free(image);
+			for (auto b = 0; b < 5; b++)
+			{
+				auto i = (unsigned char)(192.0 * sin(M_PI / (double)(b - 1)));
+				auto color = ((uint32_t)255 << 24) | ((uint32_t)i << 16) | ((uint32_t)i << 8) | i;
+				auto texTopIndex = b * appState.ScreenWidth + b;
+				auto texBottomIndex = (appState.ScreenHeight - 1 - b) * appState.ScreenWidth + b;
+				for (auto x = 0; x < appState.ScreenWidth - b - b; x++)
+				{
+					appState.NoGameDataData[texTopIndex] = color;
+					texTopIndex++;
+					appState.NoGameDataData[texBottomIndex] = color;
+					texBottomIndex++;
+				}
+				auto texLeftIndex = (b + 1) * appState.ScreenWidth + b;
+				auto texRightIndex = (b + 1) * appState.ScreenWidth + appState.ScreenWidth - 1 - b;
+				for (auto y = 0; y < appState.ScreenHeight - b - 1 - b - 1; y++)
+				{
+					appState.NoGameDataData[texLeftIndex] = color;
+					texLeftIndex += appState.ScreenWidth;
+					appState.NoGameDataData[texRightIndex] = color;
+					texRightIndex += appState.ScreenWidth;
+				}
+			}
 			appState.Scene.numBuffers = (isMultiview) ? VRAPI_FRAME_LAYER_EYE_MAX : 1;
 			createShaderModule(appState, app, (isMultiview ? "shaders/textured_multiview.vert.spv" : "shaders/textured.vert.spv"), &appState.Scene.texturedVertex);
 			createShaderModule(appState, app, "shaders/textured.frag.spv", &appState.Scene.texturedFragment);
@@ -3895,7 +3950,7 @@ void android_main(struct android_app *app)
 		const double predictedDisplayTime = vrapi_GetPredictedDisplayTime(appState.Ovr, appState.FrameIndex);
 		const ovrTracking2 tracking = vrapi_GetPredictedTracking2(appState.Ovr, predictedDisplayTime);
 		appState.DisplayTime = predictedDisplayTime;
-		if (appState.Mode != AppStartupMode)
+		if (appState.Mode != AppStartupMode && appState.Mode != AppNoGameDataMode)
 		{
 			if (cls.demoplayback || cl.intermission)
 			{
@@ -3910,19 +3965,62 @@ void android_main(struct android_app *app)
 		{
 			if (appState.PreviousMode == AppStartupMode)
 			{
-				sys_argc = 3;
-				sys_argv = new char *[sys_argc];
-				sys_argv[0] = (char *) "SlipNFrag";
-				sys_argv[1] = (char *) "-basedir";
-				sys_argv[2] = (char *) "/sdcard/android/data/com.heribertodelgado.slipnfrag/files";
+				const char* basedir = "/sdcard/android/data/com.heribertodelgado.slipnfrag/files";
+				std::vector<std::string> arguments;
+				arguments.emplace_back("SlipNFrag");
+				arguments.emplace_back("-basedir");
+				arguments.emplace_back(basedir);
+				std::vector<unsigned char> commandline;
+				auto file = fopen((std::string(basedir) + "/slipnfrag.commandline").c_str(), "rb");
+				if (file != nullptr)
+				{
+					fseek(file, 0, SEEK_END);
+					auto length = ftell(file);
+					if (length > 0)
+					{
+						fseek(file, 0, SEEK_SET);
+						commandline.resize(length);
+						fread(commandline.data(), length, 1, file);
+					}
+					fclose(file);
+				}
+				arguments.emplace_back();
+				for (auto c : commandline)
+				{
+					if (c <= ' ')
+					{
+						if (arguments[arguments.size() - 1].size() != 0)
+						{
+							arguments.emplace_back();
+						}
+					}
+					else
+					{
+						arguments[arguments.size() - 1] += c;
+					}
+				}
+				if (arguments[arguments.size() - 1].size() == 0)
+				{
+					arguments.pop_back();
+				}
+				sys_argc = (int)arguments.size();
+				sys_argv = new char*[sys_argc];
+				for (auto i = 0; i < arguments.size(); i++)
+				{
+					sys_argv[i] = new char[arguments[i].length() + 1];
+					strcpy(sys_argv[i], arguments[i].c_str());
+				}
 				Sys_Init(sys_argc, sys_argv);
 				if (sys_errormessage.length() > 0)
 				{
 					if (sys_nogamedata)
 					{
-						__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Game data not found. Upload the game data files to your headset and try again.");
+						appState.Mode = AppNoGameDataMode;
 					}
-					exit(0);
+					else
+					{
+						exit(0);
+					}
 				}
 				appState.PreviousLeftButtons = 0;
 				appState.PreviousRightButtons = 0;
@@ -3946,7 +4044,6 @@ void android_main(struct android_app *app)
 				con_height = appState.ConsoleHeight;
 				Cvar_SetValue("fov", appState.DefaultFOV);
 				VID_Resize(320.0 / 240.0);
-				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "appState.Mode = AppScreenMode");
 			}
 			else if (appState.Mode == AppWorldMode)
 			{
@@ -3966,7 +4063,12 @@ void android_main(struct android_app *app)
 				con_height = appState.ConsoleHeight;
 				Cvar_SetValue("fov", appState.FOV);
 				VID_Resize(1);
-				__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "appState.Mode = AppWorldMode");
+			}
+			else if (appState.Mode == AppNoGameDataMode)
+			{
+				d_uselists = false;
+				r_skip_fov_check = false;
+				sb_onconsole = false;
 			}
 			appState.PreviousMode = appState.Mode;
 		}
@@ -5963,6 +6065,23 @@ void android_main(struct android_app *app)
 			submitInfo.pCommandBuffers = &perImage.commandBuffer;
 			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &submitInfo, perImage.fence));
 			perImage.submitted = true;
+		}
+		else if (appState.Mode == AppNoGameDataMode)
+		{
+			VK(appState.Device.vkMapMemory(appState.Device.device, appState.Screen.Buffer.memory, 0, appState.Screen.Buffer.size, 0, &appState.Screen.Buffer.mapped));
+			memcpy(appState.Screen.Buffer.mapped, appState.NoGameDataData.data(), appState.NoGameDataData.size() * sizeof(uint32_t));
+			VC(appState.Device.vkUnmapMemory(appState.Device.device, appState.Screen.Buffer.memory));
+			appState.Screen.Buffer.mapped = nullptr;
+			VK(appState.Device.vkBeginCommandBuffer(appState.Screen.CommandBuffer, &commandBufferBeginInfo));
+			VkBufferImageCopy region { };
+			region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			region.imageSubresource.layerCount = 1;
+			region.imageExtent.width = appState.ScreenWidth;
+			region.imageExtent.height = appState.ScreenHeight;
+			region.imageExtent.depth = 1;
+			VC(appState.Device.vkCmdCopyBufferToImage(appState.Screen.CommandBuffer, appState.Screen.Buffer.buffer, appState.Screen.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+			VK(appState.Device.vkEndCommandBuffer(appState.Screen.CommandBuffer));
+			VK(appState.Device.vkQueueSubmit(appState.Context.queue, 1, &appState.Screen.SubmitInfo, VK_NULL_HANDLE));
 		}
 		ovrLayerProjection2 worldLayer = vrapi_DefaultLayerProjection2();
 		worldLayer.HeadPose = tracking.HeadPose;
