@@ -1,0 +1,40 @@
+#version 440 core
+
+layout(local_size_x_id = 0) in;
+
+layout(push_constant) uniform Parameters
+{
+	uint outOffset;
+};
+
+layout(binding = 0) buffer Texture
+{
+	uint texData[];
+};
+
+layout(binding = 1) buffer Palette
+{
+	uint palData[];
+};
+
+void main()
+{
+	uint inIndex = gl_GlobalInvocationID.x;
+	uint outIndex = outOffset + gl_GlobalInvocationID.x * 4;
+	uint inValues = texData[inIndex];
+	uint entry0 = (inValues >> 24) & 255;
+	uint value0 = palData[entry0];
+	texData[outIndex] = value0;
+	outIndex++;
+	uint entry1 = (inValues >> 16) & 255;
+	uint value1 = palData[entry1];
+	texData[outIndex] = value1;
+	outIndex++;
+	uint entry2 = (inValues >> 8) & 255;
+	uint value2 = palData[entry2];
+	texData[outIndex] = value2;
+	outIndex++;
+	uint entry3 = inValues & 255;
+	uint value3 = palData[entry3];
+	texData[outIndex] = value3;
+}
