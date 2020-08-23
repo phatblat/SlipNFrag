@@ -8,22 +8,19 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE			:= slipnfrag
 ID1_FILES				:= $(wildcard $(LOCAL_PATH)/../../../../../id1/*.cpp)
-ID1_FILES				:= $(filter-out $(LOCAL_PATH)/../../../../../id1/snd_dma.cpp, $(ID1_FILES))
-ID1_FILES				:= $(filter-out $(LOCAL_PATH)/../../../../../id1/snd_mem.cpp, $(ID1_FILES))
-ID1_FILES				:= $(filter-out $(LOCAL_PATH)/../../../../../id1/snd_mix.cpp, $(ID1_FILES))
 ID1_FILES				:= $(filter-out $(LOCAL_PATH)/../../../../../id1/net_win.cpp, $(ID1_FILES))
 ID1_FILES				:= $(filter-out $(LOCAL_PATH)/../../../../../id1/net_wins.cpp, $(ID1_FILES))
 LOCAL_SRC_FILES			:=  $(LOCAL_PATH)/../../../../../SlipNFrag/cd_null.cpp \
 							$(LOCAL_PATH)/../../../Src/in_ovr.cpp \
 							$(LOCAL_PATH)/../../../Src/main.cpp \
 							$(LOCAL_PATH)/../../../../../SlipNFrag/net_none.cpp \
-							$(LOCAL_PATH)/../../../../../SlipNFrag/snd_null.cpp \
+							$(LOCAL_PATH)/../../../Src/snd_ovr.cpp \
 							$(LOCAL_PATH)/../../../Src/sys_ovr.cpp \
 							$(LOCAL_PATH)/../../../Src/vid_ovr.cpp
 LOCAL_SRC_FILES         += $(ID1_FILES)
 LOCAL_C_INCLUDES        :=	$(LOCAL_PATH)/../../../../../id1 \
 							$(LOCAL_PATH)/../../../../3rdParty/stb/src
-LOCAL_LDLIBS			:= -llog -landroid
+LOCAL_LDLIBS			:= -llog -landroid -lOpenSLES
 
 LOCAL_LDFLAGS			:= -u ANativeActivity_onCreate
 
