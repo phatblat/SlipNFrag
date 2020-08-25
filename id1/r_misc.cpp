@@ -409,7 +409,9 @@ r_refdef.viewangles[2]=    0;
 
 // build the transformation matrix for the given view angles
 	VectorCopy (r_refdef.vieworg, modelorg);
+	VectorAdd (modelorg, r_modelorg_delta, modelorg);
 	VectorCopy (r_refdef.vieworg, r_origin);
+	VectorAdd (r_origin, r_modelorg_delta, r_origin);
 
 	AngleVectors (r_refdef.viewangles, vpn, vright, vup);
 

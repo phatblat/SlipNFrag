@@ -512,6 +512,7 @@ static const int GPU_LEVEL = 3;
 
 extern m_state_t m_state;
 extern qboolean r_skip_fov_check;
+extern vec3_t r_modelorg_delta;
 
 PermissionsGrantStatus PermissionsGrantStatus = PermissionsPending;
 
@@ -4171,6 +4172,21 @@ void android_main(struct android_app *app)
 			appState.Pitch = asin(s2);
 			appState.Roll = atan2(2 * (w * Q[2] - psign * Q[1] * Q[0]), ww + Q11 - Q22 - Q33);
 		}
+		auto pose = vrapi_LocateTrackingSpace(appState.Ovr, VRAPI_TRACKING_SPACE_LOCAL_FLOOR);
+		auto playerHeight = 32;
+		if (host_initialized && cl.viewentity >= 0 && cl.viewentity < cl_entities.size())
+		{
+			auto player = &cl_entities[cl.viewentity];
+			if (player != nullptr)
+			{
+				auto model = player->model;
+				if (model != nullptr)
+				{
+					playerHeight = model->maxs[1] - model->mins[1];
+				}
+			}
+		}
+		auto scale = -pose.Position.y / playerHeight;
 		bool host_updated = false;
 		if (host_initialized)
 		{
@@ -4211,6 +4227,9 @@ void android_main(struct android_app *app)
 			{
 				if (d_uselists)
 				{
+					r_modelorg_delta[0] = tracking.HeadPose.Pose.Position.x / scale;
+					r_modelorg_delta[1] = -tracking.HeadPose.Pose.Position.z / scale;
+					r_modelorg_delta[2] = tracking.HeadPose.Pose.Position.y / scale;
 					d_lists.last_surface = -1;
 					d_lists.last_sprite = -1;
 					d_lists.last_turbulent = -1;
@@ -4257,26 +4276,14 @@ void android_main(struct android_app *app)
 				}
 				else
 				{
+					r_modelorg_delta[0] = 0;
+					r_modelorg_delta[1] = 0;
+					r_modelorg_delta[2] = 0;
 					Host_FrameRender();
 				}
 			}
 			Host_FrameFinish(host_updated);
 		}
-		auto pose = vrapi_LocateTrackingSpace(appState.Ovr, VRAPI_TRACKING_SPACE_LOCAL_FLOOR);
-		auto playerHeight = 32;
-		if (host_initialized && cl.viewentity >= 0 && cl.viewentity < cl_entities.size())
-		{
-			auto player = &cl_entities[cl.viewentity];
-			if (player != nullptr)
-			{
-				auto model = player->model;
-				if (model != nullptr)
-				{
-					playerHeight = model->maxs[1] - model->mins[1];
-				}
-			}
-		}
-		auto scale = -pose.Position.y / playerHeight;
 		auto matrixIndex = 0;
 		for (auto& view : appState.Views)
 		{

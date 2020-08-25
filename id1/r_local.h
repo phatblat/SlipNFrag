@@ -255,6 +255,7 @@ extern int		r_clipflags;
 extern int		r_dlightframecount;
 extern qboolean	r_fov_greater_than_90;
 extern qboolean r_skip_fov_check;
+extern vec3_t 	r_modelorg_delta;
 
 void R_StoreEfrags (efrag_t **ppefrag);
 void R_TimeRefresh_f (void);
