@@ -110,6 +110,7 @@ struct dlists_t
 extern dlists_t d_lists;
 
 extern qboolean d_uselists;
+extern qboolean d_skipviewmodeangles;
 
 void D_AddSurfaceToLists (msurface_t* face, struct surfcache_s* cache, entity_t* entity, qboolean created);
 void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc);

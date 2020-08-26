@@ -504,6 +504,7 @@ struct AppState
 	ovrVector2f PreviousRightJoystick;
 	ovrVector2f LeftJoystick;
 	ovrVector2f RightJoystick;
+	bool NearViewModel;
 };
 
 static const int queueCount = 1;
@@ -2832,7 +2833,10 @@ void android_main(struct android_app *app)
 						}
 						if (leftButtonIsDown(appState, ovrButton_Trigger) || rightButtonIsDown(appState, ovrButton_Trigger))
 						{
-							Cmd_ExecuteString("+attack", src_command);
+							if (appState.NearViewModel)
+							{
+								Cmd_ExecuteString("+attack", src_command);
+							}
 						}
 						if (leftButtonIsUp(appState, ovrButton_Trigger) || rightButtonIsUp(appState, ovrButton_Trigger))
 						{
@@ -3874,7 +3878,7 @@ void android_main(struct android_app *app)
 			appState.Scene.viewmodel.stages[1].pName = "main";
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.viewmodel.descriptorSetLayout));
 			pushConstantInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			pushConstantInfo.size = 3 * sizeof(float);
+			pushConstantInfo.size = 7 * sizeof(float);
 			pipelineLayoutCreateInfo.pSetLayouts = &appState.Scene.viewmodel.descriptorSetLayout;
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantInfo;
@@ -4230,6 +4234,9 @@ void android_main(struct android_app *app)
 					r_modelorg_delta[0] = tracking.HeadPose.Pose.Position.x / scale;
 					r_modelorg_delta[1] = -tracking.HeadPose.Pose.Position.z / scale;
 					r_modelorg_delta[2] = tracking.HeadPose.Pose.Position.y / scale;
+					auto distanceSquared = r_modelorg_delta[0] * r_modelorg_delta[0] + r_modelorg_delta[1] * r_modelorg_delta[1] + r_modelorg_delta[2] * r_modelorg_delta[2];
+					appState.NearViewModel = (distanceSquared < 8 * 8);
+					d_skipviewmodeangles = !appState.NearViewModel;
 					d_lists.last_surface = -1;
 					d_lists.last_sprite = -1;
 					d_lists.last_turbulent = -1;
@@ -5494,11 +5501,29 @@ void android_main(struct android_app *app)
 					writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 					writes[1].pImageInfo = textureInfo;
 					VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 2, writes, 0, nullptr));
-					float forward[3];
-					forward[0] = vpn[0] / scale;
-					forward[1] = vpn[2] / scale;
-					forward[2] = -vpn[1] / scale;
-					VC(appState.Device.vkCmdPushConstants(perImage.commandBuffer, appState.Scene.viewmodel.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 3 * sizeof(float), &forward));
+					auto distanceSquared = r_modelorg_delta[0] * r_modelorg_delta[0] + r_modelorg_delta[1] * r_modelorg_delta[1] + r_modelorg_delta[2] * r_modelorg_delta[2];
+					float forwardAndTint[7];
+					if (appState.NearViewModel)
+					{
+						forwardAndTint[0] = vpn[0] / scale;
+						forwardAndTint[1] = vpn[2] / scale;
+						forwardAndTint[2] = -vpn[1] / scale;
+						forwardAndTint[3] = 1;
+						forwardAndTint[4] = 1;
+						forwardAndTint[5] = 1;
+						forwardAndTint[6] = 1;
+					}
+					else
+					{
+						forwardAndTint[0] = 1 / scale;
+						forwardAndTint[1] = 0;
+						forwardAndTint[2] = 0;
+						forwardAndTint[3] = 1;
+						forwardAndTint[4] = 0;
+						forwardAndTint[5] = 0;
+						forwardAndTint[6] = 0.6 + 0.4 * sin(cl.time * M_PI);
+					}
+					VC(appState.Device.vkCmdPushConstants(perImage.commandBuffer, appState.Scene.viewmodel.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 7 * sizeof(float), &forwardAndTint));
 					if (indices16 != nullptr)
 					{
 						VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices16->buffer, perImage.colormappedIndex16Base, VK_INDEX_TYPE_UINT16));

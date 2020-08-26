@@ -9,6 +9,15 @@ precision mediump int;
 layout(binding = 1) uniform sampler2D fragmentTexture;
 layout(binding = 2) uniform sampler2D fragmentColormap;
 layout(binding = 3) uniform sampler2D fragmentPalette;
+
+layout(push_constant) uniform Tint
+{
+	layout(offset = 12) float tintR;
+	layout(offset = 16) float tintG;
+	layout(offset = 20) float tintB;
+	layout(offset = 24) float tintA;
+};
+
 layout(location = 0) in vec2 fragmentTexCoords;
 layout(location = 1) in float fragmentLight;
 layout(location = 2) in float fragmentAlpha;
@@ -30,5 +39,5 @@ void main()
 	float g = lowColor.y + delta * (highColor.y - lowColor.y);
 	float b = lowColor.z + delta * (highColor.z - lowColor.z);
 	float a = lowColor.w + delta * (highColor.w - lowColor.w);
-	outColor = vec4(r, g, b, a * fragmentAlpha);
+	outColor = vec4(r * tintR, g * tintG, b * tintB, a * tintA * fragmentAlpha);
 }
