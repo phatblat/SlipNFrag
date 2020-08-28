@@ -14,6 +14,7 @@ layout(push_constant) uniform Forward
 	layout(offset = 0) float forwardX;
 	layout(offset = 4) float forwardY;
 	layout(offset = 8) float forwardZ;
+	layout(offset = 12) float offset;
 };
 
 layout(location = 0) in vec3 vertexPosition;
@@ -34,6 +35,6 @@ void main(void)
 	gl_Position = ProjectionMatrix * (ViewMatrix * (vertexTransform * vec4(vertexPosition, 1)));
 	fragmentTexCoords = vertexTexCoords;
 	fragmentLight = vertexLight;
-	float projection = vertexPosition.x * forwardX + vertexPosition.y * forwardY + vertexPosition.z * forwardZ;
+	float projection = offset + vertexPosition.x * forwardX + vertexPosition.y * forwardY + vertexPosition.z * forwardZ;
 	fragmentAlpha = min(max(projection / 8, 0), 1);
 }

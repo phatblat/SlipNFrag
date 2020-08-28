@@ -12,10 +12,10 @@ layout(binding = 3) uniform sampler2D fragmentPalette;
 
 layout(push_constant) uniform Tint
 {
-	layout(offset = 12) float tintR;
-	layout(offset = 16) float tintG;
-	layout(offset = 20) float tintB;
-	layout(offset = 24) float tintA;
+	layout(offset = 16) float tintR;
+	layout(offset = 20) float tintG;
+	layout(offset = 24) float tintB;
+	layout(offset = 28) float tintA;
 };
 
 layout(location = 0) in vec2 fragmentTexCoords;

@@ -7,7 +7,7 @@
 dlists_t d_lists { -1, -1, -1, -1, -1, -1, -1, -1, -1,-1, -1, -1, -1, -1, -1, -1, -1 };
 
 qboolean d_uselists = false;
-qboolean d_skipviewmodeangles = false;
+qboolean d_awayfromviewmodel = false;
 
 extern int r_ambientlight;
 extern float r_shadelight;
@@ -729,7 +729,7 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 		memcpy(view_model.colormap.data(), colormap, 16384);
 	}
 	vec3_t angles;
-	if (d_skipviewmodeangles)
+	if (d_awayfromviewmodel)
 	{
 		angles[ROLL] = 0;
 		angles[PITCH] = 0;
@@ -760,6 +760,12 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 	t2matrix[0][3] = currententity->origin[0];
 	t2matrix[1][3] = currententity->origin[1];
 	t2matrix[2][3] = currententity->origin[2];
+	if (d_awayfromviewmodel)
+	{
+		t2matrix[0][3] -= forward[0] * 8;
+		t2matrix[1][3] -= forward[1] * 8;
+		t2matrix[2][3] -= forward[2] * 8;
+	}
 	float transform[3][4];
 	R_ConcatTransforms (t2matrix, tmatrix, transform);
 	auto vertex = vertices;
