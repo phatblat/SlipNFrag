@@ -67,7 +67,7 @@ void VID_Init(unsigned char *palette)
     vid.conheight = con_height;
     vid.aspect = ((float)vid.height / (float)vid.width) * (320.0 / 240.0);
     vid.numpages = 1;
-    vid.colormap = host_colormap;
+    vid.colormap = host_colormap.data();
     vid.fullbright = 256 - LittleLong (*((int *)vid.colormap + 2048));
     vid.buffer = vid_buffer.data();
     vid.conbuffer = con_buffer.data();
