@@ -21,21 +21,15 @@ void main()
 	vec4 lowColor;
 	if (lowEntry.x > 1.0f - 1.0f / 255.0f)
 	{
-		lowColor = vec4(0, 0, 0, 0);
+		discard;
 	}
-	else
-	{
-		lowColor = texelFetch(fragmentPalette, ivec2(lowEntry.x * 255.0, 0), 0);
-	}
+	lowColor = texelFetch(fragmentPalette, ivec2(lowEntry.x * 255.0, 0), 0);
 	vec4 highColor;
 	if (highEntry.x > 1.0f - 1.0f / 255.0f)
 	{
-		highColor = vec4(0, 0, 0, 0);
+		discard;
 	}
-	else
-	{
-		highColor = texelFetch(fragmentPalette, ivec2(highEntry.x * 255.0, 0), 0);
-	}
+	highColor = texelFetch(fragmentPalette, ivec2(highEntry.x * 255.0, 0), 0);
 	float delta = level.y - lowMip;
 	float r = lowColor.x + delta * (highColor.x - lowColor.x);
 	float g = lowColor.y + delta * (highColor.y - lowColor.y);

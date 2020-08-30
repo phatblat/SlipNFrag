@@ -219,31 +219,46 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 
 void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 {
-	d_lists.last_sprite++;
-	if (d_lists.last_sprite >= d_lists.sprites.size())
+	if (d_lists.last_sprite < 0 || d_lists.sprites[d_lists.last_sprite].frame != (void*)r_spritedesc.pspriteframe)
 	{
-		d_lists.sprites.emplace_back();
+		d_lists.last_sprite++;
+		if (d_lists.last_sprite >= d_lists.sprites.size())
+		{
+			d_lists.sprites.emplace_back();
+		}
+		else
+		{
+			auto& sprite = d_lists.sprites[d_lists.last_sprite];
+			sprite.first_index16 = -1;
+			sprite.first_index32 = -1;
+			sprite.count = 0;
+		}
+		auto& sprite = d_lists.sprites[d_lists.last_sprite];
+		sprite.frame = r_spritedesc.pspriteframe;
+		sprite.width = spritedesc->pspriteframe->width;
+		sprite.height = spritedesc->pspriteframe->height;
+		sprite.size = sprite.width * sprite.height;
+		if (sprite.size > sprite.data.size())
+		{
+			sprite.data.resize(sprite.size);
+		}
+		memcpy(sprite.data.data(), &r_spritedesc.pspriteframe->pixels[0], sprite.size);
 	}
 	auto& sprite = d_lists.sprites[d_lists.last_sprite];
-	sprite.width = spritedesc->pspriteframe->width;
-	sprite.height = spritedesc->pspriteframe->height;
-	sprite.size = sprite.width * sprite.height;
-	if (sprite.size > sprite.data.size())
-	{
-		sprite.data.resize(sprite.size);
-	}
-	memcpy(sprite.data.data(), &r_spritedesc.pspriteframe->pixels[0], sprite.size);
 	auto first_vertex = (d_lists.last_textured_vertex + 1) / 5;
 	auto is_index16 = (first_vertex + 4 <= 65520);
-	if (is_index16)
+	if (sprite.count == 0)
 	{
-		sprite.first_index16 = d_lists.last_textured_index16 + 1;
-		sprite.first_index32 = -1;
-	}
-	else
-	{
-		sprite.first_index16 = -1;
-		sprite.first_index32 = d_lists.last_textured_index32 + 1;
+		if (is_index16)
+		{
+			sprite.first_index16 = d_lists.last_textured_index16 + 1;
+			sprite.first_index32 = -1;
+		}
+		else
+		{
+			sprite.first_index16 = -1;
+			sprite.first_index32 = d_lists.last_textured_index32 + 1;
+		}
 	}
 	for (auto i = 0; i < 4; i++)
 	{
@@ -298,7 +313,7 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 			d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
 		}
 	}
-	sprite.count = 6;
+	sprite.count += 6;
 	auto v0 = first_vertex;
 	auto v1 = first_vertex + 1;
 	auto v2 = first_vertex + 2;
@@ -476,7 +491,7 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 	alias.height = mdl->skinheight;
 	alias.size = alias.width * alias.height;
 	alias.data = (byte *)aliashdr + skindesc->skin;
-	if (colormap == host_colormap)
+	if (colormap == host_colormap.data())
 	{
 		alias.is_host_colormap = true;
 	}
@@ -715,7 +730,7 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 	view_model.height = mdl->skinheight;
 	view_model.size = view_model.width * view_model.height;
 	view_model.data = (byte *)aliashdr + skindesc->skin;
-	if (colormap == host_colormap)
+	if (colormap == host_colormap.data())
 	{
 		view_model.is_host_colormap = true;
 	}

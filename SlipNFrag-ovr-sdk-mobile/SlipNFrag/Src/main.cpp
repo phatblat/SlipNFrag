@@ -4235,7 +4235,7 @@ void android_main(struct android_app *app)
 					r_modelorg_delta[1] = -tracking.HeadPose.Pose.Position.z / scale;
 					r_modelorg_delta[2] = tracking.HeadPose.Pose.Position.y / scale;
 					auto distanceSquared = r_modelorg_delta[0] * r_modelorg_delta[0] + r_modelorg_delta[1] * r_modelorg_delta[1] + r_modelorg_delta[2] * r_modelorg_delta[2];
-					appState.NearViewModel = (distanceSquared < 8 * 8);
+					appState.NearViewModel = (distanceSquared < 12 * 12);
 					d_awayfromviewmodel = !appState.NearViewModel;
 					d_lists.last_surface = -1;
 					d_lists.last_sprite = -1;
@@ -4649,7 +4649,7 @@ void android_main(struct android_app *app)
 				createTexture(appState, perImage.commandBuffer, 256, 1, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.palette);
 			}
 			perImage.host_colormapOffset = -1;
-			if (host_colormap != nullptr && perImage.host_colormap == nullptr)
+			if (host_colormap.size() > 0 && perImage.host_colormap == nullptr)
 			{
 				createTexture(appState, perImage.commandBuffer, 256, 64, VK_FORMAT_R8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.host_colormap);
 				perImage.host_colormapOffset = stagingBufferSize;
@@ -4836,7 +4836,7 @@ void android_main(struct android_app *app)
 					perImage.aliasPerKey.insert({ texture->key, texture });
 					moveTextureToFront(texture, perImage.alias);
 				}
-				if (d_lists.alias[i].is_host_colormap)
+				if (alias.is_host_colormap)
 				{
 					perImage.aliasColormapOffsets[i] = -1;
 					perImage.aliasColormapList[i] = perImage.host_colormap;
@@ -4851,7 +4851,7 @@ void android_main(struct android_app *app)
 			{
 				perImage.viewmodelOffsets.resize(d_lists.last_viewmodel + 1);
 				perImage.viewmodelColormapOffsets.resize(d_lists.last_viewmodel + 1);
-				perImage.viewmodelColormapList.resize(d_lists.last_alias + 1);
+				perImage.viewmodelColormapList.resize(d_lists.last_viewmodel + 1);
 			}
 			perImage.viewmodelsPerKey.clear();
 			for (auto i = 0; i <= d_lists.last_viewmodel; i++)
@@ -4901,7 +4901,7 @@ void android_main(struct android_app *app)
 					perImage.viewmodelsPerKey.insert({ texture->key, texture });
 					moveTextureToFront(texture, perImage.viewmodels);
 				}
-				if (d_lists.viewmodel[i].is_host_colormap)
+				if (viewmodel.is_host_colormap)
 				{
 					perImage.viewmodelColormapOffsets[i] = -1;
 					perImage.viewmodelColormapList[i] = perImage.host_colormap;
@@ -4956,7 +4956,7 @@ void android_main(struct android_app *app)
 				auto offset = 1024;
 				if (perImage.host_colormapOffset >= 0)
 				{
-					memcpy(((unsigned char*)stagingBuffer->mapped) + offset, host_colormap, 16384);
+					memcpy(((unsigned char*)stagingBuffer->mapped) + offset, host_colormap.data(), 16384);
 					offset += 16384;
 				}
 				for (auto i = 0; i <= d_lists.last_surface; i++)
@@ -5062,12 +5062,9 @@ void android_main(struct android_app *app)
 			if (stagingBufferSize > 1024)
 			{
 				fillTexture(appState, perImage.palette, stagingBuffer, 0, perImage.commandBuffer);
-				if ((d_lists.last_alias >= 0 || d_lists.last_viewmodel >= 0) && perImage.host_colormap != nullptr)
+				if (perImage.host_colormapOffset >= 0)
 				{
-					if (perImage.host_colormapOffset >= 0)
-					{
-						fillTexture(appState, perImage.host_colormap, stagingBuffer, perImage.host_colormapOffset, perImage.commandBuffer);
-					}
+					fillTexture(appState, perImage.host_colormap, stagingBuffer, perImage.host_colormapOffset, perImage.commandBuffer);
 				}
 				for (auto i = 0; i <= d_lists.last_surface; i++)
 				{

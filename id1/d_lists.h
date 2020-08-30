@@ -16,6 +16,7 @@ struct dsurface_t
 
 struct dspritedata_t
 {
+	void* frame;
 	int width;
 	int height;
 	int size;
