@@ -17,6 +17,8 @@
 #include <pix.h>
 #include <DirectXColors.h>
 #include <chrono>
+#include <thread>
+#include <mutex>
 #include <winrt/Windows.ApplicationModel.h>
 #include <winrt/Windows.ApplicationModel.Core.h>
 #include <winrt/Windows.ApplicationModel.Activation.h>
