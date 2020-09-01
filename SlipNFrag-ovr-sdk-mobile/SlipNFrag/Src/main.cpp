@@ -303,6 +303,7 @@ struct PerImage
 	CachedTextures viewmodels;
 	CachedTextures colormaps;
 	PipelineResources* pipelineResources;
+	int paletteOffset;
 	int host_colormapOffset;
 	std::vector<int> surfaceOffsets;
 	std::vector<int> spriteOffsets;
@@ -313,6 +314,7 @@ struct PerImage
 	std::vector<int> viewmodelColormapOffsets;
 	int skyOffset;
 	int floorOffset;
+	int paletteChanged;
 	Texture* palette;
 	Texture* host_colormap;
 	int hostClearCount;
@@ -4643,10 +4645,17 @@ void android_main(struct android_app *app)
 					VC(appState.Device.vkCmdPipelineBarrier(perImage.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 1, &bufferMemoryBarrier, 0, nullptr));
 				}
 			}
-			auto stagingBufferSize = 1024;
-			if (perImage.palette == nullptr)
+			auto stagingBufferSize = 0;
+			perImage.paletteOffset = -1;
+			if (perImage.palette == nullptr || perImage.paletteChanged != pal_changed)
 			{
-				createTexture(appState, perImage.commandBuffer, 256, 1, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.palette);
+				if (perImage.palette == nullptr)
+				{
+					createTexture(appState, perImage.commandBuffer, 256, 1, VK_FORMAT_R8G8B8A8_UNORM, 1, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, perImage.palette);
+				}
+				perImage.paletteOffset = stagingBufferSize;
+				stagingBufferSize += 1024;
+				perImage.paletteChanged = pal_changed;
 			}
 			perImage.host_colormapOffset = -1;
 			if (host_colormap.size() > 0 && perImage.host_colormap == nullptr)
@@ -4935,7 +4944,7 @@ void android_main(struct android_app *app)
 				floorSize = 0;
 			}
 			stagingBuffer = nullptr;
-			if (stagingBufferSize > 1024)
+			if (stagingBufferSize > 0)
 			{
 				for (Buffer** b = &perImage.stagingBuffers.oldBuffers; *b != nullptr; b = &(*b)->next)
 				{
@@ -4952,8 +4961,12 @@ void android_main(struct android_app *app)
 				}
 				moveBufferToFront(stagingBuffer, perImage.stagingBuffers);
 				VK(appState.Device.vkMapMemory(appState.Device.device, stagingBuffer->memory, 0, stagingBufferSize, 0, &stagingBuffer->mapped));
-				memcpy(stagingBuffer->mapped, d_8to24table, 1024);
-				auto offset = 1024;
+				auto offset = 0;
+				if (perImage.paletteOffset >= 0)
+				{
+					memcpy(stagingBuffer->mapped, d_8to24table, 1024);
+					offset += 1024;
+				}
 				if (perImage.host_colormapOffset >= 0)
 				{
 					memcpy(((unsigned char*)stagingBuffer->mapped) + offset, host_colormap.data(), 16384);
@@ -5059,9 +5072,12 @@ void android_main(struct android_app *app)
 			writes[2].descriptorCount = 1;
 			writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 			writes[3].descriptorCount = 1;
-			if (stagingBufferSize > 1024)
+			if (stagingBufferSize > 0)
 			{
-				fillTexture(appState, perImage.palette, stagingBuffer, 0, perImage.commandBuffer);
+				if (perImage.paletteOffset >= 0)
+				{
+					fillTexture(appState, perImage.palette, stagingBuffer, perImage.paletteOffset, perImage.commandBuffer);
+				}
 				if (perImage.host_colormapOffset >= 0)
 				{
 					fillTexture(appState, perImage.host_colormap, stagingBuffer, perImage.host_colormapOffset, perImage.commandBuffer);

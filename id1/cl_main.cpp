@@ -64,7 +64,8 @@ void client_state_t::Clear()
     memset(item_gettime, 0, sizeof(item_gettime));
     faceanimtime = 0;
     memset(cshifts, 0, sizeof(cshifts));
-    memset(prev_cshifts, 0, sizeof(prev_cshifts));
+    //No longer clearing this, as it causes some issues when updating specific cshift values after a server restart:
+    //memset(prev_cshifts, 0, sizeof(prev_cshifts));
     memset(mviewangles, 0, sizeof(mviewangles));
     memset(viewangles, 0, sizeof(viewangles));
     memset(mvelocity, 0, sizeof(mvelocity));
