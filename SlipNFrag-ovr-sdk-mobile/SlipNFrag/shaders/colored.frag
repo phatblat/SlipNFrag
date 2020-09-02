@@ -6,11 +6,13 @@
 precision mediump float;
 precision mediump int;
 
+layout(set = 0, binding = 0) uniform sampler2D fragmentPalette;
+
 layout(push_constant) uniform Color
 {
 	layout(offset = 0) float inColor;
 };
-layout(binding = 1) uniform sampler2D fragmentPalette;
+
 layout(location = 0) out lowp vec4 outColor;
 
 void main()

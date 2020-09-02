@@ -6,8 +6,9 @@
 precision highp float;
 precision highp int;
 
-layout(binding = 1) uniform sampler2D fragmentTexture;
-layout(binding = 2) uniform sampler2D fragmentPalette;
+layout(set = 0, binding = 0) uniform sampler2D fragmentPalette;
+layout(set = 1, binding = 1) uniform sampler2D fragmentTexture;
+
 layout(push_constant) uniform Time
 {
 	layout(offset = 0) float time;
