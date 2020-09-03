@@ -82,6 +82,10 @@ int			scr_center_lines;
 int			scr_erase_lines;
 int			scr_erase_center;
 
+std::string scr_interruptablecenterstring;
+int			scr_interruptablecenter_lines;
+qboolean 	scr_interrupted;
+
 /*
 ==============
 SCR_CenterPrint
@@ -104,6 +108,41 @@ void SCR_CenterPrint (char *str)
 			scr_center_lines++;
 		str++;
 	}
+
+	if (!scr_interrupted)
+	{
+		SCR_Interrupt();
+	}
+}
+
+void SCR_InterruptableCenterPrint (char *str)
+{
+	if (scr_interrupted)
+	{
+		return;
+	}
+
+	scr_interruptablecenterstring = str;
+	scr_centertime_off = 99999;
+
+// count the number of lines for centering
+	scr_interruptablecenter_lines = 1;
+	while (*str)
+	{
+		if (*str == '\n')
+			scr_interruptablecenter_lines++;
+		str++;
+	}
+}
+
+void SCR_Interrupt ()
+{
+	if (scr_interruptablecenter_lines > scr_erase_lines)
+	{
+		scr_erase_lines = scr_interruptablecenter_lines;
+	}
+	scr_interruptablecenterstring.clear();
+	scr_interrupted = true;
 }
 
 void SCR_EraseCenterString (void)
@@ -140,12 +179,24 @@ void SCR_DrawCenterString (void)
 		remaining = 9999;
 
 	scr_erase_center = 0;
-	start = scr_centerstring.c_str();
+	if (scr_centerstring.length() > 0)
+	{
+		start = scr_centerstring.c_str();
 
-	if (scr_center_lines <= 4)
-		y = vid.conheight*0.35;
+		if (scr_center_lines <= 4)
+			y = vid.conheight*0.35;
+		else
+			y = 48;
+	}
 	else
-		y = 48;
+	{
+		start = scr_interruptablecenterstring.c_str();
+
+		if (scr_interruptablecenter_lines <= 4)
+			y = vid.conheight*0.35;
+		else
+			y = 48;
+	}
 
 	do	
 	{

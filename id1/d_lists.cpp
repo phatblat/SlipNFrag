@@ -803,21 +803,29 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 		t /= view_model.height;
 
 		// lighting
-		auto plightnormal = r_avertexnormals[vertex->lightnormalindex];
-		auto lightcos = DotProduct (plightnormal, r_plightvec);
-		auto temp = r_ambientlight;
-
-		if (lightcos < 0)
+		float light;
+		if (d_awayfromviewmodel)
 		{
-			temp += (int)(r_shadelight * lightcos);
-
-			// clamp; because we limited the minimum ambient and shading light, we
-			// don't have to clamp low light, just bright
-			if (temp < 0)
-				temp = 0;
+			light = 0;
 		}
+		else
+		{
+			auto plightnormal = r_avertexnormals[vertex->lightnormalindex];
+			auto lightcos = DotProduct (plightnormal, r_plightvec);
+			auto temp = r_ambientlight;
 
-		float light = temp / 256;
+			if (lightcos < 0)
+			{
+				temp += (int)(r_shadelight * lightcos);
+
+				// clamp; because we limited the minimum ambient and shading light, we
+				// don't have to clamp low light, just bright
+				if (temp < 0)
+					temp = 0;
+			}
+
+			light = temp / 256;
+		}
 
 		d_lists.last_colormapped_vertex++;
 		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())

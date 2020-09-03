@@ -509,6 +509,9 @@ struct AppState
 	ovrVector2f LeftJoystick;
 	ovrVector2f RightJoystick;
 	bool NearViewModel;
+	double TimeInWorldMode;
+	bool ControlsMessageDisplayed;
+	bool ControlsMessageClosed;
 };
 
 static const int queueCount = 1;
@@ -2837,7 +2840,12 @@ void android_main(struct android_app *app)
 						}
 						if (leftButtonIsDown(appState, ovrButton_Trigger) || rightButtonIsDown(appState, ovrButton_Trigger))
 						{
-							if (appState.NearViewModel || d_lists.last_viewmodel < 0)
+							if (!appState.ControlsMessageClosed && appState.ControlsMessageDisplayed && (appState.NearViewModel || d_lists.last_viewmodel < 0))
+							{
+								SCR_Interrupt();
+								appState.ControlsMessageClosed = true;
+							}
+							else if (appState.NearViewModel || d_lists.last_viewmodel < 0)
 							{
 								Cmd_ExecuteString("+attack", src_command);
 							}
@@ -2854,7 +2862,7 @@ void android_main(struct android_app *app)
 						{
 							Cmd_ExecuteString("-speed", src_command);
 						}
-						if (leftButtonIsDown(appState, ovrButton_Joystick))
+						if (leftButtonIsDown(appState, ovrButton_Joystick) || rightButtonIsDown(appState, ovrButton_Joystick))
 						{
 							Cmd_ExecuteString("impulse 10", src_command);
 						}
@@ -4213,6 +4221,15 @@ void android_main(struct android_app *app)
 				appState.PreviousTime = appState.CurrentTime;
 				appState.CurrentTime = getTime();
 				frame_lapse = (float) (appState.CurrentTime - appState.PreviousTime);
+				if (appState.Mode == AppWorldMode)
+				{
+					appState.TimeInWorldMode += frame_lapse;
+					if (!appState.ControlsMessageDisplayed && appState.TimeInWorldMode > 4)
+					{
+						SCR_InterruptableCenterPrint("Controls:\n\nLeft or Right Joysticks:\nWalk Forward / Backpedal, \n   Step Left / Step Right \n\n[B] / [Y]: Jump     \n[A] / [X]: Swim down\nTriggers: Attack  \nGrip Triggers: Run          \nClick Joysticks: Change Weapon  \n\nApproach and fire weapon to close");
+						appState.ControlsMessageDisplayed = true;
+					}
+				}
 			}
 			if (r_cache_thrash)
 			{
