@@ -280,7 +280,7 @@ void UDP_Listen (qboolean state)
 int UDP_OpenSocket (int port)
 {
     int newsocket;
-    struct sockaddr_in6 address;
+    struct sockaddr_in6 address { };
     qboolean _true = true;
     int off = 0;
 

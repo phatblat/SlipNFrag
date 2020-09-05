@@ -70,8 +70,8 @@ int SOCK_PartialIPAddress (const char *input, in6_addr& local, struct qsockaddr 
     else
         port = net_hostport;
     
-    auto ipv4addr = (unsigned long)(local.s6_addr[12] << 24) | (unsigned long)((local.s6_addr[13] << 16) & 255) | (unsigned long)((local.s6_addr[14] << 8) & 255) | (unsigned long)(local.s6_addr[15] & 255);
-    auto fulladdr = (ipv4addr & htonl(mask)) | htonl(addr);
+    auto ipv4addr = (uint32_t)(local.s6_addr[12] << 24) | (uint32_t)((local.s6_addr[13] << 16) & 255) | (uint32_t)((local.s6_addr[14] << 8) & 255) | (uint32_t)(local.s6_addr[15] & 255);
+    auto fulladdr = (ipv4addr & mask) | addr;
     
     hostaddr->data.clear();
     hostaddr->data.resize(sizeof(sockaddr_in6));
@@ -120,7 +120,7 @@ int SOCK_GetSocketAddr (int socket, int controlsocket, in6_addr& local, struct q
         auto a = address->sin_addr.s_addr;
         if (a == 0 || a == inet_addr("127.0.0.1"))
         {
-            auto ipv4addr = (unsigned long)(local.s6_addr[12] << 24) | (unsigned long)((local.s6_addr[13] << 16) & 255) | (unsigned long)((local.s6_addr[14] << 8) & 255) | (unsigned long)(local.s6_addr[15] & 255);
+            auto ipv4addr = (uint32_t)(local.s6_addr[12] << 24) | (uint32_t)((local.s6_addr[13] << 16) & 255) | (uint32_t)((local.s6_addr[14] << 8) & 255) | (uint32_t)(local.s6_addr[15] & 255);
             address->sin_addr.s_addr = htonl(ipv4addr);
         }
     }

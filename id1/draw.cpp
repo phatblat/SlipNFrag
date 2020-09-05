@@ -897,6 +897,7 @@ void Draw_ConsoleBackground (int lines)
 		Draw_CharToConback (ver[x], dest+(x<<3));
 	
 // draw the pic
+    auto width = vid.conwidth - vid.conwidth % 3;
 	if (r_pixbytes == 1)
 	{
 		dest = vid.conbuffer;
@@ -911,7 +912,7 @@ void Draw_ConsoleBackground (int lines)
 			{
 				f = 0;
 				fstep = 320*0x10000/vid.conwidth;
-				for (x=0 ; x<vid.conwidth ; x+=4)
+				for (x=0 ; x<width ; x+=4)
 				{
 					dest[x] = src[f>>16];
 					f += fstep;
@@ -922,6 +923,11 @@ void Draw_ConsoleBackground (int lines)
 					dest[x+3] = src[f>>16];
 					f += fstep;
 				}
+                while (x<vid.conwidth)
+                {
+                    dest[x++] = src[f>>16];
+                    f += fstep;
+                }
 			}
 		}
 	}
@@ -937,7 +943,7 @@ void Draw_ConsoleBackground (int lines)
 			src = conback->data + v*320;
 			f = 0;
 			fstep = 320*0x10000/vid.conwidth;
-			for (x=0 ; x<vid.conwidth ; x+=4)
+			for (x=0 ; x<width ; x+=4)
 			{
 				pusdest[x] = d_8to16table[src[f>>16]];
 				f += fstep;
@@ -948,6 +954,11 @@ void Draw_ConsoleBackground (int lines)
 				pusdest[x+3] = d_8to16table[src[f>>16]];
 				f += fstep;
 			}
+            while (x<vid.conwidth)
+            {
+                dest[x++] = src[f>>16];
+                f += fstep;
+            }
 		}
 	}
 }
