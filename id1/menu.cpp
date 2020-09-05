@@ -647,7 +647,7 @@ void M_MultiPlayer_Draw (void)
 
 	if (serialAvailable || ipxAvailable || tcpipAvailable)
 		return;
-	M_PrintWhite ((320/2) - ((27*8)/2), 148, "No Communications Available");
+	M_PrintWhite ((320/2) - ((27*8)/2), 152, "No Communications Available");
 }
 
 
@@ -1815,7 +1815,7 @@ void M_SerialConfig_Draw (void)
 		M_DrawCharacter (168 + 8*strlen(serialConfig_phone), serialConfig_cursor_table [serialConfig_cursor], 10+((int)(realtime*4)&1));
 
 	if (*m_return_reason)
-		M_PrintWhite (basex, 148, m_return_reason);
+		M_PrintWhite (basex, 152, m_return_reason);
 }
 
 
@@ -2243,7 +2243,7 @@ void M_LanConfig_Draw (void)
 		M_DrawCharacter (basex+16 + 8*strlen(lanConfig_joinname), lanConfig_cursor_table [2], 10+((int)(realtime*4)&1));
 
 	if (*m_return_reason)
-		M_PrintWhite (basex, 148, m_return_reason);
+		M_PrintWhite (basex, 152, m_return_reason);
 }
 
 
@@ -2927,7 +2927,7 @@ void M_ServerList_Draw (void)
 	M_DrawCharacter (0, 32 + slist_cursor*8, 12+((int)(realtime*4)&1));
 
 	if (*m_return_reason)
-		M_PrintWhite (16, 148, m_return_reason);
+		M_PrintWhite (16, 152, m_return_reason);
 }
 
 

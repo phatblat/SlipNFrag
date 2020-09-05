@@ -39,6 +39,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <unistd.h>
 #include <ifaddrs.h>
 #include <net/if.h>
+#define USE_IFADDRS
+#elif defined(__linux__)
+#include <ifaddrs.h>
+#include <net/if.h>
+#define USE_IFADDRS
 #else
 extern "C" int gethostname (char *, int);
 #endif
@@ -57,15 +62,100 @@ static struct qsockaddr broadcastaddr;
 
 static in6_addr myAddr { };
 
-char*       net_ipaddress = NULL;
-char**      net_ipaddresses = NULL;
-int         net_ipaddressescount = 0;
-int         net_ipaddressessize = 0;
-
 int UDP_OpenIPV4Socket(int port);
 
 //=============================================================================
 
+#ifdef USE_IFADDRS
+int UDP_Init (void)
+{
+	char	buff[MAXHOSTNAMELEN];
+	struct qsockaddr addr;
+
+	if (COM_CheckParm ("-noudp"))
+		return -1;
+
+	// determine my name & address
+	ifaddrs *allInterfaces;
+	auto result = getifaddrs(&allInterfaces);
+	if (result < 0)
+	{
+		return result;
+	}
+	if (hostname.string == "UNNAMED")
+	{
+		auto found = false;
+		for (auto interface = allInterfaces; interface != nullptr; interface = interface->ifa_next)
+		{
+			auto flags = interface->ifa_flags;
+			auto addr = interface->ifa_addr;
+			if (((flags & (IFF_UP|IFF_RUNNING|IFF_LOOPBACK)) == (IFF_UP|IFF_RUNNING)) && addr->sa_family == AF_INET)
+			{
+				getnameinfo(addr, sizeof(sockaddr), buff, MAXHOSTNAMELEN, nullptr, 0, NI_NUMERICHOST);
+				myAddr.s6_addr[10] = 255;
+				myAddr.s6_addr[11] = 255;
+				myAddr.s6_addr[12] = addr->sa_data[2];
+				myAddr.s6_addr[13] = addr->sa_data[3];
+				myAddr.s6_addr[14] = addr->sa_data[4];
+				myAddr.s6_addr[15] = addr->sa_data[5];
+				strncpy(my_tcpip_address, buff, NET_NAMELEN);
+				Cvar_Set ("hostname", buff);
+				found = true;
+				break;
+			}
+		}
+		freeifaddrs(allInterfaces);
+		if (!found)
+		{
+			return -1;
+		}
+	}
+	else
+	{
+		auto found = false;
+		for (auto interface = allInterfaces; interface != nullptr; interface = interface->ifa_next)
+		{
+			auto flags = interface->ifa_flags;
+			auto addr = interface->ifa_addr;
+			if (((flags & (IFF_UP|IFF_RUNNING|IFF_LOOPBACK)) == (IFF_UP|IFF_RUNNING)) && addr->sa_family == AF_INET)
+			{
+				getnameinfo(addr, sizeof(sockaddr), buff, MAXHOSTNAMELEN, nullptr, 0, NI_NUMERICHOST);
+				if (hostname.string == buff)
+				{
+					myAddr.s6_addr[10] = 255;
+					myAddr.s6_addr[11] = 255;
+					myAddr.s6_addr[12] = addr->sa_data[2];
+					myAddr.s6_addr[13] = addr->sa_data[3];
+					myAddr.s6_addr[14] = addr->sa_data[4];
+					myAddr.s6_addr[15] = addr->sa_data[5];
+					strncpy(my_tcpip_address, buff, NET_NAMELEN);
+					found = true;
+					break;
+				}
+			}
+		}
+		freeifaddrs(allInterfaces);
+		if (!found)
+		{
+			return -1;
+		}
+	}
+
+	if ((net_controlsocket = UDP_OpenIPV4Socket (0)) == -1)
+		Sys_Error("UDP_Init: Unable to open control socket\n");
+
+	broadcastaddr.data.resize(sizeof(sockaddr_in));
+	auto address = (sockaddr_in*)broadcastaddr.data.data();
+	address->sin_family = AF_INET;
+	address->sin_addr.s_addr = INADDR_BROADCAST;
+	address->sin_port = htons((unsigned short)net_hostport);
+
+	Con_Printf("UDP Initialized\n");
+	tcpipAvailable = true;
+
+	return net_controlsocket;
+}
+#else
 int UDP_Init (void)
 {
 	char	buff[MAXHOSTNAMELEN];
@@ -154,6 +244,7 @@ int UDP_Init (void)
 
 	return net_controlsocket;
 }
+#endif
 
 //=============================================================================
 

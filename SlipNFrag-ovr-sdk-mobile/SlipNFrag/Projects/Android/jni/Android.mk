@@ -13,7 +13,7 @@ ID1_FILES				:= $(filter-out $(LOCAL_PATH)/../../../../../id1/net_wins.cpp, $(ID
 LOCAL_SRC_FILES			:=  $(LOCAL_PATH)/../../../../../SlipNFrag/cd_null.cpp \
 							$(LOCAL_PATH)/../../../Src/in_ovr.cpp \
 							$(LOCAL_PATH)/../../../Src/main.cpp \
-							$(LOCAL_PATH)/../../../../../SlipNFrag/net_none.cpp \
+							$(LOCAL_PATH)/../../../Src/net_ovr.cpp \
 							$(LOCAL_PATH)/../../../Src/snd_ovr.cpp \
 							$(LOCAL_PATH)/../../../Src/sys_ovr.cpp \
 							$(LOCAL_PATH)/../../../Src/vid_ovr.cpp
