@@ -278,6 +278,7 @@ extern	int 		host_clearcount;
 extern	int			host_framecount;	// incremented every frame, never reset
 extern	double		realtime;			// not bounded in any way, changed at
 										// start of every frame, never reset
+extern	std::string	sys_version;
 
 void Host_ClearMemory (void);
 void Host_ServerFrame (void);

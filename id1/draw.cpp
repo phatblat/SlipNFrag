@@ -37,6 +37,8 @@ byte		*draw_chars;				// 8*8 graphic characters
 qpic_t		*draw_disc;
 qpic_t		*draw_backtile;
 
+std::string sys_version;
+
 //=============================================================================
 /* Support Routines */
 
@@ -879,6 +881,13 @@ void Draw_ConsoleBackground (int lines)
 	conback = Draw_CachePic ("gfx/conback.lmp");
 
 // hack the version number directly into the pic
+	if (sys_version.size() > 0)
+	{
+		sprintf (ver, "%s", sys_version.c_str());
+		dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
+	}
+	else
+	{
 #ifdef _WIN32
 	sprintf (ver, "(WinQuake) %4.2f", (float)VERSION);
 	dest = conback->data + 320*186 + 320 - 11 - 8*strlen(ver);
@@ -892,6 +901,7 @@ void Draw_ConsoleBackground (int lines)
 	dest = conback->data + 320 - 43 + 320*186;
 	sprintf (ver, "%4.2f", VERSION);
 #endif
+	}
 
 	for (x=0 ; x<strlen(ver) ; x++)
 		Draw_CharToConback (ver[x], dest+(x<<3));

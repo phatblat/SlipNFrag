@@ -1189,8 +1189,10 @@ void android_main(struct android_app *app)
 #endif
 	static const char *requestedLayers[]
 	{
+#if defined(_DEBUG)
 		"VK_LAYER_LUNARG_core_validation",
 		"VK_LAYER_LUNARG_parameter_validation",
+#endif
 		"VK_LAYER_LUNARG_object_tracker",
 		"VK_LAYER_GOOGLE_threading",
 		"VK_LAYER_GOOGLE_unique_objects"
@@ -4041,6 +4043,7 @@ void android_main(struct android_app *app)
 		{
 			if (appState.PreviousMode == AppStartupMode)
 			{
+				sys_version = "OVR 1.0.3";
 				const char* basedir = "/sdcard/android/data/com.heribertodelgado.slipnfrag/files";
 				std::vector<std::string> arguments;
 				arguments.emplace_back("SlipNFrag");
