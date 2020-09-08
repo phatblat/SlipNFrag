@@ -298,6 +298,8 @@
     vid_width = (int)self.view.frame.size.width;
     vid_height = (int)self.view.frame.size.height;
     [self calculateConsoleDimensions];
+    NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"];
+    sys_version = std::string("MacOS ") + [version cStringUsingEncoding:NSString.defaultCStringEncoding];
     std::vector<std::string> arguments;
     arguments.emplace_back(sys_argv[0]);
     NSData* basedir = [NSUserDefaults.standardUserDefaults objectForKey:@"basedir_bookmark"];
