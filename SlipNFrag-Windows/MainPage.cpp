@@ -547,6 +547,7 @@ namespace winrt::SlipNFrag_Windows::implementation
 					sys_argv[i] = new char[arguments[i].length() + 1];
 					strcpy(sys_argv[i], arguments[i].c_str());
 				}
+				sys_version = "UWP 1.0.3";
 				swapChainPanel().Dispatcher().RunAsync(CoreDispatcherPriority::High, [=]()
 					{
 						newScreenWidth = (float)swapChainPanel().ActualWidth();

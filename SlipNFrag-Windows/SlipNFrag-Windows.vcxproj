@@ -69,11 +69,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <PackageCertificateThumbprint>F551DA692365EDD73E1C0F72E41D4B28BE13F5B0</PackageCertificateThumbprint>
+    <PackageCertificateThumbprint>887FBA3DAA7A1B3F166E4C75AB39709BAFFAF9A9</PackageCertificateThumbprint>
     <GenerateAppInstallerFile>True</GenerateAppInstallerFile>
     <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
-    <AppxPackageDir>C:\Projects\Releases\</AppxPackageDir>
-    <AppxBundle>Auto</AppxBundle>
+    <AppxPackageDir>C:\Projects\Releases\SlipNFrag</AppxPackageDir>
+    <AppxBundle>Always</AppxBundle>
     <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
     <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
@@ -81,7 +81,7 @@
     <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-    <AppInstallerUri>C:\Projects\Releases</AppInstallerUri>
+    <AppInstallerUri>C:\Projects\Releases\SlipNFrag</AppInstallerUri>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>

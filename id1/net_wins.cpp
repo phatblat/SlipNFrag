@@ -75,46 +75,20 @@ void WINS_GetLocalAddress()
 		return;
 	}
 
-	addrinfo* result = nullptr;
+	addrinfo* result;
 	for (result = results; result != nullptr; result = result->ai_next)
 	{
-		if (result->ai_family == AF_INET6)
+		if (result->ai_family == AF_INET)
 		{
-			auto is_local = true;
-			for (auto i = 0; i < 16; i++)
-			{
-				if (((sockaddr_in6*)result->ai_addr)->sin6_addr.u.Byte[i] != in6addr_loopback.u.Byte[i])
-				{
-					is_local = false;
-					break;
-				}
-			}
-			if (!is_local)
-			{
-				myAddr = ((sockaddr_in6*)result->ai_addr)->sin6_addr;
-				myAddr_initialized = true;
-				inet_ntop(AF_INET6, &myAddr, my_tcpip_address, NET_NAMELEN);
-				break;
-			}
-		}
-	}
-
-	if (result == nullptr)
-	{
-		for (result = results; result != nullptr; result = result->ai_next)
-		{
-			if (result->ai_family == AF_INET)
-			{
-				auto address = ((sockaddr_in*)result->ai_addr)->sin_addr;
-				myAddr = in6addr_v4mappedprefix;
-				myAddr.u.Byte[12] = address.S_un.S_un_b.s_b1;
-				myAddr.u.Byte[13] = address.S_un.S_un_b.s_b2;
-				myAddr.u.Byte[14] = address.S_un.S_un_b.s_b3;
-				myAddr.u.Byte[15] = address.S_un.S_un_b.s_b4;
-				myAddr_initialized = true;
-				inet_ntop(AF_INET, &address, my_tcpip_address, NET_NAMELEN);
-				break;
-			}
+			auto address = ((sockaddr_in*)result->ai_addr)->sin_addr;
+			myAddr = in6addr_v4mappedprefix;
+			myAddr.u.Byte[12] = address.S_un.S_un_b.s_b1;
+			myAddr.u.Byte[13] = address.S_un.S_un_b.s_b2;
+			myAddr.u.Byte[14] = address.S_un.S_un_b.s_b3;
+			myAddr.u.Byte[15] = address.S_un.S_un_b.s_b4;
+			myAddr_initialized = true;
+			inet_ntop(AF_INET, &address, my_tcpip_address, NET_NAMELEN);
+			break;
 		}
 	}
 
@@ -159,7 +133,7 @@ int WINS_Init (void)
 	}
 
 	// if the quake hostname isn't set, set it to the machine name
-	if (Q_strcmp(hostname.string.c_str(), "UNNAMED") == 0)
+	if (hostname.string == "UNNAMED")
 	{
 		// see if it's a text IP address (well, close enough)
 		for (p = buff; *p; p++)
@@ -204,6 +178,7 @@ int WINS_Init (void)
 				myAddr_initialized = true;
 			}
 			strcpy(my_tcpip_address, com_argv[i+1]);
+			Cvar_Set("hostname", my_tcpip_address);
 		}
 		else
 		{
@@ -212,8 +187,7 @@ int WINS_Init (void)
 	}
 	else
 	{
-		myAddr = in6addr_any;
-		strcpy(my_tcpip_address, "in6addr_any");
+		WINS_GetLocalAddress();
 	}
 
 	if ((net_controlsocket = WINS_OpenIPV4Socket (0)) == -1)
