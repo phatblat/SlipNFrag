@@ -83,6 +83,10 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 	{
 		return;
 	}
+	auto texinfo = face->texinfo;
+	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
+	auto next_back = next_front + face->numedges - 1;
+	auto is_index16 = (next_back < 65520);
 	auto is_new = true;
 	if (d_lists.last_surface >= 0)
 	{
@@ -91,14 +95,14 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		{
 			if (surface.first_index16 >= 0)
 			{
-				if (surface.first_index16 + surface.count == d_lists.last_textured_index16 + 1)
+				if (is_index16 && surface.first_index16 + surface.count == d_lists.last_textured_index16 + 1)
 				{
 					is_new = false;
 				}
 			}
 			else if (surface.first_index32 >= 0)
 			{
-				if (surface.first_index32 + surface.count == d_lists.last_textured_index32 + 1)
+				if (!is_index16 && surface.first_index32 + surface.count == d_lists.last_textured_index32 + 1)
 				{
 					is_new = false;
 				}
@@ -129,10 +133,17 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		}
 		memcpy(surface.data.data(), cache->data, surface.size);
 		surface.count = 0;
+		if (is_index16)
+		{
+			surface.first_index16 = d_lists.last_textured_index16 + 1;
+			surface.first_index32 = -1;
+		}
+		else
+		{
+			surface.first_index16 = -1;
+			surface.first_index32 = d_lists.last_textured_index32 + 1;
+		}
 	}
-	auto texinfo = face->texinfo;
-	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
-	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
 	for (auto i = 0; i < face->numedges; i++)
 	{
@@ -203,20 +214,6 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		}
 		edgeindex++;
 	}
-	auto is_index16 = (next_back < 65520);
-	if (is_new)
-	{
-		if (is_index16)
-		{
-			surface.first_index16 = d_lists.last_textured_index16 + 1;
-			surface.first_index32 = -1;
-		}
-		else
-		{
-			surface.first_index16 = -1;
-			surface.first_index32 = d_lists.last_textured_index32 + 1;
-		}
-	}
 	surface.count += (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
@@ -252,6 +249,8 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 
 void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 {
+	auto first_vertex = (d_lists.last_textured_vertex + 1) / 5;
+	auto is_index16 = (first_vertex + 4 <= 65520);
 	auto is_new = true;
 	if (d_lists.last_sprite >= 0)
 	{
@@ -260,14 +259,14 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 		{
 			if (sprite.first_index16 >= 0)
 			{
-				if (sprite.first_index16 + sprite.count == d_lists.last_textured_index16 + 1)
+				if (is_index16 && sprite.first_index16 + sprite.count == d_lists.last_textured_index16 + 1)
 				{
 					is_new = false;
 				}
 			}
 			else if (sprite.first_index32 >= 0)
 			{
-				if (sprite.first_index32 + sprite.count == d_lists.last_textured_index32 + 1)
+				if (!is_index16 && sprite.first_index32 + sprite.count == d_lists.last_textured_index32 + 1)
 				{
 					is_new = false;
 				}
@@ -296,11 +295,6 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 		}
 		memcpy(sprite.data.data(), &r_spritedesc.pspriteframe->pixels[0], sprite.size);
 		sprite.count = 0;
-	}
-	auto first_vertex = (d_lists.last_textured_vertex + 1) / 5;
-	auto is_index16 = (first_vertex + 4 <= 65520);
-	if (is_new)
-	{
 		if (is_index16)
 		{
 			sprite.first_index16 = d_lists.last_textured_index16 + 1;
@@ -398,6 +392,9 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 	}
 	auto texinfo = face->texinfo;
 	auto texture = texinfo->texture;
+	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
+	auto next_back = next_front + face->numedges - 1;
+	auto is_index16 = (next_back < 65520);
 	auto is_new = true;
 	if (d_lists.last_turbulent >= 0)
 	{
@@ -406,14 +403,14 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		{
 			if (turbulent.first_index16 >= 0)
 			{
-				if (turbulent.first_index16 + turbulent.count == d_lists.last_textured_index16 + 1)
+				if (is_index16 && turbulent.first_index16 + turbulent.count == d_lists.last_textured_index16 + 1)
 				{
 					is_new = false;
 				}
 			}
 			else if (turbulent.first_index32 >= 0)
 			{
-				if (turbulent.first_index32 + turbulent.count == d_lists.last_textured_index32 + 1)
+				if (!is_index16 && turbulent.first_index32 + turbulent.count == d_lists.last_textured_index32 + 1)
 				{
 					is_new = false;
 				}
@@ -438,9 +435,17 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		turbulent.size = turbulent.width * turbulent.height;
 		turbulent.data = (unsigned char*)texture + texture->offsets[0];
 		turbulent.count = 0;
+		if (is_index16)
+		{
+			turbulent.first_index16 = d_lists.last_textured_index16 + 1;
+			turbulent.first_index32 = -1;
+		}
+		else
+		{
+			turbulent.first_index16 = -1;
+			turbulent.first_index32 = d_lists.last_textured_index32 + 1;
+		}
 	}
-	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
-	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
 	for (auto i = 0; i < face->numedges; i++)
 	{
@@ -511,20 +516,6 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		}
 		edgeindex++;
 	}
-	auto is_index16 = (next_back < 65520);
-	if (is_new)
-	{
-		if (is_index16)
-		{
-			turbulent.first_index16 = d_lists.last_textured_index16 + 1;
-			turbulent.first_index32 = -1;
-		}
-		else
-		{
-			turbulent.first_index16 = -1;
-			turbulent.first_index32 = d_lists.last_textured_index32 + 1;
-		}
-	}
 	turbulent.count += (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
@@ -565,6 +556,8 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 	{
 		return;
 	}
+	auto basevert = (d_lists.last_colormapped_vertex + 1) / 6;
+	auto is_index16 = (basevert + mdl->numverts * 2 <= 65520);
 	auto is_new = true;
 	if (d_lists.last_alias >= 0)
 	{
@@ -573,14 +566,14 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 		{
 			if (alias.first_index16 >= 0)
 			{
-				if (alias.first_index16 + alias.count == d_lists.last_colormapped_index16 + 1)
+				if (is_index16 && alias.first_index16 + alias.count == d_lists.last_colormapped_index16 + 1)
 				{
 					is_new = false;
 				}
 			}
 			else if (alias.first_index32 >= 0)
 			{
-				if (alias.first_index32 + alias.count == d_lists.last_colormapped_index32 + 1)
+				if (!is_index16 && alias.first_index32 + alias.count == d_lists.last_colormapped_index32 + 1)
 				{
 					is_new = false;
 				}
@@ -618,6 +611,16 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 			memcpy(alias.colormap.data(), colormap, 16384);
 		}
 		alias.count = 0;
+		if (is_index16)
+		{
+			alias.first_index16 = d_lists.last_colormapped_index16 + 1;
+			alias.first_index32 = -1;
+		}
+		else
+		{
+			alias.first_index16 = -1;
+			alias.first_index32 = d_lists.last_colormapped_index32 + 1;
+		}
 	}
 	vec3_t angles;
 	angles[ROLL] = currententity->angles[ROLL];
@@ -647,7 +650,6 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 	auto vertex = vertices;
 	auto texcoordsbase = (stvert_t *)((byte *)aliashdr + aliashdr->stverts);
 	auto texcoords = texcoordsbase;
-	auto basevert = (d_lists.last_colormapped_vertex + 1) / 6;
 	for (auto i = 0; i < mdl->numverts; i++)
 	{
 		vec3_t pos { (float)vertex->v[0], (float)vertex->v[1], (float)vertex->v[2] };
@@ -764,7 +766,7 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 		d_lists.last_colormapped_vertex++;
 		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
 		{
-			d_lists.colormapped_vertices.emplace_back(s);
+			d_lists.colormapped_vertices.emplace_back(s + 0.5);
 		}
 		else
 		{
@@ -790,20 +792,6 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 		}
 		vertex++;
 		texcoords++;
-	}
-	auto is_index16 = (basevert + mdl->numverts <= 65520);
-	if (is_new)
-	{
-		if (is_index16)
-		{
-			alias.first_index16 = d_lists.last_colormapped_index16 + 1;
-			alias.first_index32 = -1;
-		}
-		else
-		{
-			alias.first_index16 = -1;
-			alias.first_index32 = d_lists.last_colormapped_index32 + 1;
-		}
 	}
 	alias.count += mdl->numtris * 3;
 	auto triangle = (mtriangle_t *)((byte *)aliashdr + aliashdr->triangles);
@@ -1030,7 +1018,7 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 		d_lists.last_colormapped_vertex++;
 		if (d_lists.last_colormapped_vertex >= d_lists.colormapped_vertices.size())
 		{
-			d_lists.colormapped_vertices.emplace_back(s);
+			d_lists.colormapped_vertices.emplace_back(s + 0.5);
 		}
 		else
 		{
@@ -1057,7 +1045,7 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 		vertex++;
 		texcoords++;
 	}
-	auto is_index16 = (basevert + mdl->numverts <= 65520);
+	auto is_index16 = (basevert + mdl->numverts * 2 <= 65520);
 	if (is_index16)
 	{
 		view_model.first_index16 = d_lists.last_colormapped_index16 + 1;

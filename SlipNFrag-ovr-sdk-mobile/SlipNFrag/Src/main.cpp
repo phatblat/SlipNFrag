@@ -4277,6 +4277,36 @@ void android_main(struct android_app *app)
 					auto nodrift = cl.nodrift;
 					cl.nodrift = true;
 					Host_FrameRender();
+#if defined(_DEBUG)
+					auto surfacecount = 0; for (auto x = 0; x <= d_lists.last_surface; x++) surfacecount += d_lists.surfaces[x].size;
+					auto spritecount = 0; for (auto x = 0; x <= d_lists.last_sprite; x++) spritecount += d_lists.sprites[x].size;
+					auto turbulentcount = 0; for (auto x = 0; x <= d_lists.last_turbulent; x++) turbulentcount += d_lists.turbulent[x].size;
+					auto aliascount = 0; for (auto x = 0; x <= d_lists.last_alias; x++) aliascount += d_lists.alias[x].size;
+					auto viewmodelcount = 0; for (auto x = 0; x <= d_lists.last_viewmodel; x++) viewmodelcount += d_lists.viewmodel[x].size;
+					__android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "** %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i %i",
+						d_lists.last_surface,
+						surfacecount,
+						d_lists.last_sprite,
+						spritecount,
+						d_lists.last_turbulent,
+						turbulentcount,
+						d_lists.last_alias,
+						aliascount,
+						d_lists.last_viewmodel,
+						viewmodelcount,
+						d_lists.last_particle,
+						d_lists.last_sky,
+						d_lists.last_textured_vertex,
+						d_lists.last_textured_index16,
+						d_lists.last_textured_index32,
+						d_lists.last_colormapped_vertex,
+						d_lists.last_colormapped_index16,
+						d_lists.last_colormapped_index32,
+						d_lists.last_colored_vertex,
+						d_lists.last_colored_index16,
+						d_lists.last_colored_index32,
+						d_lists.clear_color);
+#endif
 					cl.nodrift = nodrift;
 					if (appState.Scene.hostClearCount != host_clearcount)
 					{
@@ -5328,6 +5358,7 @@ void android_main(struct android_app *app)
 				resources->sprites.created = true;
 				if (indices16 != nullptr)
 				{
+					VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices16->buffer, noOffset, VK_INDEX_TYPE_UINT16));
 					for (auto i = 0; i <= d_lists.last_sprite; i++)
 					{
 						auto& sprite = d_lists.sprites[i];
@@ -5349,6 +5380,7 @@ void android_main(struct android_app *app)
 				}
 				if (indices32 != nullptr)
 				{
+					VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices32->buffer, noOffset, VK_INDEX_TYPE_UINT32));
 					for (auto i = 0; i <= d_lists.last_sprite; i++)
 					{
 						auto& sprite = d_lists.sprites[i];
@@ -5538,7 +5570,6 @@ void android_main(struct android_app *app)
 					writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 					writes[0].pBufferInfo = bufferInfo;
 					VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 1, writes, 0, nullptr));
-					auto distanceSquared = r_modelorg_delta[0] * r_modelorg_delta[0] + r_modelorg_delta[1] * r_modelorg_delta[1] + r_modelorg_delta[2] * r_modelorg_delta[2];
 					float forwardAndTint[8];
 					if (appState.NearViewModel)
 					{
