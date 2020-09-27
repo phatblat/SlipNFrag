@@ -4,6 +4,7 @@ struct dsurface_t
 {
 	void* surface;
 	void* entity;
+	int frame_count;
 	int created;
 	int width;
 	int height;
@@ -17,6 +18,7 @@ struct dsurface_t
 struct dspritedata_t
 {
 	void* frame;
+	int frame_count;
 	int width;
 	int height;
 	int size;
@@ -29,6 +31,7 @@ struct dspritedata_t
 struct dturbulent_t
 {
 	void* texture;
+	int frame_count;
 	int width;
 	int height;
 	int size;
@@ -41,6 +44,7 @@ struct dturbulent_t
 struct dalias_t
 {
 	void* model;
+	int frame_count;
 	int width;
 	int height;
 	int size;

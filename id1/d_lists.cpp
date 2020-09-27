@@ -83,24 +83,54 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 	{
 		return;
 	}
-	auto texinfo = face->texinfo;
-	d_lists.last_surface++;
-	if (d_lists.last_surface >= d_lists.surfaces.size())
+	auto is_new = true;
+	if (d_lists.last_surface >= 0)
 	{
-		d_lists.surfaces.emplace_back();
+		auto& surface = d_lists.surfaces[d_lists.last_surface];
+		if (surface.surface == face && surface.entity == entity && surface.frame_count == r_framecount)
+		{
+			if (surface.first_index16 >= 0)
+			{
+				if (surface.first_index16 + surface.count == d_lists.last_textured_index16 + 1)
+				{
+					is_new = false;
+				}
+			}
+			else if (surface.first_index32 >= 0)
+			{
+				if (surface.first_index32 + surface.count == d_lists.last_textured_index32 + 1)
+				{
+					is_new = false;
+				}
+			}
+		}
+	}
+	if (is_new)
+	{
+		d_lists.last_surface++;
+		if (d_lists.last_surface >= d_lists.surfaces.size())
+		{
+			d_lists.surfaces.emplace_back();
+		}
 	}
 	auto& surface = d_lists.surfaces[d_lists.last_surface];
-	surface.surface = face;
-	surface.entity = entity;
-	surface.created = (created ? 1: 0);
-	surface.width = cache->width;
-	surface.height = cache->height;
-	surface.size = surface.width * surface.height;
-	if (surface.size > surface.data.size())
+	if (is_new)
 	{
-		surface.data.resize(surface.size);
+		surface.surface = face;
+		surface.entity = entity;
+		surface.frame_count = r_framecount;
+		surface.created = (created ? 1: 0);
+		surface.width = cache->width;
+		surface.height = cache->height;
+		surface.size = surface.width * surface.height;
+		if (surface.size > surface.data.size())
+		{
+			surface.data.resize(surface.size);
+		}
+		memcpy(surface.data.data(), cache->data, surface.size);
+		surface.count = 0;
 	}
-	memcpy(surface.data.data(), cache->data, surface.size);
+	auto texinfo = face->texinfo;
 	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
@@ -174,17 +204,20 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		edgeindex++;
 	}
 	auto is_index16 = (next_back < 65520);
-	if (is_index16)
+	if (is_new)
 	{
-		surface.first_index16 = d_lists.last_textured_index16 + 1;
-		surface.first_index32 = -1;
+		if (is_index16)
+		{
+			surface.first_index16 = d_lists.last_textured_index16 + 1;
+			surface.first_index32 = -1;
+		}
+		else
+		{
+			surface.first_index16 = -1;
+			surface.first_index32 = d_lists.last_textured_index32 + 1;
+		}
 	}
-	else
-	{
-		surface.first_index16 = -1;
-		surface.first_index32 = d_lists.last_textured_index32 + 1;
-	}
-	surface.count = (face->numedges - 2) * 3;
+	surface.count += (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
 	{
@@ -219,22 +252,41 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 
 void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 {
-	if (d_lists.last_sprite < 0 || d_lists.sprites[d_lists.last_sprite].frame != (void*)r_spritedesc.pspriteframe)
+	auto is_new = true;
+	if (d_lists.last_sprite >= 0)
+	{
+		auto& sprite = d_lists.sprites[d_lists.last_sprite];
+		if (sprite.frame == (void*)r_spritedesc.pspriteframe && sprite.frame_count == r_framecount)
+		{
+			if (sprite.first_index16 >= 0)
+			{
+				if (sprite.first_index16 + sprite.count == d_lists.last_textured_index16 + 1)
+				{
+					is_new = false;
+				}
+			}
+			else if (sprite.first_index32 >= 0)
+			{
+				if (sprite.first_index32 + sprite.count == d_lists.last_textured_index32 + 1)
+				{
+					is_new = false;
+				}
+			}
+		}
+	}
+	if (is_new)
 	{
 		d_lists.last_sprite++;
 		if (d_lists.last_sprite >= d_lists.sprites.size())
 		{
 			d_lists.sprites.emplace_back();
 		}
-		else
-		{
-			auto& sprite = d_lists.sprites[d_lists.last_sprite];
-			sprite.first_index16 = -1;
-			sprite.first_index32 = -1;
-			sprite.count = 0;
-		}
-		auto& sprite = d_lists.sprites[d_lists.last_sprite];
+	}
+	auto& sprite = d_lists.sprites[d_lists.last_sprite];
+	if (is_new)
+	{
 		sprite.frame = r_spritedesc.pspriteframe;
+		sprite.frame_count = r_framecount;
 		sprite.width = spritedesc->pspriteframe->width;
 		sprite.height = spritedesc->pspriteframe->height;
 		sprite.size = sprite.width * sprite.height;
@@ -243,11 +295,11 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 			sprite.data.resize(sprite.size);
 		}
 		memcpy(sprite.data.data(), &r_spritedesc.pspriteframe->pixels[0], sprite.size);
+		sprite.count = 0;
 	}
-	auto& sprite = d_lists.sprites[d_lists.last_sprite];
 	auto first_vertex = (d_lists.last_textured_vertex + 1) / 5;
 	auto is_index16 = (first_vertex + 4 <= 65520);
-	if (sprite.count == 0)
+	if (is_new)
 	{
 		if (is_index16)
 		{
@@ -346,17 +398,47 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 	}
 	auto texinfo = face->texinfo;
 	auto texture = texinfo->texture;
-	d_lists.last_turbulent++;
-	if (d_lists.last_turbulent >= d_lists.turbulent.size())
+	auto is_new = true;
+	if (d_lists.last_turbulent >= 0)
 	{
-		d_lists.turbulent.emplace_back();
+		auto& turbulent = d_lists.turbulent[d_lists.last_turbulent];
+		if (turbulent.texture == texture && turbulent.frame_count == r_framecount)
+		{
+			if (turbulent.first_index16 >= 0)
+			{
+				if (turbulent.first_index16 + turbulent.count == d_lists.last_textured_index16 + 1)
+				{
+					is_new = false;
+				}
+			}
+			else if (turbulent.first_index32 >= 0)
+			{
+				if (turbulent.first_index32 + turbulent.count == d_lists.last_textured_index32 + 1)
+				{
+					is_new = false;
+				}
+			}
+		}
+	}
+	if (is_new)
+	{
+		d_lists.last_turbulent++;
+		if (d_lists.last_turbulent >= d_lists.turbulent.size())
+		{
+			d_lists.turbulent.emplace_back();
+		}
 	}
 	auto& turbulent = d_lists.turbulent[d_lists.last_turbulent];
-	turbulent.texture = texture;
-	turbulent.width = texture->width;
-	turbulent.height = texture->height;
-	turbulent.size = turbulent.width * turbulent.height;
-	turbulent.data = (unsigned char*)texture + texture->offsets[0];
+	if (is_new)
+	{
+		turbulent.texture = texture;
+		turbulent.frame_count = r_framecount;
+		turbulent.width = texture->width;
+		turbulent.height = texture->height;
+		turbulent.size = turbulent.width * turbulent.height;
+		turbulent.data = (unsigned char*)texture + texture->offsets[0];
+		turbulent.count = 0;
+	}
 	auto next_front = (d_lists.last_textured_vertex + 1) / 5;
 	auto next_back = next_front + face->numedges - 1;
 	auto edgeindex = face->firstedge;
@@ -430,17 +512,20 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		edgeindex++;
 	}
 	auto is_index16 = (next_back < 65520);
-	if (is_index16)
+	if (is_new)
 	{
-		turbulent.first_index16 = d_lists.last_textured_index16 + 1;
-		turbulent.first_index32 = -1;
+		if (is_index16)
+		{
+			turbulent.first_index16 = d_lists.last_textured_index16 + 1;
+			turbulent.first_index32 = -1;
+		}
+		else
+		{
+			turbulent.first_index16 = -1;
+			turbulent.first_index32 = d_lists.last_textured_index32 + 1;
+		}
 	}
-	else
-	{
-		turbulent.first_index16 = -1;
-		turbulent.first_index32 = d_lists.last_textured_index32 + 1;
-	}
-	turbulent.count = (face->numedges - 2) * 3;
+	turbulent.count += (face->numedges - 2) * 3;
 	qboolean use_back = false;
 	for (auto i = 0; i < face->numedges - 2; i++)
 	{
@@ -480,29 +565,59 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 	{
 		return;
 	}
-	d_lists.last_alias++;
-	if (d_lists.last_alias >= d_lists.alias.size())
+	auto is_new = true;
+	if (d_lists.last_alias >= 0)
 	{
-		d_lists.alias.emplace_back();
+		auto& alias = d_lists.alias[d_lists.last_alias];
+		if (alias.model == mdl && alias.frame_count == r_framecount)
+		{
+			if (alias.first_index16 >= 0)
+			{
+				if (alias.first_index16 + alias.count == d_lists.last_colormapped_index16 + 1)
+				{
+					is_new = false;
+				}
+			}
+			else if (alias.first_index32 >= 0)
+			{
+				if (alias.first_index32 + alias.count == d_lists.last_colormapped_index32 + 1)
+				{
+					is_new = false;
+				}
+			}
+		}
+	}
+	if (is_new)
+	{
+		d_lists.last_alias++;
+		if (d_lists.last_alias >= d_lists.alias.size())
+		{
+			d_lists.alias.emplace_back();
+		}
 	}
 	auto& alias = d_lists.alias[d_lists.last_alias];
-	alias.model = mdl;
-	alias.width = mdl->skinwidth;
-	alias.height = mdl->skinheight;
-	alias.size = alias.width * alias.height;
-	alias.data = (byte *)aliashdr + skindesc->skin;
-	if (colormap == host_colormap.data())
+	if (is_new)
 	{
-		alias.is_host_colormap = true;
-	}
-	else
-	{
-		alias.is_host_colormap = false;
-		if (alias.colormap.size() < 16384)
+		alias.model = mdl;
+		alias.frame_count = r_framecount;
+		alias.width = mdl->skinwidth;
+		alias.height = mdl->skinheight;
+		alias.size = alias.width * alias.height;
+		alias.data = (byte *)aliashdr + skindesc->skin;
+		if (colormap == host_colormap.data())
 		{
-			alias.colormap.resize(16384);
+			alias.is_host_colormap = true;
 		}
-		memcpy(alias.colormap.data(), colormap, 16384);
+		else
+		{
+			alias.is_host_colormap = false;
+			if (alias.colormap.size() < 16384)
+			{
+				alias.colormap.resize(16384);
+			}
+			memcpy(alias.colormap.data(), colormap, 16384);
+		}
+		alias.count = 0;
 	}
 	vec3_t angles;
 	angles[ROLL] = currententity->angles[ROLL];
@@ -677,17 +792,20 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 		texcoords++;
 	}
 	auto is_index16 = (basevert + mdl->numverts <= 65520);
-	if (is_index16)
+	if (is_new)
 	{
-		alias.first_index16 = d_lists.last_colormapped_index16 + 1;
-		alias.first_index32 = -1;
+		if (is_index16)
+		{
+			alias.first_index16 = d_lists.last_colormapped_index16 + 1;
+			alias.first_index32 = -1;
+		}
+		else
+		{
+			alias.first_index16 = -1;
+			alias.first_index32 = d_lists.last_colormapped_index32 + 1;
+		}
 	}
-	else
-	{
-		alias.first_index16 = -1;
-		alias.first_index32 = d_lists.last_colormapped_index32 + 1;
-	}
-	alias.count = mdl->numtris * 3;
+	alias.count += mdl->numtris * 3;
 	auto triangle = (mtriangle_t *)((byte *)aliashdr + aliashdr->triangles);
 	for (auto i = 0; i < mdl->numtris; i++)
 	{
@@ -726,6 +844,7 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 	}
 	auto& view_model = d_lists.viewmodel[d_lists.last_viewmodel];
 	view_model.model = mdl;
+	view_model.frame_count = r_framecount;
 	view_model.width = mdl->skinwidth;
 	view_model.height = mdl->skinheight;
 	view_model.size = view_model.width * view_model.height;

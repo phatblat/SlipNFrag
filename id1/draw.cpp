@@ -396,47 +396,7 @@ Draw_Pic
 */
 void Draw_Pic (int x, int y, qpic_t *pic)
 {
-	byte			*dest, *source;
-	unsigned short	*pusdest;
-	int				v, u;
-
-	if ((x < 0) ||
-		(x + pic->width > vid.width) ||
-		(y < 0) ||
-		(y + pic->height > vid.height))
-	{
-        return;
-	}
-
-	source = pic->data;
-
-	if (r_pixbytes == 1)
-	{
-		dest = vid.buffer + y * vid.rowbytes + x;
-
-		for (v=0 ; v<pic->height ; v++)
-		{
-			Q_memcpy (dest, source, pic->width);
-			dest += vid.rowbytes;
-			source += pic->width;
-		}
-	}
-	else
-	{
-	// FIXME: pretranslate at load time?
-		pusdest = (unsigned short *)vid.buffer + y * (vid.rowbytes >> 1) + x;
-
-		for (v=0 ; v<pic->height ; v++)
-		{
-			for (u=0 ; u<pic->width ; u++)
-			{
-				pusdest[u] = d_8to16table[source[u]];
-			}
-
-			pusdest += vid.rowbytes >> 1;
-			source += pic->width;
-		}
-	}
+    Draw_TransPic (x, y, pic);
 }
 
 
@@ -447,47 +407,7 @@ void Draw_Pic (int x, int y, qpic_t *pic)
  */
 void Draw_PicOnConsole (int x, int y, qpic_t *pic)
 {
-    byte            *dest, *source;
-    unsigned short    *pusdest;
-    int                v, u;
-    
-    if ((x < 0) ||
-        (x + pic->width > vid.conwidth) ||
-        (y < 0) ||
-        (y + pic->height > vid.conheight))
-    {
-        return;
-    }
-    
-    source = pic->data;
-    
-    if (r_pixbytes == 1)
-    {
-        dest = vid.conbuffer + y * vid.conrowbytes + x;
-        
-        for (v=0 ; v<pic->height ; v++)
-        {
-            Q_memcpy (dest, source, pic->width);
-            dest += vid.conrowbytes;
-            source += pic->width;
-        }
-    }
-    else
-    {
-        // FIXME: pretranslate at load time?
-        pusdest = (unsigned short *)vid.conbuffer + y * (vid.conrowbytes >> 1) + x;
-        
-        for (v=0 ; v<pic->height ; v++)
-        {
-            for (u=0 ; u<pic->width ; u++)
-            {
-                pusdest[u] = d_8to16table[source[u]];
-            }
-            
-            pusdest += vid.conrowbytes >> 1;
-            source += pic->width;
-        }
-    }
+    Draw_TransPicOnConsole (x, y, pic);
 }
 
 
