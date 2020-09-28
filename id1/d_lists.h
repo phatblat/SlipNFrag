@@ -12,7 +12,11 @@ struct dsurface_t
 	std::vector<unsigned char> data;
 	int first_index16;
 	int first_index32;
+	int first_vertex;
 	int count;
+	float origin_x;
+	float origin_y;
+	float origin_z;
 };
 
 struct dspritedata_t
@@ -43,7 +47,6 @@ struct dturbulent_t
 
 struct dalias_t
 {
-	void* model;
 	int frame_count;
 	int width;
 	int height;
