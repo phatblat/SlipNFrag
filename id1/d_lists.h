@@ -4,14 +4,11 @@ struct dsurface_t
 {
 	void* surface;
 	void* entity;
-	int frame_count;
 	int created;
 	int width;
 	int height;
 	int size;
 	std::vector<unsigned char> data;
-	int first_index16;
-	int first_index32;
 	int first_vertex;
 	int count;
 	float origin_x;
@@ -22,27 +19,26 @@ struct dsurface_t
 struct dspritedata_t
 {
 	void* frame;
-	int frame_count;
 	int width;
 	int height;
 	int size;
 	std::vector<unsigned char> data;
-	int first_index16;
-	int first_index32;
+	int first_vertex;
 	int count;
 };
 
 struct dturbulent_t
 {
 	void* texture;
-	int frame_count;
 	int width;
 	int height;
 	int size;
 	unsigned char* data;
-	int first_index16;
-	int first_index32;
+	int first_vertex;
 	int count;
+	float origin_x;
+	float origin_y;
+	float origin_z;
 };
 
 struct dalias_t
