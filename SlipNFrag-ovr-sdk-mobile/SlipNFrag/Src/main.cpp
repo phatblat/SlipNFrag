@@ -3734,7 +3734,7 @@ void android_main(struct android_app *app)
 			appState.Scene.skyAttributes.vertexInputState.vertexAttributeDescriptionCount = appState.Scene.skyAttributes.vertexAttributes.size();
 			appState.Scene.skyAttributes.vertexInputState.pVertexAttributeDescriptions = appState.Scene.skyAttributes.vertexAttributes.data();
 			appState.Scene.skyAttributes.inputAssemblyState.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-			appState.Scene.skyAttributes.inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+			appState.Scene.skyAttributes.inputAssemblyState.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
 			appState.Scene.floorAttributes.vertexAttributes.resize(2);
 			appState.Scene.floorAttributes.vertexBindings.resize(2);
 			appState.Scene.floorAttributes.vertexAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -5653,31 +5653,10 @@ void android_main(struct android_app *app)
 					descriptorSets[0] = resources->palette.descriptorSet;
 					descriptorSets[1] = resources->sky.descriptorSet;
 					VC(appState.Device.vkCmdBindDescriptorSets(perImage.commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, appState.Scene.sky.pipelineLayout, 0, 2, descriptorSets, 0, nullptr));
-					if (indices16 != nullptr)
+					for (auto i = 0; i <= d_lists.last_sky; i++)
 					{
-						VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices16->buffer, noOffset, VK_INDEX_TYPE_UINT16));
-						for (auto i = 0; i <= d_lists.last_sky; i++)
-						{
-							auto& sky = d_lists.sky[i];
-							if (sky.first_index16 < 0)
-							{
-								continue;
-							}
-							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, sky.count, 1, sky.first_index16, 0, 0));
-						}
-					}
-					if (indices32 != nullptr)
-					{
-						VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices32->buffer, noOffset, VK_INDEX_TYPE_UINT32));
-						for (auto i = 0; i <= d_lists.last_sky; i++)
-						{
-							auto& sky = d_lists.sky[i];
-							if (sky.first_index32 < 0)
-							{
-								continue;
-							}
-							VC(appState.Device.vkCmdDrawIndexed(perImage.commandBuffer, sky.count, 1, sky.first_index32, 0, 0));
-						}
+						auto& sky = d_lists.sky[i];
+						VC(appState.Device.vkCmdDraw(perImage.commandBuffer, sky.count, 1, sky.first_vertex, 0));
 					}
 				}
 				if (appState.Mode != AppWorldMode)

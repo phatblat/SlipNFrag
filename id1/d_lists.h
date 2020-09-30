@@ -69,8 +69,7 @@ struct dsky_t
 	float left;
 	float right;
 	float bottom;
-	int first_index16;
-	int first_index32;
+	int first_vertex;
 	int count;
 };
 
