@@ -83,9 +83,9 @@ struct dlists_t
 	int last_particle;
 	int last_sky;
 	int last_textured_vertex;
-	int last_textured_index16;
-	int last_textured_index32;
+	int last_textured_attribute;
 	int last_colormapped_vertex;
+	int last_colormapped_attribute;
 	int last_colormapped_index16;
 	int last_colormapped_index32;
 	int last_colored_vertex;
@@ -100,9 +100,9 @@ struct dlists_t
 	std::vector<dparticle_t> particles;
 	std::vector<dsky_t> sky;
 	std::vector<float> textured_vertices;
-	std::vector<uint16_t> textured_indices16;
-	std::vector<uint32_t> textured_indices32;
+	std::vector<float> textured_attributes;
 	std::vector<float> colormapped_vertices;
+	std::vector<float> colormapped_attributes;
 	std::vector<uint16_t> colormapped_indices16;
 	std::vector<uint32_t> colormapped_indices32;
 	std::vector<float> colored_vertices;

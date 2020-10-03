@@ -38,15 +38,20 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		surface.data.resize(surface.size);
 	}
 	memcpy(surface.data.data(), cache->data, surface.size);
-	surface.first_vertex = (d_lists.last_textured_vertex + 1) / 5;
+	surface.first_vertex = (d_lists.last_textured_vertex + 1) / 3;
 	surface.count = face->numedges;
 	surface.origin_x = entity->origin[0];
 	surface.origin_y = entity->origin[1];
 	surface.origin_z = entity->origin[2];
-	auto new_size = d_lists.last_textured_vertex + 1 + 5 * face->numedges;
+	auto new_size = d_lists.last_textured_vertex + 1 + 3 * face->numedges;
 	if (d_lists.textured_vertices.size() < new_size)
 	{
 		d_lists.textured_vertices.resize(new_size);
+	}
+	new_size = d_lists.last_textured_attribute + 1 + 2 * face->numedges;
+	if (d_lists.textured_attributes.size() < new_size)
+	{
+		d_lists.textured_attributes.resize(new_size);
 	}
 	auto texinfo = face->texinfo;
 	auto edge = entity->model->surfedges[face->firstedge];
@@ -72,10 +77,10 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 	d_lists.last_textured_vertex++;
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	auto next_front = 0;
 	auto next_back = face->numedges;
 	auto use_back = false;
@@ -113,10 +118,10 @@ void D_AddSurfaceToLists (msurface_t* face, surfcache_t* cache, entity_t* entity
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 		d_lists.last_textured_vertex++;
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	}
 }
 
@@ -137,12 +142,17 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 		sprite.data.resize(sprite.size);
 	}
 	memcpy(sprite.data.data(), &r_spritedesc.pspriteframe->pixels[0], sprite.size);
-	sprite.first_vertex = (d_lists.last_textured_vertex + 1) / 5;
+	sprite.first_vertex = (d_lists.last_textured_vertex + 1) / 3;
 	sprite.count = 4;
-	auto new_size = d_lists.last_textured_vertex + 1 + 5 * 4;
+	auto new_size = d_lists.last_textured_vertex + 1 + 3 * 4;
 	if (d_lists.textured_vertices.size() < new_size)
 	{
 		d_lists.textured_vertices.resize(new_size);
+	}
+	new_size = d_lists.last_textured_attribute + 1 + 2 * 4;
+	if (d_lists.textured_attributes.size() < new_size)
+	{
+		d_lists.textured_attributes.resize(new_size);
 	}
 	auto x = pverts[0][0];
 	auto y = pverts[0][1];
@@ -155,10 +165,10 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 	d_lists.last_textured_vertex++;
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	x = pverts[1][0];
 	y = pverts[1][1];
 	z = pverts[1][2];
@@ -170,10 +180,10 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 	d_lists.last_textured_vertex++;
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	x = pverts[3][0];
 	y = pverts[3][1];
 	z = pverts[3][2];
@@ -185,10 +195,10 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 	d_lists.last_textured_vertex++;
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	x = pverts[2][0];
 	y = pverts[2][1];
 	z = pverts[2][2];
@@ -200,10 +210,10 @@ void D_AddSpriteToLists (vec5_t* pverts, spritedesc_t* spritedesc)
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 	d_lists.last_textured_vertex++;
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 }
 
 void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
@@ -225,15 +235,20 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 	turbulent.height = texture->height;
 	turbulent.size = turbulent.width * turbulent.height;
 	turbulent.data = (unsigned char*)texture + texture->offsets[0];
-	turbulent.first_vertex = (d_lists.last_textured_vertex + 1) / 5;
+	turbulent.first_vertex = (d_lists.last_textured_vertex + 1) / 3;
 	turbulent.count = face->numedges;
 	turbulent.origin_x = entity->origin[0];
 	turbulent.origin_y = entity->origin[1];
 	turbulent.origin_z = entity->origin[2];
-	auto new_size = d_lists.last_textured_vertex + 1 + 5 * face->numedges;
+	auto new_size = d_lists.last_textured_vertex + 1 + 3 * face->numedges;
 	if (d_lists.textured_vertices.size() < new_size)
 	{
 		d_lists.textured_vertices.resize(new_size);
+	}
+	new_size = d_lists.last_textured_attribute + 1 + 2 * face->numedges;
+	if (d_lists.textured_attributes.size() < new_size)
+	{
+		d_lists.textured_attributes.resize(new_size);
 	}
 	auto edge = entity->model->surfedges[face->firstedge];
 	mvertex_t* vertex;
@@ -258,10 +273,10 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 	d_lists.last_textured_vertex++;
 	d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-	d_lists.last_textured_vertex++;
-	d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+	d_lists.last_textured_attribute++;
+	d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	auto next_front = 0;
 	auto next_back = face->numedges;
 	auto use_back = false;
@@ -299,10 +314,10 @@ void D_AddTurbulentToLists (msurface_t* face, entity_t* entity)
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 		d_lists.last_textured_vertex++;
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	}
 }
 
@@ -313,9 +328,9 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 	{
 		return;
 	}
-	auto basevert = (d_lists.last_colormapped_vertex + 1) / 6;
+	auto base_vertex = (d_lists.last_colormapped_vertex + 1) / 3;
 	auto skin_start = (byte *)aliashdr + skindesc->skin;
-	auto is_index16 = (basevert + mdl->numverts * 2 <= 65520);
+	auto is_index16 = (base_vertex + mdl->numverts * 2 <= 65520);
 	auto is_new = true;
 	if (d_lists.last_alias >= 0)
 	{
@@ -379,10 +394,15 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 			alias.first_index32 = d_lists.last_colormapped_index32 + 1;
 		}
 	}
-	auto new_size = d_lists.last_colormapped_vertex + 1 + 2 * 6 * mdl->numverts;
+	auto new_size = d_lists.last_colormapped_vertex + 1 + 2 * 3 * mdl->numverts;
 	if (d_lists.colormapped_vertices.size() < new_size)
 	{
 		d_lists.colormapped_vertices.resize(new_size);
+	}
+	new_size = d_lists.last_colormapped_attribute + 1 + 2 * 3 * mdl->numverts;
+	if (d_lists.colormapped_attributes.size() < new_size)
+	{
+		d_lists.colormapped_attributes.resize(new_size);
 	}
 	vec3_t angles;
 	angles[ROLL] = currententity->angles[ROLL];
@@ -450,24 +470,24 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = z;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = -y;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = s;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = t;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = light;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = s;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = t;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = light;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = x;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = z;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = -y;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = s + 0.5;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = t;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = light;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = s + 0.5;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = t;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = light;
 		vertex++;
 		texcoords++;
 	}
@@ -488,9 +508,9 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 			auto v0back = (((texcoordsbase[v0].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v1back = (((texcoordsbase[v1].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v2back = (((texcoordsbase[v2].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
-			v0 = basevert + v0 * 2 + (v0back ? 1 : 0);
-			v1 = basevert + v1 * 2 + (v1back ? 1 : 0);
-			v2 = basevert + v2 * 2 + (v2back ? 1 : 0);
+			v0 = base_vertex + v0 * 2 + (v0back ? 1 : 0);
+			v1 = base_vertex + v1 * 2 + (v1back ? 1 : 0);
+			v2 = base_vertex + v2 * 2 + (v2back ? 1 : 0);
 			d_lists.last_colormapped_index16++;
 			d_lists.colormapped_indices16[d_lists.last_colormapped_index16] = v0;
 			d_lists.last_colormapped_index16++;
@@ -515,9 +535,9 @@ void D_AddAliasToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, byte* 
 			auto v0back = (((texcoordsbase[v0].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v1back = (((texcoordsbase[v1].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v2back = (((texcoordsbase[v2].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
-			v0 = basevert + v0 * 2 + (v0back ? 1 : 0);
-			v1 = basevert + v1 * 2 + (v1back ? 1 : 0);
-			v2 = basevert + v2 * 2 + (v2back ? 1 : 0);
+			v0 = base_vertex + v0 * 2 + (v0back ? 1 : 0);
+			v1 = base_vertex + v1 * 2 + (v1back ? 1 : 0);
+			v2 = base_vertex + v2 * 2 + (v2back ? 1 : 0);
 			d_lists.last_colormapped_index32++;
 			d_lists.colormapped_indices32[d_lists.last_colormapped_index32] = v0;
 			d_lists.last_colormapped_index32++;
@@ -560,10 +580,15 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 		}
 		memcpy(view_model.colormap.data(), colormap, 16384);
 	}
-	auto new_size = d_lists.last_colormapped_vertex + 1 + 2 * 6 * mdl->numverts;
+	auto new_size = d_lists.last_colormapped_vertex + 1 + 2 * 3 * mdl->numverts;
 	if (d_lists.colormapped_vertices.size() < new_size)
 	{
 		d_lists.colormapped_vertices.resize(new_size);
+	}
+	new_size = d_lists.last_colormapped_attribute + 1 + 2 * 3 * mdl->numverts;
+	if (d_lists.colormapped_attributes.size() < new_size)
+	{
+		d_lists.colormapped_attributes.resize(new_size);
 	}
 	vec3_t angles;
 	if (d_awayfromviewmodel)
@@ -608,7 +633,7 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 	auto vertex = vertices;
 	auto texcoordsbase = (stvert_t *)((byte *)aliashdr + aliashdr->stverts);
 	auto texcoords = texcoordsbase;
-	auto basevert = (d_lists.last_colormapped_vertex + 1) / 6;
+	auto base_vertex = (d_lists.last_colormapped_vertex + 1) / 3;
 	for (auto i = 0; i < mdl->numverts; i++)
 	{
 		vec3_t pos { (float)vertex->v[0], (float)vertex->v[1], (float)vertex->v[2] };
@@ -655,28 +680,28 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = z;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = -y;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = s;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = t;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = light;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = s;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = t;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = light;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = x;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = z;
 		d_lists.last_colormapped_vertex++;
 		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = -y;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = s + 0.5;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = t;
-		d_lists.last_colormapped_vertex++;
-		d_lists.colormapped_vertices[d_lists.last_colormapped_vertex] = light;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = s + 0.5;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = t;
+		d_lists.last_colormapped_attribute++;
+		d_lists.colormapped_attributes[d_lists.last_colormapped_attribute] = light;
 		vertex++;
 		texcoords++;
 	}
-	auto is_index16 = (basevert + mdl->numverts * 2 <= 65520);
+	auto is_index16 = (base_vertex + mdl->numverts * 2 <= 65520);
 	if (is_index16)
 	{
 		view_model.first_index16 = d_lists.last_colormapped_index16 + 1;
@@ -704,9 +729,9 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 			auto v0back = (((texcoordsbase[v0].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v1back = (((texcoordsbase[v1].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v2back = (((texcoordsbase[v2].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
-			v0 = basevert + v0 * 2 + (v0back ? 1 : 0);
-			v1 = basevert + v1 * 2 + (v1back ? 1 : 0);
-			v2 = basevert + v2 * 2 + (v2back ? 1 : 0);
+			v0 = base_vertex + v0 * 2 + (v0back ? 1 : 0);
+			v1 = base_vertex + v1 * 2 + (v1back ? 1 : 0);
+			v2 = base_vertex + v2 * 2 + (v2back ? 1 : 0);
 			d_lists.last_colormapped_index16++;
 			d_lists.colormapped_indices16[d_lists.last_colormapped_index16] = v0;
 			d_lists.last_colormapped_index16++;
@@ -731,9 +756,9 @@ void D_AddViewModelToLists (aliashdr_t* aliashdr, maliasskindesc_t* skindesc, by
 			auto v0back = (((texcoordsbase[v0].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v1back = (((texcoordsbase[v1].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
 			auto v2back = (((texcoordsbase[v2].onseam & ALIAS_ONSEAM) == ALIAS_ONSEAM) && triangle->facesfront == 0);
-			v0 = basevert + v0 * 2 + (v0back ? 1 : 0);
-			v1 = basevert + v1 * 2 + (v1back ? 1 : 0);
-			v2 = basevert + v2 * 2 + (v2back ? 1 : 0);
+			v0 = base_vertex + v0 * 2 + (v0back ? 1 : 0);
+			v1 = base_vertex + v1 * 2 + (v1back ? 1 : 0);
+			v2 = base_vertex + v2 * 2 + (v2back ? 1 : 0);
 			d_lists.last_colormapped_index32++;
 			d_lists.colormapped_indices32[d_lists.last_colormapped_index32] = v0;
 			d_lists.last_colormapped_index32++;
@@ -749,35 +774,51 @@ void D_AddParticleToLists (particle_t* part)
 {
 	auto first_vertex = (d_lists.last_colored_vertex + 1) / 3;
 	auto is_index16 = (first_vertex + 4 <= 65520);
-	dparticle_t* particle;
-	if (d_lists.last_particle >= 0 && d_lists.particles[d_lists.last_particle].color == part->color && ((is_index16 && (d_lists.particles[d_lists.last_particle].first_index16 >= 0)) || (!is_index16 && (d_lists.particles[d_lists.last_particle].first_index32 >= 0))))
+	auto is_new = true;
+	if (d_lists.last_particle >= 0)
 	{
-		particle = d_lists.particles.data() + d_lists.last_particle;
+		auto& particle = d_lists.particles[d_lists.last_particle];
+		if (particle.color == part->color)
+		{
+			if (particle.first_index16 >= 0)
+			{
+				if (is_index16 && particle.first_index16 + particle.count == d_lists.last_colored_index16 + 1)
+				{
+					is_new = false;
+				}
+			}
+			else if (particle.first_index32 >= 0)
+			{
+				if (!is_index16 && particle.first_index32 + particle.count == d_lists.last_colored_index32 + 1)
+				{
+					is_new = false;
+				}
+			}
+		}
 	}
-	else
+	if (is_new)
 	{
 		d_lists.last_particle++;
 		if (d_lists.last_particle >= d_lists.particles.size())
 		{
 			d_lists.particles.emplace_back();
-			particle = d_lists.particles.data() + d_lists.last_particle;
 		}
-		else
-		{
-			particle = d_lists.particles.data() + d_lists.last_particle;
-			particle->count = 0;
-		}
+	}
+	auto& particle = d_lists.particles[d_lists.last_particle];
+	if (is_new)
+	{
+		particle.color = part->color;
+		particle.count = 0;
 		if (is_index16)
 		{
-			particle->first_index16 = d_lists.last_colored_index16 + 1;
-			particle->first_index32 = -1;
+			particle.first_index16 = d_lists.last_colored_index16 + 1;
+			particle.first_index32 = -1;
 		}
 		else
 		{
-			particle->first_index16 = -1;
-			particle->first_index32 = d_lists.last_colored_index32 + 1;
+			particle.first_index16 = -1;
+			particle.first_index32 = d_lists.last_colored_index32 + 1;
 		}
-		particle->color = part->color;
 	}
 	auto new_size = d_lists.last_colored_vertex + 1 + 3 * 4;
 	if (d_lists.colored_vertices.size() < new_size)
@@ -820,7 +861,7 @@ void D_AddParticleToLists (particle_t* part)
 	d_lists.colored_vertices[d_lists.last_colored_vertex] = z;
 	d_lists.last_colored_vertex++;
 	d_lists.colored_vertices[d_lists.last_colored_vertex] = -y;
-	particle->count += 6;
+	particle.count += 6;
 	if (is_index16)
 	{
 		new_size = d_lists.last_colored_index16 + 1 + 6;
@@ -925,12 +966,17 @@ void D_AddSkyToLists (surf_t* surf)
 		sky.right = (float)right / (float)vid.width;
 		sky.top = (float)top / (float)vid.height;
 		sky.bottom = (float)bottom / (float)vid.height;
-		sky.first_vertex = (d_lists.last_textured_vertex + 1) / 5;
+		sky.first_vertex = (d_lists.last_textured_vertex + 1) / 3;
 		sky.count = 4;
-		auto new_size = d_lists.last_textured_vertex + 1 + 5 * 4;
+		auto new_size = d_lists.last_textured_vertex + 1 + 3 * 4;
 		if (d_lists.textured_vertices.size() < new_size)
 		{
 			d_lists.textured_vertices.resize(new_size);
+		}
+		new_size = d_lists.last_textured_attribute + 1 + 2 * 4;
+		if (d_lists.textured_attributes.size() < new_size)
+		{
+			d_lists.textured_attributes.resize(new_size);
 		}
 		float x = sky.left * 2 - 1;
 		float y = 1;
@@ -943,10 +989,10 @@ void D_AddSkyToLists (surf_t* surf)
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 		d_lists.last_textured_vertex++;
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 		x = sky.right * 2 - 1;
 		s = sky.right;
 		d_lists.last_textured_vertex++;
@@ -955,10 +1001,10 @@ void D_AddSkyToLists (surf_t* surf)
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 		d_lists.last_textured_vertex++;
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 		x = sky.left * 2 - 1;
 		z = 1 - sky.bottom * 2;
 		s = sky.left;
@@ -969,10 +1015,10 @@ void D_AddSkyToLists (surf_t* surf)
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 		d_lists.last_textured_vertex++;
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 		x = sky.right * 2 - 1;
 		s = sky.right;
 		d_lists.last_textured_vertex++;
@@ -981,10 +1027,10 @@ void D_AddSkyToLists (surf_t* surf)
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = z;
 		d_lists.last_textured_vertex++;
 		d_lists.textured_vertices[d_lists.last_textured_vertex] = -y;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = s;
-		d_lists.last_textured_vertex++;
-		d_lists.textured_vertices[d_lists.last_textured_vertex] = t;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = s;
+		d_lists.last_textured_attribute++;
+		d_lists.textured_attributes[d_lists.last_textured_attribute] = t;
 	}
 	else
 	{
@@ -992,58 +1038,58 @@ void D_AddSkyToLists (surf_t* surf)
 		sky.right = std::max(sky.right, (float)right / (float)vid.width);
 		sky.top = std::min(sky.top, (float)top / (float)vid.height);
 		sky.bottom = std::max(sky.bottom, (float)bottom / (float)vid.height);
-		auto position = sky.first_vertex * 5;
+		auto vertex = sky.first_vertex * 3;
+		auto attribute = sky.first_vertex * 2;
 		float x = sky.left * 2 - 1;
 		float y = 1;
 		float z = 1 - sky.top * 2;
 		float s = sky.left;
 		float t = sky.top;
-		d_lists.textured_vertices[position] = x;
-		position++;
-		d_lists.textured_vertices[position] = z;
-		position++;
-		d_lists.textured_vertices[position] = -y;
-		position++;
-		d_lists.textured_vertices[position] = s;
-		position++;
-		d_lists.textured_vertices[position] = t;
-		position++;
+		d_lists.textured_vertices[vertex] = x;
+		vertex++;
+		d_lists.textured_vertices[vertex] = z;
+		vertex++;
+		d_lists.textured_vertices[vertex] = -y;
+		vertex++;
+		d_lists.textured_attributes[attribute] = s;
+		attribute++;
+		d_lists.textured_attributes[attribute] = t;
+		attribute++;
 		x = sky.right * 2 - 1;
 		s = sky.right;
-		d_lists.textured_vertices[position] = x;
-		position++;
-		d_lists.textured_vertices[position] = z;
-		position++;
-		d_lists.textured_vertices[position] = -y;
-		position++;
-		d_lists.textured_vertices[position] = s;
-		position++;
-		d_lists.textured_vertices[position] = t;
-		position++;
+		d_lists.textured_vertices[vertex] = x;
+		vertex++;
+		d_lists.textured_vertices[vertex] = z;
+		vertex++;
+		d_lists.textured_vertices[vertex] = -y;
+		vertex++;
+		d_lists.textured_attributes[attribute] = s;
+		attribute++;
+		d_lists.textured_attributes[attribute] = t;
+		attribute++;
 		x = sky.left * 2 - 1;
 		z = 1 - sky.bottom * 2;
 		s = sky.left;
 		t = sky.bottom;
-		d_lists.textured_vertices[position] = x;
-		position++;
-		d_lists.textured_vertices[position] = z;
-		position++;
-		d_lists.textured_vertices[position] = -y;
-		position++;
-		d_lists.textured_vertices[position] = s;
-		position++;
-		d_lists.textured_vertices[position] = t;
-		position++;
+		d_lists.textured_vertices[vertex] = x;
+		vertex++;
+		d_lists.textured_vertices[vertex] = z;
+		vertex++;
+		d_lists.textured_vertices[vertex] = -y;
+		vertex++;
+		d_lists.textured_attributes[attribute] = s;
+		attribute++;
+		d_lists.textured_attributes[attribute] = t;
+		attribute++;
 		x = sky.right * 2 - 1;
 		s = sky.right;
-		d_lists.textured_vertices[position] = x;
-		position++;
-		d_lists.textured_vertices[position] = z;
-		position++;
-		d_lists.textured_vertices[position] = -y;
-		position++;
-		d_lists.textured_vertices[position] = s;
-		position++;
-		d_lists.textured_vertices[position] = t;
+		d_lists.textured_vertices[vertex] = x;
+		vertex++;
+		d_lists.textured_vertices[vertex] = z;
+		vertex++;
+		d_lists.textured_vertices[vertex] = -y;
+		d_lists.textured_attributes[attribute] = s;
+		attribute++;
+		d_lists.textured_attributes[attribute] = t;
 	}
 }
