@@ -49,6 +49,9 @@ struct dalias_t
 	unsigned char* data;
 	std::vector<unsigned char> colormap;
 	qboolean is_host_colormap;
+	trivertx_t* vertices;
+	int vertex_count;
+	int first_attribute;
 	int first_index16;
 	int first_index32;
 	int count;
