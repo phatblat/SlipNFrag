@@ -43,7 +43,6 @@ struct dturbulent_t
 
 struct dalias_t
 {
-	int frame_count;
 	int width;
 	int height;
 	int size;
@@ -53,6 +52,7 @@ struct dalias_t
 	int first_index16;
 	int first_index32;
 	int count;
+	float transform[3][4];
 };
 
 struct dparticle_t

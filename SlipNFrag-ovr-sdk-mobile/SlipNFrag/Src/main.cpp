@@ -3807,7 +3807,7 @@ void android_main(struct android_app *app)
 			pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts;
 			VkPushConstantRange pushConstantInfo { };
 			pushConstantInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			pushConstantInfo.size = 4 * sizeof(float);
+			pushConstantInfo.size = 3 * sizeof(float);
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantInfo;
 			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.textured.pipelineLayout));
@@ -3837,6 +3837,8 @@ void android_main(struct android_app *app)
 			appState.Scene.sprites.stages[1].module = appState.Scene.spritesFragment;
 			appState.Scene.sprites.stages[1].pName = "main";
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.sprites.descriptorSetLayout));
+			pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+			pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 			descriptorSetLayouts[1] = appState.Scene.sprites.descriptorSetLayout;
 			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.sprites.pipelineLayout));
 			graphicsPipelineCreateInfo.stageCount = appState.Scene.sprites.stages.size();
@@ -3853,7 +3855,7 @@ void android_main(struct android_app *app)
 			appState.Scene.turbulent.stages[1].module = appState.Scene.turbulentFragment;
 			appState.Scene.turbulent.stages[1].pName = "main";
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.turbulent.descriptorSetLayout));
-			pushConstantInfo.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			pushConstantInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 			pushConstantInfo.size = 4 * sizeof(float);
 			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantInfo;
@@ -3883,8 +3885,10 @@ void android_main(struct android_app *app)
 			descriptorSetBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			descriptorSetLayoutCreateInfo.bindingCount = 3;
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.alias.descriptorSetLayout));
-			pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-			pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+			pushConstantInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+			pushConstantInfo.size = 16 * sizeof(float);
+			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantInfo;
 			descriptorSetLayouts[1] = appState.Scene.alias.descriptorSetLayout;
 			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.alias.pipelineLayout));
 			graphicsPipelineCreateInfo.stageCount = appState.Scene.alias.stages.size();
@@ -3903,10 +3907,8 @@ void android_main(struct android_app *app)
 			appState.Scene.viewmodel.stages[1].module = appState.Scene.viewmodelFragment;
 			appState.Scene.viewmodel.stages[1].pName = "main";
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.viewmodel.descriptorSetLayout));
-			pushConstantInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-			pushConstantInfo.size = 8 * sizeof(float);
-			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantInfo;
+			pushConstantInfo.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+			pushConstantInfo.size = 24 * sizeof(float);
 			descriptorSetLayouts[1] = appState.Scene.viewmodel.descriptorSetLayout;
 			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.viewmodel.pipelineLayout));
 			graphicsPipelineCreateInfo.stageCount = appState.Scene.viewmodel.stages.size();
@@ -3929,8 +3931,6 @@ void android_main(struct android_app *app)
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.colored.descriptorSetLayout));
 			pushConstantInfo.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 			pushConstantInfo.size = sizeof(float);
-			pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-			pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantInfo;
 			descriptorSetLayouts[1] = appState.Scene.colored.descriptorSetLayout;
 			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.colored.pipelineLayout));
 			graphicsPipelineCreateInfo.stageCount = appState.Scene.colored.stages.size();
@@ -3988,8 +3988,6 @@ void android_main(struct android_app *app)
 			VK(appState.Device.vkCreateDescriptorSetLayout(appState.Device.device, &descriptorSetLayoutCreateInfo, nullptr, &appState.Scene.floor.descriptorSetLayout));
 			pipelineLayoutCreateInfo.setLayoutCount = 1;
 			pipelineLayoutCreateInfo.pSetLayouts = &appState.Scene.floor.descriptorSetLayout;
-			pipelineLayoutCreateInfo.pushConstantRangeCount = 0;
-			pipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 			VK(appState.Device.vkCreatePipelineLayout(appState.Device.device, &pipelineLayoutCreateInfo, nullptr, &appState.Scene.floor.pipelineLayout));
 			graphicsPipelineCreateInfo.stageCount = appState.Scene.floor.stages.size();
 			graphicsPipelineCreateInfo.pStages = appState.Scene.floor.stages.data();
@@ -5452,6 +5450,24 @@ void android_main(struct android_app *app)
 									{
 										continue;
 									}
+									float transforms[16];
+									transforms[0] = alias.transform[0][0];
+									transforms[1] = alias.transform[2][0];
+									transforms[2] = -alias.transform[1][0];
+									transforms[3] = 0;
+									transforms[4] = alias.transform[0][2];
+									transforms[5] = alias.transform[2][2];
+									transforms[6] = -alias.transform[1][2];
+									transforms[7] = 0;
+									transforms[8] = -alias.transform[0][1];
+									transforms[9] = -alias.transform[2][1];
+									transforms[10] = alias.transform[1][1];
+									transforms[11] = 0;
+									transforms[12] = alias.transform[0][3];
+									transforms[13] = alias.transform[2][3];
+									transforms[14] = -alias.transform[1][3];
+									transforms[15] = 1;
+									VC(appState.Device.vkCmdPushConstants(perImage.commandBuffer, appState.Scene.alias.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 16 * sizeof(float), &transforms));
 									auto texture = perImage.aliasPerKey.find(alias.data)->second;
 									auto colormap = perImage.aliasColormapList[i];
 									textureInfo[0].sampler = texture->sampler;
@@ -5481,6 +5497,24 @@ void android_main(struct android_app *app)
 									{
 										continue;
 									}
+									float transforms[16];
+									transforms[0] = alias.transform[0][0];
+									transforms[1] = alias.transform[2][0];
+									transforms[2] = -alias.transform[1][0];
+									transforms[3] = 0;
+									transforms[4] = alias.transform[0][2];
+									transforms[5] = alias.transform[2][2];
+									transforms[6] = -alias.transform[1][2];
+									transforms[7] = 0;
+									transforms[8] = -alias.transform[0][1];
+									transforms[9] = -alias.transform[2][1];
+									transforms[10] = alias.transform[1][1];
+									transforms[11] = 0;
+									transforms[12] = alias.transform[0][3];
+									transforms[13] = alias.transform[2][3];
+									transforms[14] = -alias.transform[1][3];
+									transforms[15] = 1;
+									VC(appState.Device.vkCmdPushConstants(perImage.commandBuffer, appState.Scene.alias.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 16 * sizeof(float), &transforms));
 									auto texture = perImage.aliasPerKey.find(alias.data)->second;
 									auto colormap = perImage.aliasColormapList[i];
 									textureInfo[0].sampler = texture->sampler;
@@ -5519,30 +5553,29 @@ void android_main(struct android_app *app)
 							writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 							writes[0].pBufferInfo = bufferInfo;
 							VC(appState.Device.vkUpdateDescriptorSets(appState.Device.device, 1, writes, 0, nullptr));
-							float forwardAndTint[8];
+							float transformsPlusTint[24];
 							if (appState.NearViewModel)
 							{
-								forwardAndTint[0] = vpn[0] / scale;
-								forwardAndTint[1] = vpn[2] / scale;
-								forwardAndTint[2] = -vpn[1] / scale;
-								forwardAndTint[3] = 0;
-								forwardAndTint[4] = 1;
-								forwardAndTint[5] = 1;
-								forwardAndTint[6] = 1;
-								forwardAndTint[7] = 1;
+								transformsPlusTint[16] = vpn[0] / scale;
+								transformsPlusTint[17] = vpn[2] / scale;
+								transformsPlusTint[18] = -vpn[1] / scale;
+								transformsPlusTint[19] = 0;
+								transformsPlusTint[20] = 1;
+								transformsPlusTint[21] = 1;
+								transformsPlusTint[22] = 1;
+								transformsPlusTint[23] = 1;
 							}
 							else
 							{
-								forwardAndTint[0] = 1 / scale;
-								forwardAndTint[1] = 0;
-								forwardAndTint[2] = 0;
-								forwardAndTint[3] = 8;
-								forwardAndTint[4] = 1;
-								forwardAndTint[5] = 0;
-								forwardAndTint[6] = 0;
-								forwardAndTint[7] = 0.7 + 0.3 * sin(cl.time * M_PI);
+								transformsPlusTint[16] = 1 / scale;
+								transformsPlusTint[17] = 0;
+								transformsPlusTint[18] = 0;
+								transformsPlusTint[19] = 8;
+								transformsPlusTint[20] = 1;
+								transformsPlusTint[21] = 0;
+								transformsPlusTint[22] = 0;
+								transformsPlusTint[23] = 0.7 + 0.3 * sin(cl.time * M_PI);
 							}
-							VC(appState.Device.vkCmdPushConstants(perImage.commandBuffer, appState.Scene.viewmodel.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 8 * sizeof(float), &forwardAndTint));
 							if (indices16 != nullptr)
 							{
 								VC(appState.Device.vkCmdBindIndexBuffer(perImage.commandBuffer, indices16->buffer, perImage.colormappedIndex16Base, VK_INDEX_TYPE_UINT16));
@@ -5553,6 +5586,23 @@ void android_main(struct android_app *app)
 									{
 										continue;
 									}
+									transformsPlusTint[0] = viewmodel.transform[0][0];
+									transformsPlusTint[1] = viewmodel.transform[2][0];
+									transformsPlusTint[2] = -viewmodel.transform[1][0];
+									transformsPlusTint[3] = 0;
+									transformsPlusTint[4] = viewmodel.transform[0][2];
+									transformsPlusTint[5] = viewmodel.transform[2][2];
+									transformsPlusTint[6] = -viewmodel.transform[1][2];
+									transformsPlusTint[7] = 0;
+									transformsPlusTint[8] = -viewmodel.transform[0][1];
+									transformsPlusTint[9] = -viewmodel.transform[2][1];
+									transformsPlusTint[10] = viewmodel.transform[1][1];
+									transformsPlusTint[11] = 0;
+									transformsPlusTint[12] = viewmodel.transform[0][3];
+									transformsPlusTint[13] = viewmodel.transform[2][3];
+									transformsPlusTint[14] = -viewmodel.transform[1][3];
+									transformsPlusTint[15] = 1;
+									VC(appState.Device.vkCmdPushConstants(perImage.commandBuffer, appState.Scene.viewmodel.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 24 * sizeof(float), &transformsPlusTint));
 									auto texture = perImage.viewmodelsPerKey.find(viewmodel.data)->second;
 									auto colormap = perImage.viewmodelColormapList[i];
 									textureInfo[0].sampler = texture->sampler;
@@ -5582,6 +5632,23 @@ void android_main(struct android_app *app)
 									{
 										continue;
 									}
+									transformsPlusTint[0] = viewmodel.transform[0][0];
+									transformsPlusTint[1] = viewmodel.transform[2][0];
+									transformsPlusTint[2] = -viewmodel.transform[1][0];
+									transformsPlusTint[3] = 0;
+									transformsPlusTint[4] = viewmodel.transform[0][2];
+									transformsPlusTint[5] = viewmodel.transform[2][2];
+									transformsPlusTint[6] = -viewmodel.transform[1][2];
+									transformsPlusTint[7] = 0;
+									transformsPlusTint[8] = -viewmodel.transform[0][1];
+									transformsPlusTint[9] = -viewmodel.transform[2][1];
+									transformsPlusTint[10] = viewmodel.transform[1][1];
+									transformsPlusTint[11] = 0;
+									transformsPlusTint[12] = viewmodel.transform[0][3];
+									transformsPlusTint[13] = viewmodel.transform[2][3];
+									transformsPlusTint[14] = -viewmodel.transform[1][3];
+									transformsPlusTint[15] = 1;
+									VC(appState.Device.vkCmdPushConstants(perImage.commandBuffer, appState.Scene.viewmodel.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, 24 * sizeof(float), &transformsPlusTint));
 									auto texture = perImage.viewmodelsPerKey.find(viewmodel.data)->second;
 									auto colormap = perImage.viewmodelColormapList[i];
 									textureInfo[0].sampler = texture->sampler;

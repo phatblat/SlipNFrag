@@ -10,12 +10,13 @@ layout(set = 1, binding = 0) uniform SceneMatrices
 	layout(offset = 128) mat4 ProjectionMatrix[2];
 };
 
-layout(push_constant) uniform Forward
+layout(push_constant) uniform Transforms
 {
-	layout(offset = 0) float forwardX;
-	layout(offset = 4) float forwardY;
-	layout(offset = 8) float forwardZ;
-	layout(offset = 12) float offset;
+	layout(offset = 0) mat4 aliasTransform;
+	layout(offset = 64) float forwardX;
+	layout(offset = 68) float forwardY;
+	layout(offset = 72) float forwardZ;
+	layout(offset = 76) float offset;
 };
 
 layout(location = 0) in vec3 vertexPosition;
@@ -33,7 +34,7 @@ out gl_PerVertex
 
 void main(void)
 {
-	vec4 position = vertexTransform * vec4(vertexPosition, 1);
+	vec4 position = vertexTransform * (aliasTransform * vec4(vertexPosition, 1));
 	gl_Position = ProjectionMatrix[gl_ViewID_OVR] * (ViewMatrix[gl_ViewID_OVR] * position);
 	fragmentTexCoords = vertexTexCoords;
 	fragmentLight = vertexLight;
